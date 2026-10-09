@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TrustShare Wireframes</title>
+<style>
+  :root{--ink:#1f2937;--mute:#6b7280;--line:#c7cdd6;--fill:#eef1f5;--soft:#f7f8fa;--accent:#2563eb;--bad:#dc2626;--ok:#16a34a}
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:#fff}
+  header.top{padding:28px 24px 8px;max-width:1200px;margin:auto}
+  header.top h1{margin:0 0 4px;font-size:24px}
+  header.top p{margin:0;color:var(--mute)}
+  nav.toc{max-width:1200px;margin:12px auto 0;padding:0 24px;display:flex;flex-wrap:wrap;gap:8px}
+  nav.toc a{font-size:13px;color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+  main{max-width:1200px;margin:auto;padding:8px 24px 60px}
+  section.screen{margin-top:36px}
+  section.screen h2{font-size:17px;margin:0 0 2px}
+  section.screen .note{color:var(--mute);margin:0 0 10px;font-size:13px}
+  .frame{border:2px solid var(--ink);border-radius:10px;background:var(--soft);overflow:hidden}
+  .bar{height:26px;border-bottom:2px solid var(--ink);background:#fff;display:flex;align-items:center;gap:6px;padding:0 10px}
+  .bar i{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--ink);display:inline-block}
+  .bar span{margin-left:10px;font-size:11px;color:var(--mute)}
+  .center{display:flex;justify-content:center;padding:36px 12px}
+  .card{background:#fff;border:1.5px solid var(--ink);border-radius:10px;padding:22px;width:360px;max-width:100%}
+  .card h3{margin:0 0 4px;font-size:19px}
+  .logo{font-weight:700;letter-spacing:.2px;display:flex;align-items:center;gap:6px}
+  .logo b{width:18px;height:18px;border:2px solid var(--ink);border-radius:5px;display:inline-block}
+  .sub{color:var(--mute);margin:0 0 14px;font-size:13px}
+  label{display:block;font-size:12px;margin:10px 0 4px;color:var(--mute)}
+  .in{height:34px;border:1.5px solid var(--line);border-radius:6px;background:#fff;display:flex;align-items:center;padding:0 10px;color:#9aa3af;font-size:13px}
+  .btn{height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:600;margin-top:14px;border:1.5px solid var(--ink)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.sm{height:30px;margin:0;padding:0 12px;font-size:12px;display:inline-flex}
+  .row{display:flex;gap:10px;align-items:center}
+  .between{justify-content:space-between}
+  .link{color:var(--accent);font-size:12px}
+  .muted{color:var(--mute);font-size:12px}
+  .or{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:12px;margin:14px 0 0}
+  .or:before,.or:after{content:"";flex:1;border-top:1px solid var(--line)}
+  .meter{height:6px;background:var(--fill);border-radius:3px;overflow:hidden}
+  .meter i{display:block;height:100%;background:var(--accent)}
+  .rules{font-size:12px;color:var(--mute);margin:6px 0 0;padding-left:16px}
+  .rules li.ok{color:var(--ok)}
+  .otp{display:flex;gap:6px;margin-top:8px}
+  .otp div{width:40px;height:44px;border:1.5px solid var(--line);border-radius:6px;background:#fff}
+  .err{color:var(--bad);font-size:12px;margin-top:6px}
+  /* dashboard */
+  .app{display:grid;grid-template-columns:210px 1fr;min-height:520px}
+  .side{border-right:2px solid var(--ink);background:#fff;padding:14px;display:flex;flex-direction:column;gap:6px}
+  .side .new{background:var(--accent);color:#fff;border-radius:18px;height:38px;display:flex;align-items:center;justify-content:center;font-weight:600;margin:10px 0 8px}
+  .nav{padding:7px 10px;border-radius:6px;font-size:13px}
+  .nav.on{background:#dbe6fd;font-weight:600}
+  .side .spacer{flex:1}
+  .content{display:flex;flex-direction:column;min-width:0}
+  .topbar{height:56px;border-bottom:2px solid var(--ink);background:#fff;display:flex;align-items:center;gap:12px;padding:0 16px}
+  .search{flex:1;max-width:520px;height:36px;border-radius:18px;background:var(--fill);display:flex;align-items:center;padding:0 14px;color:#9aa3af;font-size:13px}
+  .avatar{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--ink);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;margin-left:auto}
+  .pane{padding:16px;display:flex;flex-direction:column;gap:12px}
+  .crumbs{font-size:15px}
+  .crumbs b{font-weight:600}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{border:1.5px solid var(--line);border-radius:14px;padding:3px 10px;font-size:12px;background:#fff}
+  .chip.on{border-color:var(--accent);color:var(--accent)}
+  .folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .folder{background:#fff;border:1.5px solid var(--line);border-radius:8px;padding:10px;font-size:13px;display:flex;gap:8px;align-items:center}
+  .ico{width:18px;height:14px;border:1.5px solid var(--ink);border-radius:2px;display:inline-block;flex:none}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1.5px solid var(--line);border-radius:8px;overflow:hidden;font-size:13px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--fill)}
+  th{color:var(--mute);font-weight:600;font-size:12px;background:var(--soft)}
+  td.k{text-align:right;color:var(--mute)}
+  .tag{font-size:11px;border-radius:4px;padding:1px 6px;border:1px solid var(--line)}
+  .tag.adm{border-color:var(--accent);color:var(--accent)}
+  /* modal */
+  .overlay{position:relative;background:rgba(31,41,55,.35);padding:30px 12px;display:flex;justify-content:center}
+  .modal{background:#fff;border:2px solid var(--ink);border-radius:12px;width:520px;max-width:100%;padding:18px}
+  .drop{border:2px dashed var(--line);border-radius:10px;padding:26px;text-align:center;color:var(--mute);margin:12px 0}
+  .up{border:1.5px solid var(--line);border-radius:8px;padding:9px 10px;margin-top:8px;font-size:13px}
+  .up .meter{margin-top:6px}
+  .qr{width:130px;height:130px;border:2px solid var(--ink);background:repeating-conic-gradient(var(--ink) 0 25%,#fff 0 50%) 0 0/16px 16px}
+  .callout{border-left:3px solid var(--accent);background:#fff;padding:8px 12px;font-size:12px;color:var(--mute)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:760px){.app{grid-template-columns:1fr}.side{display:none}.grid2{grid-template-columns:1fr}.hide-sm{display:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>TrustShare – UI Wireframes (Milestone 1)</h1>
+  <p>Low-fidelity layouts for the auth flow and the workspace. Visual style: clean, light, Drive-like. Annotations in grey explain behaviour.</p>
+</header>
+<nav class="toc">
+  <a href="#login">1. Login</a><a href="#signup">2. Sign up</a><a href="#forgot">3. Forgot / reset password</a><a href="#mfa">4. MFA step</a>
+  <a href="#dash">5. Dashboard</a><a href="#upload">6. Upload modal</a><a href="#settings">7. Security settings</a><a href="#admin">8. Admin – users</a><a href="#flow">9. Screen flow</a>
+</nav>
+<main>
+
+<section class="screen" id="login">
+  <h2>1. Login</h2>
+  <p class="note">Generic error ("Invalid email or password") – no hint whether the email exists. After 5 failures: "Account temporarily locked, try again in 15 minutes."</p>
+  <div class="frame"><div class="bar"><i></i><i></i><i></i><span>localhost:5173/login</span></div>
+    <div class="center"><div class="card">
+      <div class="logo"><b></b>TrustShare</div>
+      <h3 style="margin-top:14px">Welcome back</h3><p class="sub">Log in to your secure workspace</p>
+      <label>Email</label><div class="in">you@example.com</div>
+      <div class="row between"><label>Password</label><span class="link">Forgot password?</span></div><div class="in">••••••••••  👁</div>
+      <div class="btn primary">Log in</div>
+      <div class="or">or</div>
+      <div class="btn">G&nbsp; Continue with Google</div>
+      <p class="muted" style="text-align:center;margin:14px 0 0">New here? <span class="link">Create an account</span></p>
+    </div></div></div>
+</section>
+
+<section class="screen" id="signup">
+  <h2>2. Sign up</h2>
+  <p class="note">Live password checklist; submit disabled until valid. Success shows "Check your email to verify your account" (verification link valid 24 h).</p>
+  <div class="frame"><div class="bar"><i></i><i></i><i></i><span>localhost:5173/register</span></div>
+    <div class="center"><div class="card">
+      <div class="logo"><b></b>TrustShare</div>
+      <h3 style="margin-top:14px">Create your account</h3><p class="sub">Secure file sharing for your team</p>
+      <label>Full name</label><div class="in">Vimal S</div>
+      <label>Email</label><div class="in">you@example.com</div>
+      <label>Password</label><div class="in">••••••••</div>
+      <ul class="rules"><li class="ok">✓ At least 10 characters</li><li class="ok">✓ Upper- and lower-case letters</li><li>○ A number</li><li>○ A symbol</li></ul>
+      <label>Confirm password</label><div class="in">••••••••</div>
+      <div class="btn primary">Create account</div>
+      <div class="or">or</div><div class="btn">G&nbsp; Sign up with Google</div>
+      <p class="muted" style="text-align:center;margin:14px 0 0">Already have an account? <span class="link">Log in</span></p>
+    </div></div></div>
+</section>
+
+<section class="screen" id="forgot">
+  <h2>3. Forgot password → Reset password</h2>
+  <p class="note">Forgot: always shows the same confirmation (no user enumeration). Reset link valid 15 min, single use; after reset every session is logged out.</p>
+  <div class="grid2">
+    <div class="frame"><div class="bar"><i></i><i></i><i></i><span>/forgot-password</span></div>
+      <div class="center"><div class="card">
+        <h3>Reset your password</h3><p class="sub">We'll email you a link to set a new password.</p>
+        <label>Email</label><div class="in">you@example.com</div>
+        <div class="btn primary">Send reset link</div>
+        <div class="callout" style="margin-top:12px">✓ If an account exists for this email, a reset link is on its way.</div>
+        <p class="muted" style="margin:12px 0 0"><span class="link">← Back to login</span></p>
+      </div></div></div>
+    <div class="frame"><div class="bar"><i></i><i></i><i></i><span>/reset-password?token=…</span></div>
+      <div class="center"><div class="card">
+        <h3>Choose a new password</h3><p class="sub">Link expires 15 minutes after it was sent.</p>
+        <label>New password</label><div class="in">••••••••</div>
+        <label>Confirm new password</label><div class="in">••••••••</div>
+        <div class="btn primary">Update password</div>
+        <div class="err">Expired link? → "This link is no longer valid. Request a new one."</div>
+      </div></div></div>
+  </div>
+</section>
+
+<section class="screen" id="mfa">
+  <h2>4. MFA verification (login step 2)</h2>
+  <p class="note">Shown only when the account has MFA enabled. Auto-submits on the 6th digit. Challenge expires after 5 minutes.</p>
+  <div class="frame"><div class="bar"><i></i><i></i><i></i><span>/login/mfa</span></div>
+    <div class="center"><div class="card">
+      <h3>Two-step verification</h3><p class="sub">Enter the 6-digit code from your authenticator app.</p>
+      <div class="otp"><div></div><div></div><div></div><div></div><div></div><div></div></div>
+      <div class="btn primary">Verify</div>
+      <p class="muted" style="margin:12px 0 0">Lost your phone? <span class="link">Use a backup code</span></p>
+    </div></div></div>
+</section>
+
+<section class="screen" id="dash">
+  <h2>5. Workspace dashboard</h2>
+  <p class="note">Sidebar navigation · top search · storage meter · breadcrumbs · filter chips · folders then files · list/grid toggle · sortable columns · ⋮ action menu (Preview, Download, Rename, Move, Move to trash). Guests see no "New" button and no edit actions. Empty state: illustration + "Drop files here or click New".</p>
+  <div class="frame"><div class="bar"><i></i><i></i><i></i><span>/files/6718c2a0…</span></div>
+    <div class="app">
+      <aside class="side">
+        <div class="logo"><b></b>TrustShare</div>
+        <div class="new">＋ New</div>
+        <div class="nav on">📁 My Files</div>
+        <div class="nav">🕘 Recent</div>
+        <div class="nav">🗑 Trash</div>
+        <div class="nav">📜 Activity</div>
+        <div class="nav">👥 Admin · Users <span class="tag adm">admin</span></div>
+        <div class="nav">⚙ Settings</div>
+        <div class="spacer"></div>
+        <div class="muted">Storage</div>
+        <div class="meter"><i style="width:23%"></i></div>
+        <div class="muted">236 MB of 1 GB used</div>
+      </aside>
+      <div class="content">
+        <div class="topbar"><div class="search">🔍 Search files and folders</div><span class="muted hide-sm">☰ / ▦</span><div class="avatar">VS</div></div>
+        <div class="pane">
+          <div class="row between"><div class="crumbs">My Files › <b>Finance</b></div><span class="btn sm primary">⬆ Upload</span></div>
+          <div class="chips"><span class="chip on">All</span><span class="chip">Documents</span><span class="chip">Spreadsheets</span><span class="chip">Presentations</span><span class="chip">Images</span><span class="chip">Text</span><span class="chip">Modified: Any time ▾</span></div>
+          <div class="muted">Folders</div>
+          <div class="folders"><div class="folder"><span class="ico"></span>Invoices</div><div class="folder"><span class="ico"></span>Tax 2026</div><div class="folder"><span class="ico"></span>Reports</div></div>
+          <div class="muted">Files</div>
+          <table>
+            <tr><th>Name ▲</th><th class="hide-sm">Type</th><th class="hide-sm">Uploaded</th><th style="text-align:right">Size</th><th></th></tr>
+            <tr><td>📄 Q3 Report.pdf</td><td class="hide-sm">PDF</td><td class="hide-sm">12 Oct 2026</td><td class="k">471 KB</td><td class="k">⋮</td></tr>
+            <tr><td>📊 Budget.xlsx</td><td class="hide-sm">Excel</td><td class="hide-sm">11 Oct 2026</td><td class="k">88 KB</td><td class="k">⋮</td></tr>
+            <tr><td>📽 Pitch.pptx</td><td class="hide-sm">PowerPoint</td><td class="hide-sm">10 Oct 2026</td><td class="k">3.2 MB</td><td class="k">⋮</td></tr>
+            <tr><td>🖼 Receipt.png</td><td class="hide-sm">Image</td><td class="hide-sm">10 Oct 2026</td><td class="k">640 KB</td><td class="k">⋮</td></tr>
+          </table>
+          <div class="muted">Showing 4 of 4 · Loading state = skeleton rows · Error state = message + "Retry"</div>
+        </div>
+      </div>
+    </div></div>
+</section>
+
+<section class="screen" id="upload">
+  <h2>6. Upload modal</h2>
+  <p class="note">Drag-and-drop or browse; multiple files; per-file progress bar; client pre-checks type and size, server re-checks (magic bytes, 25 MB, quota). Failed files show the reason and can be removed; the rest continue.</p>
+  <div class="frame"><div class="bar"><i></i><i></i><i></i><span>/files (modal open)</span></div>
+    <div class="overlay"><div class="modal">
+      <div class="row between"><h3 style="margin:0">Upload to “Finance”</h3><span>✕</span></div>
+      <div class="drop">⬆<br><b>Drag files here</b> or <span class="link">browse</span><br><span class="muted">PDF, DOCX, XLSX, PPTX, TXT, CSV, PNG, JPG · max 25 MB each</span></div>
+      <div class="up"><div class="row between"><span>📄 Contract.pdf</span><span class="muted">2.1 MB · 64%</span></div><div class="meter"><i style="width:64%"></i></div></div>
+      <div class="up"><div class="row between"><span>🖼 Logo.png</span><span style="color:var(--ok)">✓ Uploaded</span></div><div class="meter"><i style="width:100%;background:var(--ok)"></i></div></div>
+      <div class="up"><div class="row between"><span>⚙ setup.exe</span><span class="err" style="margin:0">✕ File type not allowed</span></div></div>
+      <div class="up"><div class="row between"><span>🎞 video.pdf (30 MB)</span><span class="err" style="margin:0">✕ Exceeds 25 MB limit</span></div></div>
+      <div class="row" style="justify-content:flex-end;margin-top:14px;gap:8px"><span class="btn sm">Cancel</span><span class="btn sm primary">Done</span></div>
+    </div></div></div>
+</section>
+
+<section class="screen" id="settings">
+  <h2>7. Settings → Security (enable MFA)</h2>
+  <p class="note">Step 1 scan QR · Step 2 confirm a code · Step 3 show 10 backup codes once (copy / download). Also: change password, "Log out of all devices".</p>
+  <div class="frame"><div class="bar"><i></i><i></i><i></i><span>/settings/security</span></div>
+    <div class="center"><div class="card" style="width:560px">
+      <h3>Two-step verification</h3><p class="sub">Protect your account with an authenticator app.</p>
+      <div class="row" style="gap:18px;align-items:flex-start">
+        <div class="qr"></div>
+        <div style="flex:1">
+          <p class="muted" style="margin:0">1. Scan with Google Authenticator<br>Can't scan? Key: <code>JBSW Y3DP EHPK 3PXP</code></p>
+          <label>2. Enter the 6-digit code</label><div class="in">123 456</div>
+          <div class="btn primary">Enable MFA</div>
+        </div>
+      </div>
+      <div class="or">Account</div>
+      <div class="row between" style="margin-top:10px"><span>Password · last changed 3 days ago</span><span class="btn sm">Change</span></div>
+      <div class="row between" style="margin-top:10px"><span>Active sessions: 2 devices</span><span class="btn sm" style="color:var(--bad);border-color:var(--bad)">Log out everywhere</span></div>
+    </div></div></div>
+</section>
+
+<section class="screen" id="admin">
+  <h2>8. Admin – User management</h2>
+  <p class="note">Visible only with <code>user:read</code>. Role dropdown and actions need <code>user:manage</code>. An admin can't demote or deactivate themselves. A normal User opening this URL gets a "403 – You don't have access" page.</p>
+  <div class="frame"><div class="bar"><i></i><i></i><i></i><span>/admin/users</span></div>
+    <div class="pane">
+      <div class="row between"><h3 style="margin:0">Users</h3><div class="search" style="max-width:300px">🔍 Search name or email</div></div>
+      <table>
+        <tr><th>User</th><th>Role</th><th class="hide-sm">MFA</th><th class="hide-sm">Status</th><th class="hide-sm">Last login</th><th></th></tr>
+        <tr><td>Vimal S<br><span class="muted">admin@trustshare.local</span></td><td><span class="tag adm">Admin ▾</span></td><td class="hide-sm">On</td><td class="hide-sm">Active</td><td class="hide-sm">Today 10:02</td><td class="k">⋮</td></tr>
+        <tr><td>Asha R<br><span class="muted">asha@example.com</span></td><td><span class="tag">User ▾</span></td><td class="hide-sm">Off</td><td class="hide-sm">Active</td><td class="hide-sm">Yesterday</td><td class="k">⋮</td></tr>
+        <tr><td>Guest Reviewer<br><span class="muted">guest@example.com</span></td><td><span class="tag">Guest ▾</span></td><td class="hide-sm">Off</td><td class="hide-sm"><span style="color:var(--bad)">Locked</span></td><td class="hide-sm">2 days ago</td><td class="k">⋮ Unlock</td></tr>
+      </table>
+    </div></div>
+</section>
+
+<section class="screen" id="flow">
+  <h2>9. Screen flow</h2>
+  <p class="note">How the screens connect.</p>
+  <div class="frame" style="padding:18px;background:#fff;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;white-space:pre;overflow:auto">Sign up ──► "Check your email" ──► Verify email ──► Login
+Login ──(MFA off)──────────────────────────────► Dashboard (My Files)
+Login ──(MFA on)───► MFA code / backup code ───► Dashboard
+Login ──► Continue with Google ──► Google consent ──► Dashboard (or MFA step)
+Login ──► Forgot password ──► email link ──► Reset password ──► Login
+
+Dashboard ─┬─ folder click ──► sub-folder (breadcrumbs back)
+           ├─ New / Upload ──► Upload modal ──► list refreshes
+           ├─ ⋮ menu ──► Preview · Download · Rename · Move · Trash
+           ├─ Trash ──► Restore · Delete forever · Empty trash
+           ├─ Activity ──► my recent actions (admin: everyone)
+           ├─ Settings ──► Profile · Password · MFA · Log out everywhere
+           └─ Admin › Users (admin only) ──► change role · deactivate · unlock</div>
+</section>
+
+</main>
+</body>
+</html>
