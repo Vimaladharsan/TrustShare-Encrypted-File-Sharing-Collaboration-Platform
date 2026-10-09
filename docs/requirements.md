@@ -14,9 +14,12 @@ Organisations exchange sensitive documents through email attachments and public 
 |---|---|---|
 | **Admin** | Platform operator | Manages users and roles, can view every user's files and the activity log. |
 | **User** | Standard registered member (default on sign-up) | Uploads and manages **own** files and folders. |
-| **Guest** | External / limited account (assigned by an Admin) | Read-only: can log in and view/download files available to them, cannot upload, create folders or modify anything. In M2 guests mainly receive shared files. |
+| **Guest** | Known external person with an account (role assigned by an Admin) | Logs in, read-only: can view/download files available to them, cannot upload, create folders or modify anything. Every action is traceable to their account. |
+| **Link visitor** **(M2)** | Anyone holding a public share link – no account, not logged in | Can open only that one file, within the link's limits (expiry, download count, optional password). Not a role; identified only by IP in the logs. |
 
 Every request is authorised by **permission**, not by role name. Roles are bundles of permissions, so adding a role later (e.g. "Auditor") needs no code change.
+
+**Guest vs Link visitor:** a Guest is a logged-in role used for "Restricted" sharing (specific known people, fully traceable). A Link visitor uses "Anyone with the link" sharing (convenient, no account). In M2 the file owner chooses the access mode for each share link.
 
 ## 3. Permission matrix
 
@@ -117,6 +120,7 @@ Auth screens (login, sign-up, verify email, forgot/reset password, MFA step, Goo
 10. *As a guest*, I can browse and download files available to me but cannot upload or change anything.
 11. *As an admin*, I can see all users, change their roles, deactivate or unlock them.
 12. *As an admin*, I can see the activity log to investigate what happened.
+13. *As a link visitor* **(M2)**, I can open a file someone shared with me through a secure link without creating an account, until the link expires or reaches its download limit.
 
 ## 7. Acceptance criteria – Milestone 1 demo checklist
 
