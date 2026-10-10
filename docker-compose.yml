@@ -50,6 +50,20 @@ services:
       - mongo
       - redis
 
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    environment:
+      VITE_PROXY_TARGET: http://backend:8000
+      VITE_USE_POLLING: "true"
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
 volumes:
   pgdata:
   mongodata:
