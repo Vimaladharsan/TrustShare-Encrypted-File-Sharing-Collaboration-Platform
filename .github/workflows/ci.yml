@@ -42,6 +42,7 @@ jobs:
       MONGO_USER: trustshare
       MONGO_PASSWORD: ci-password
       REDIS_PASSWORD: ci-password
+      JWT_SECRET: ci-only-jwt-secret-that-is-at-least-32-characters-long
 
     steps:
       - uses: actions/checkout@v4

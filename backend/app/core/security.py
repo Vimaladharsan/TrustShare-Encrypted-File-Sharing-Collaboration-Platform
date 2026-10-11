@@ -1,0 +1,81 @@
+"""Password hashing (bcrypt) and access tokens (JWT)."""
+
+import contextlib
+import uuid
+from datetime import UTC, datetime, timedelta
+from functools import lru_cache
+from typing import Any
+
+import bcrypt
+import jwt
+
+from app.core.config import get_settings
+
+# Cost factor 12 = 2^12 rounds: ~0.25 s per hash. Slow for attackers, unnoticeable for users.
+BCRYPT_ROUNDS = 12
+
+
+def hash_password(password: str) -> str:
+    """One-way hash with a random salt. The original password can never be recovered."""
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt(BCRYPT_ROUNDS)).decode()
+
+
+def verify_password(password: str, password_hash: str | None) -> bool:
+    """Hash the typed password with the stored salt and compare (constant-time)."""
+    if not password_hash:
+        # Account without a password (e.g. Google-only): still spend the same time.
+        _dummy_check(password)
+        return False
+    try:
+        return bcrypt.checkpw(password.encode(), password_hash.encode())
+    except ValueError:  # bcrypt rejects passwords longer than 72 bytes
+        return False
+
+
+@lru_cache
+def _dummy_hash() -> bytes:
+    return bcrypt.hashpw(b"dummy-password", bcrypt.gensalt(BCRYPT_ROUNDS))
+
+
+def _dummy_check(password: str) -> None:
+    with contextlib.suppress(ValueError):
+        bcrypt.checkpw(password.encode(), _dummy_hash())
+
+
+def spend_password_check_time(password: str) -> None:
+    """Called when the email doesn't exist, so the response takes as long as a real check.
+    Otherwise an attacker could tell which emails are registered by timing the reply."""
+    _dummy_check(password)
+
+
+def create_access_token(user_id: uuid.UUID, role: str) -> tuple[str, int]:
+    """Signed JWT proving who the user is. Returns (token, lifetime in seconds)."""
+    settings = get_settings()
+    now = datetime.now(UTC)
+    lifetime = timedelta(minutes=settings.access_token_ttl_minutes)
+    payload = {
+        "sub": str(user_id),  # subject: who this token belongs to
+        "role": role,
+        "type": "access",
+        "jti": uuid.uuid4().hex,  # unique token id (used to revoke it on logout in Phase 3B)
+        "iat": now,  # issued at
+        "exp": now + lifetime,  # expires at
+    }
+    token = jwt.encode(
+        payload, settings.jwt_secret.get_secret_value(), algorithm=settings.jwt_algorithm
+    )
+    return token, int(lifetime.total_seconds())
+
+
+def decode_access_token(token: str) -> dict[str, Any]:
+    """Verify the signature and expiry. Raises jwt.InvalidTokenError if anything is wrong."""
+    settings = get_settings()
+    payload = jwt.decode(
+        token,
+        settings.jwt_secret.get_secret_value(),
+        algorithms=[settings.jwt_algorithm],  # never let the token choose its own algorithm
+        options={"require": ["sub", "exp", "iat", "type"]},
+    )
+    if payload["type"] != "access":
+        raise jwt.InvalidTokenError("Not an access token")
+    return payload

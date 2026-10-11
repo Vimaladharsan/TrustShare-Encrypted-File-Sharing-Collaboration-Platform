@@ -19,11 +19,18 @@ logger = logging.getLogger(__name__)
 class AppError(Exception):
     """Raise this from services for any expected, user-facing failure."""
 
-    def __init__(self, code: str, message: str, status_code: int = 400) -> None:
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        status_code: int = 400,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
         self.status_code = status_code
+        self.headers = headers
 
 
 def error_body(code: str, message: str, details: Any = None) -> dict[str, Any]:
@@ -48,7 +55,11 @@ HTTP_CODES = {
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(_: Request, exc: AppError) -> JSONResponse:
-        return JSONResponse(status_code=exc.status_code, content=error_body(exc.code, exc.message))
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=error_body(exc.code, exc.message),
+            headers=exc.headers,
+        )
 
     @app.exception_handler(StarletteHTTPException)
     async def handle_http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:

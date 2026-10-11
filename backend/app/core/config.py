@@ -1,7 +1,7 @@
 from functools import lru_cache
 from urllib.parse import quote_plus
 
-from pydantic import SecretStr
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,6 +31,22 @@ class Settings(BaseSettings):
     redis_password: SecretStr
     redis_host: str = "localhost"
     redis_port: int = 6379
+
+    # Authentication
+    jwt_secret: SecretStr
+    jwt_algorithm: str = "HS256"
+    access_token_ttl_minutes: int = 15
+
+    # Files
+    default_quota_mb: int = 1024
+
+    @field_validator("jwt_secret")
+    @classmethod
+    def jwt_secret_must_be_long(cls, value: SecretStr) -> SecretStr:
+        # A short secret could be brute-forced, letting an attacker forge tokens.
+        if len(value.get_secret_value()) < 32:
+            raise ValueError("JWT_SECRET must be at least 32 characters")
+        return value
 
     @property
     def postgres_url(self) -> str:

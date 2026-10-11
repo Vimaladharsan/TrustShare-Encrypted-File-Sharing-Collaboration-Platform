@@ -21,8 +21,13 @@ select = [
     "ASYNC",   # async pitfalls
 ]
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency injection intentionally uses these calls as parameter defaults.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.params.Depends"]
+
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]  # assert is how pytest checks things
+# assert is how pytest checks things; test passwords are fake by design.
+"tests/**" = ["S101", "S105", "S106"]
 
 # ---------- pytest ----------
 [tool.pytest.ini_options]
