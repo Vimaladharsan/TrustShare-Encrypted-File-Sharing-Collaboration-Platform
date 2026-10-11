@@ -48,7 +48,9 @@ class Role(Base):
     name: Mapped[str] = mapped_column(String(30), unique=True)
     description: Mapped[str] = mapped_column(String(255))
 
-    permissions: Mapped[list[Permission]] = relationship(secondary=role_permissions, lazy="selectin")
+    permissions: Mapped[list[Permission]] = relationship(
+        secondary=role_permissions, lazy="selectin"
+    )
 
 
 class User(Base):

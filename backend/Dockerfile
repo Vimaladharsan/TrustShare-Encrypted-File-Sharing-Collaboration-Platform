@@ -5,8 +5,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Development image: runtime packages + dev tools (ruff, pytest).
+# The production image (Milestone 4) will install only requirements.txt.
+COPY requirements.txt requirements-dev.txt ./
+RUN pip install --no-cache-dir -r requirements-dev.txt
 
 COPY . .
 

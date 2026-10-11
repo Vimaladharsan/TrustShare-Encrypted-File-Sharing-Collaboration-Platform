@@ -1,0 +1,30 @@
+[project]
+name = "trustshare-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+# ---------- ruff: linter + formatter ----------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["alembic"]  # generated scaffold and migrations
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # pycodestyle: basic style errors
+    "F",       # pyflakes: unused imports/variables, undefined names
+    "I",       # import sorting
+    "B",       # bugbear: likely bugs
+    "UP",      # pyupgrade: modern Python syntax
+    "S",       # bandit: security problems
+    "SIM",     # simplifications
+    "ASYNC",   # async pitfalls
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # assert is how pytest checks things
+
+# ---------- pytest ----------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
