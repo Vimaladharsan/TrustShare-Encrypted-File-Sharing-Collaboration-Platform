@@ -53,6 +53,12 @@ class Settings(BaseSettings):
 
     # Files
     default_quota_mb: int = 1024
+    max_upload_mb: int = 25
+    storage_dir: str = "/app/storage"  # inside the container; backend/storage on the laptop
+
+    @property
+    def max_upload_bytes(self) -> int:
+        return self.max_upload_mb * 1024 * 1024
 
     @field_validator("jwt_secret")
     @classmethod

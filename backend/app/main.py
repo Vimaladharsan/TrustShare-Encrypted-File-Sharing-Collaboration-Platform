@@ -1,8 +1,10 @@
 """TrustShare API – application entry point. Interactive docs: http://localhost:8000/docs"""
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 
@@ -11,7 +13,7 @@ from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import setup_logging
 from app.core.middleware import register_middleware
-from app.db.mongo import close_mongo, init_mongo
+from app.db.mongo import close_mongo, ensure_indexes, init_mongo
 from app.db.postgres import close_postgres, init_postgres
 from app.db.redis import close_redis, init_redis
 
@@ -26,6 +28,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     init_postgres(settings)
     init_mongo(settings)
     init_redis(settings)
+    await ensure_indexes()
+    await asyncio.to_thread(Path(settings.storage_dir).mkdir, parents=True, exist_ok=True)
     logger.info("%s API started", settings.app_name)
     yield
     await close_redis()

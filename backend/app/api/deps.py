@@ -78,3 +78,8 @@ def require_permission(permission: Perm) -> Callable[..., Awaitable[User]]:
         return user
 
     return checker
+
+
+# Ready-made guards, created once (instead of on every route definition).
+can_read_files = require_permission(Perm.FILE_READ)
+can_upload_files = require_permission(Perm.FILE_UPLOAD)

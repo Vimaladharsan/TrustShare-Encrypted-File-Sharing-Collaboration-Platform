@@ -3,8 +3,11 @@ import time
 import uuid
 
 from fastapi import FastAPI, Request, Response
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import RequestResponseEndpoint
 
+from app.core.config import get_settings
+from app.core.errors import error_body
 from app.core.logging import request_id_ctx
 
 logger = logging.getLogger("app.request")
@@ -24,7 +27,7 @@ def register_middleware(app: FastAPI) -> None:
         token = request_id_ctx.set(request_id)
         start = time.perf_counter()
         try:
-            response = await call_next(request)
+            response = _reject_oversized_upload(request) or await call_next(request)
             response.headers["X-Request-ID"] = request_id
             for name, value in SECURITY_HEADERS.items():
                 response.headers.setdefault(name, value)
@@ -39,3 +42,21 @@ def register_middleware(app: FastAPI) -> None:
             return response
         finally:
             request_id_ctx.reset(token)
+
+
+def _reject_oversized_upload(request: Request) -> Response | None:
+    """Refuse an upload whose declared size is already too big, before reading the body.
+    (Uploads without a size header are still stopped while streaming, in FileService.)"""
+    if request.method != "POST" or request.url.path != "/api/files":
+        return None
+    settings = get_settings()
+    declared = request.headers.get("content-length", "")
+    # Allow 1 MB extra for the multipart form wrapping around the file.
+    if declared.isdigit() and int(declared) > settings.max_upload_bytes + 1024 * 1024:
+        return JSONResponse(
+            status_code=413,
+            content=error_body(
+                "FILE_TOO_LARGE", f"File exceeds the {settings.max_upload_mb} MB limit."
+            ),
+        )
+    return None
