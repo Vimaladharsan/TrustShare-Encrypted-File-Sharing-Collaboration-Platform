@@ -16,6 +16,7 @@ from app.db.postgres import get_db
 from app.db.redis import get_redis
 from app.models import User
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
+from app.schemas.mfa import MfaRequiredResponse, MfaVerifyRequest
 from app.schemas.user import UserResponse
 from app.services.auth_service import AuthService
 from app.services.session_service import SessionService
@@ -61,8 +62,8 @@ async def register(
 
 @router.post(
     "/login",
-    response_model=TokenResponse,
-    summary="Log in: returns an access token and sets the refresh-token cookie",
+    response_model=TokenResponse | MfaRequiredResponse,
+    summary="Log in: returns tokens, or an MFA challenge if two-step verification is on",
     dependencies=[Depends(rate_limit("login", "login_rate_limit_per_minute"))],
 )
 async def login(
@@ -71,8 +72,29 @@ async def login(
     response: Response,
     session: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),
+) -> TokenResponse | MfaRequiredResponse:
+    result, refresh_token = await AuthService(session, redis).login(
+        data, client_ip(request), request.headers.get("user-agent", "")
+    )
+    if refresh_token:  # no cookie until the second factor is passed
+        set_refresh_cookie(response, refresh_token)
+    return result
+
+
+@router.post(
+    "/mfa/verify",
+    response_model=TokenResponse,
+    summary="Second login step: submit the 6-digit code (or a backup code)",
+    dependencies=[Depends(rate_limit("login", "login_rate_limit_per_minute"))],
+)
+async def verify_mfa(
+    data: MfaVerifyRequest,
+    request: Request,
+    response: Response,
+    session: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
 ) -> TokenResponse:
-    tokens, refresh_token = await AuthService(session, redis).login(
+    tokens, refresh_token = await AuthService(session, redis).verify_mfa(
         data, client_ip(request), request.headers.get("user-agent", "")
     )
     set_refresh_cookie(response, refresh_token)

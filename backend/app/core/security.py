@@ -8,6 +8,7 @@ from typing import Any
 
 import bcrypt
 import jwt
+from cryptography.fernet import Fernet
 
 from app.core.config import get_settings
 
@@ -79,3 +80,20 @@ def decode_access_token(token: str) -> dict[str, Any]:
     if payload["type"] != "access":
         raise jwt.InvalidTokenError("Not an access token")
     return payload
+
+
+# ---------- encryption of stored secrets (MFA) ----------
+
+
+def _fernet() -> Fernet:
+    return Fernet(get_settings().mfa_encryption_key.get_secret_value())
+
+
+def encrypt_secret(value: str) -> str:
+    """Two-way encryption (AES-128 + HMAC via Fernet). Unlike a password hash, the server must be
+    able to read the TOTP secret back to compute codes, so it is encrypted rather than hashed."""
+    return _fernet().encrypt(value.encode()).decode()
+
+
+def decrypt_secret(token: str) -> str:
+    return _fernet().decrypt(token.encode()).decode()

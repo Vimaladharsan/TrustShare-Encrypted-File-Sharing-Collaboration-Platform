@@ -20,8 +20,10 @@ from app.core.security import (
 from app.models import User
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
+from app.schemas.mfa import MfaRequiredResponse, MfaVerifyRequest
 from app.schemas.user import UserResponse
 from app.services.login_guard import LoginGuard
+from app.services.mfa_service import MfaService
 from app.services.session_service import SessionService
 
 logger = logging.getLogger(__name__)
@@ -38,6 +40,7 @@ class AuthService:
         self.users = UserRepository(session)
         self.sessions = SessionService(redis)
         self.guard = LoginGuard(redis)
+        self.mfa = MfaService(session, redis)
 
     async def register(self, data: RegisterRequest) -> User:
         # TODO (Phase 3D, email verification): return the same response for existing emails
@@ -69,8 +72,8 @@ class AuthService:
 
     async def login(
         self, data: LoginRequest, ip: str, user_agent: str
-    ) -> tuple[TokenResponse, str]:
-        """Returns (access token response, refresh token for the cookie)."""
+    ) -> tuple[TokenResponse | MfaRequiredResponse, str | None]:
+        """Returns (tokens, refresh token for the cookie), or (MFA challenge, None)."""
         user = await self.users.get_by_email(data.email)
         if user is None:
             await asyncio.to_thread(spend_password_check_time, data.password)
@@ -86,9 +89,41 @@ class AuthService:
             raise AppError("ACCOUNT_DISABLED", "This account has been disabled.", 403)
 
         await self.guard.clear(user.id)
-        user.last_login_at = datetime.now(UTC)
-        await self.session.commit()
+        if user.mfa_enabled:
+            # Password is correct, but no tokens yet: the second factor is still needed.
+            challenge_id, expires_in = await self.mfa.create_challenge(user.id)
+            return MfaRequiredResponse(challenge_id=challenge_id, expires_in=expires_in), None
+        return await self._complete_login(user, ip, user_agent)
 
+    async def verify_mfa(
+        self, data: MfaVerifyRequest, ip: str, user_agent: str
+    ) -> tuple[TokenResponse, str]:
+        """Second login step: check the authenticator (or backup) code for a challenge."""
+        expired = AppError(
+            "MFA_CHALLENGE_EXPIRED", "Your sign-in attempt expired. Please log in again.", 401
+        )
+        user_id = await self.mfa.user_for_challenge(data.challenge_id)
+        if user_id is None:
+            raise expired
+        user = await self.users.get_by_id(user_id)
+        if user is None or not user.is_active:
+            raise expired
+
+        # Wrong codes count towards the same lockout as wrong passwords.
+        await self.guard.ensure_not_locked(user.id)
+        if not await self.mfa.verify_code(user, data.code):
+            await self.guard.record_failure(user.id)
+            raise AppError("INVALID_MFA_CODE", "That code is not valid. Please try again.", 401)
+
+        await self.mfa.finish_challenge(data.challenge_id)
+        await self.guard.clear(user.id)
+        return await self._complete_login(user, ip, user_agent)
+
+    async def _complete_login(
+        self, user: User, ip: str, user_agent: str
+    ) -> tuple[TokenResponse, str]:
+        user.last_login_at = datetime.now(UTC)
+        await self.session.commit()  # also saves a used backup code, if one was used
         refresh_token = await self.sessions.create(user.id, ip, user_agent)
         return self._token_response(user), refresh_token
 

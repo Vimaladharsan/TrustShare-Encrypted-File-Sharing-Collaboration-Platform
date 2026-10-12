@@ -1,6 +1,7 @@
 from functools import lru_cache
 from urllib.parse import quote_plus
 
+from cryptography.fernet import Fernet
 from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -39,6 +40,11 @@ class Settings(BaseSettings):
     refresh_token_ttl_days: int = 7
     cookie_secure: bool = False  # True in production (HTTPS only); False for http://localhost
 
+    # Multi-factor authentication
+    mfa_encryption_key: SecretStr  # Fernet key that encrypts TOTP secrets in the database
+    mfa_issuer: str = "TrustShare"  # name shown in Google Authenticator
+    mfa_challenge_minutes: int = 5  # time allowed between password and code
+
     # Brute-force protection
     max_failed_logins: int = 5
     lockout_minutes: int = 15
@@ -54,6 +60,15 @@ class Settings(BaseSettings):
         # A short secret could be brute-forced, letting an attacker forge tokens.
         if len(value.get_secret_value()) < 32:
             raise ValueError("JWT_SECRET must be at least 32 characters")
+        return value
+
+    @field_validator("mfa_encryption_key")
+    @classmethod
+    def mfa_key_must_be_valid(cls, value: SecretStr) -> SecretStr:
+        try:
+            Fernet(value.get_secret_value())
+        except ValueError as exc:
+            raise ValueError("MFA_ENCRYPTION_KEY must be a valid Fernet key") from exc
         return value
 
     @property

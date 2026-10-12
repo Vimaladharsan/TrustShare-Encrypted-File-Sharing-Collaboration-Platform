@@ -2,10 +2,10 @@
 
 import uuid
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Role, User
+from app.models import MfaBackupCode, Role, User
 
 
 class UserRepository:
@@ -42,3 +42,32 @@ class UserRepository:
             query.order_by(User.created_at.desc()).limit(limit).offset(offset)
         )
         return list(result.scalars().all()), total or 0
+
+    # ---------- MFA backup codes ----------
+
+    async def replace_backup_codes(self, user_id: uuid.UUID, code_hashes: list[str]) -> None:
+        await self.session.execute(delete(MfaBackupCode).where(MfaBackupCode.user_id == user_id))
+        self.session.add_all(MfaBackupCode(user_id=user_id, code_hash=h) for h in code_hashes)
+
+    async def delete_backup_codes(self, user_id: uuid.UUID) -> None:
+        await self.session.execute(delete(MfaBackupCode).where(MfaBackupCode.user_id == user_id))
+
+    async def get_unused_backup_code(
+        self, user_id: uuid.UUID, code_hash: str
+    ) -> MfaBackupCode | None:
+        result = await self.session.execute(
+            select(MfaBackupCode).where(
+                MfaBackupCode.user_id == user_id,
+                MfaBackupCode.code_hash == code_hash,
+                MfaBackupCode.used_at.is_(None),
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def count_unused_backup_codes(self, user_id: uuid.UUID) -> int:
+        count = await self.session.scalar(
+            select(func.count()).where(
+                MfaBackupCode.user_id == user_id, MfaBackupCode.used_at.is_(None)
+            )
+        )
+        return count or 0
