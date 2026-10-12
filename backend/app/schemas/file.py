@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class FileInfo(BaseModel):
@@ -44,3 +44,11 @@ class FileListResponse(BaseModel):
 class StorageUsageResponse(BaseModel):
     used_bytes: int
     quota_bytes: int
+
+
+class FileUpdate(BaseModel):
+    """Send `name` to rename (the extension must stay the same), `folder_id` to move
+    (null = move to the top level), or both."""
+
+    name: str | None = Field(None, min_length=1, max_length=255)
+    folder_id: str | None = None

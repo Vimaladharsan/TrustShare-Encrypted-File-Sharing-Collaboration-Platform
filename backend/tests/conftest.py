@@ -54,6 +54,7 @@ def _delete_test_files(user_ids: list[str]) -> None:
     try:
         db = mongo[settings.mongo_db]
         db["files"].delete_many({"owner_id": {"$in": user_ids}})
+        db["folders"].delete_many({"owner_id": {"$in": user_ids}})
         db["activity_logs"].delete_many({"user_id": {"$in": user_ids}})
     finally:
         mongo.close()

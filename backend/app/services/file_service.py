@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from bson import ObjectId
 from fastapi import Request, UploadFile
 from pymongo.asynchronous.database import AsyncDatabase
 
@@ -23,6 +24,7 @@ from app.core.errors import AppError
 from app.core.permissions import Perm
 from app.models import User
 from app.repositories.file_repository import FileRepository
+from app.repositories.folder_repository import FolderRepository
 from app.services.activity_service import ActivityService
 from app.services.file_validation import (
     ALLOWED_EXTENSIONS_TEXT,
@@ -45,16 +47,20 @@ def _not_found() -> AppError:
 class FileService:
     def __init__(self, db: AsyncDatabase, storage: LocalStorage, request: Request) -> None:
         self.files = FileRepository(db)
+        self.folders = FolderRepository(db)
         self.activity = ActivityService(db)
         self.storage = storage
         self.request = request
 
     # ---------- upload ----------
 
-    async def upload(self, user: User, upload: UploadFile, allow_duplicate: bool) -> dict[str, Any]:
+    async def upload(
+        self, user: User, upload: UploadFile, folder_id: str | None, allow_duplicate: bool
+    ) -> dict[str, Any]:
         name = clean_filename(upload.filename)
         extension = extension_of(name)
         try:
+            folder_oid = await self._target_folder(user, folder_id)
             if not name or extension not in ALLOWED_TYPES:
                 raise AppError(
                     "UNSUPPORTED_FILE_TYPE",
@@ -73,7 +79,7 @@ class FileService:
                 if not await asyncio.to_thread(office_structure_ok, extension, temp):
                     raise self._type_mismatch()
                 if not allow_duplicate and await self.files.find_duplicate(
-                    str(user.id), sha256, None
+                    str(user.id), sha256, folder_oid
                 ):
                     raise AppError(
                         "DUPLICATE_FILE", "You already have an identical file here.", 409
@@ -100,7 +106,7 @@ class FileService:
         doc = await self.files.insert(
             {
                 "owner_id": str(user.id),
-                "folder_id": None,
+                "folder_id": folder_oid,
                 "original_name": name,
                 "name_lower": name.lower(),
                 "extension": extension,
@@ -186,3 +192,115 @@ class FileService:
             details={"file_name": doc["original_name"]},
         )
         return doc, self.storage.open(doc["storage_key"])
+
+    # ---------- organising: rename, move, trash, restore, delete ----------
+
+    async def _target_folder(self, user: User, folder_id: str | None) -> ObjectId | None:
+        """The folder a file goes into (must be the user's own, active folder). None = top level."""
+        if not folder_id:
+            return None
+        folder = await self.folders.get_active_owned(str(user.id), folder_id)
+        if folder is None:
+            raise AppError("FOLDER_NOT_FOUND", "Folder not found.", 404)
+        return folder["_id"]
+
+    async def owned(
+        self, user: User, file_id: str, status: str | None = "active"
+    ) -> dict[str, Any]:
+        """Only the owner may change a file – not even an Admin can alter someone else's."""
+        doc = await self.files.get(file_id)
+        if doc is None or doc["owner_id"] != str(user.id):
+            raise _not_found()
+        if status and doc["status"] != status:
+            raise _not_found()
+        return doc
+
+    async def update(self, user: User, file_id: str, changes: dict[str, Any]) -> dict[str, Any]:
+        """`changes` may contain "name" (rename) and/or "folder_id" (move; None = top level)."""
+        doc = await self.owned(user, file_id)
+        updates: dict[str, Any] = {}
+        if changes.get("name"):
+            name = clean_filename(changes["name"])
+            # Keep the extension: it was checked against the file's real content at upload.
+            if extension_of(name) != doc["extension"]:
+                raise AppError(
+                    "EXTENSION_CHANGE_NOT_ALLOWED",
+                    f"The name must still end in .{doc['extension']}.",
+                    400,
+                )
+            updates |= {"original_name": name, "name_lower": name.lower()}
+        if "folder_id" in changes:
+            updates["folder_id"] = await self._target_folder(user, changes["folder_id"])
+        if not updates:
+            return doc
+
+        updates["updated_at"] = datetime.now(UTC)
+        await self.files.update(doc["_id"], updates)
+        if "original_name" in updates:
+            await self._log(
+                user,
+                "file.rename",
+                doc,
+                {"from": doc["original_name"], "to": updates["original_name"]},
+            )
+        if "folder_id" in updates and updates["folder_id"] != doc.get("folder_id"):
+            await self._log(user, "file.move", doc, {"file_name": doc["original_name"]})
+        return await self.owned(user, file_id)
+
+    async def trash(self, user: User, file_id: str) -> None:
+        doc = await self.owned(user, file_id)
+        now = datetime.now(UTC)
+        await self.files.update(
+            doc["_id"],
+            {
+                "status": "trashed",
+                "trashed_at": now,
+                "trashed_with_folder": False,
+                "updated_at": now,
+            },
+        )
+        await self._log(user, "file.trash", doc, {"file_name": doc["original_name"]})
+
+    async def restore(self, user: User, file_id: str) -> dict[str, Any]:
+        doc = await self.owned(user, file_id, status="trashed")
+        folder_id = doc.get("folder_id")
+        if folder_id:
+            folder = await self.folders.get(folder_id)
+            if folder is None or folder["status"] != "active":
+                folder_id = None  # its folder is gone or in the trash: restore to the top level
+        await self.files.update(
+            doc["_id"],
+            {
+                "status": "active",
+                "trashed_at": None,
+                "trashed_with_folder": False,
+                "folder_id": folder_id,
+                "updated_at": datetime.now(UTC),
+            },
+        )
+        await self._log(user, "file.restore", doc, {"file_name": doc["original_name"]})
+        return await self.owned(user, file_id)
+
+    async def delete_forever(self, user: User, file_id: str) -> None:
+        """Remove the bytes from storage and the metadata from MongoDB. Cannot be undone."""
+        doc = await self.owned(user, file_id, status=None)
+        await self.storage.delete(doc["storage_key"])
+        await self.files.delete(doc["_id"])
+        await self._log(
+            user,
+            "file.delete",
+            doc,
+            {"file_name": doc["original_name"], "size_bytes": doc["size_bytes"]},
+        )
+
+    async def _log(
+        self, user: User, action: str, doc: dict[str, Any], details: dict[str, Any]
+    ) -> None:
+        await self.activity.log(
+            self.request,
+            user,
+            action,
+            resource_type="file",
+            resource_id=str(doc["_id"]),
+            details=details,
+        )

@@ -8,6 +8,7 @@ from bson.errors import InvalidId
 from pymongo.asynchronous.database import AsyncDatabase
 
 SORT_FIELDS = {"name": "name_lower", "size": "size_bytes", "date": "created_at"}
+ALL_FOLDERS = "all"  # list files from every folder (used by search)
 
 
 def to_object_id(value: str) -> ObjectId | None:
@@ -48,10 +49,18 @@ class FileRepository:
         result = await cursor.to_list(length=1)
         return result[0]["used"] if result else 0
 
+    async def update(self, file_id: ObjectId, changes: dict[str, Any]) -> None:
+        await self.files.update_one({"_id": file_id}, {"$set": changes})
+
+    async def delete(self, file_id: ObjectId) -> None:
+        await self.files.delete_one({"_id": file_id})
+
     async def list_owned(
         self,
         owner_id: str,
         *,
+        folder: ObjectId | None | str = ALL_FOLDERS,
+        trashed: bool = False,
         search: str | None,
         category: str | None,
         sort: str,
@@ -59,7 +68,15 @@ class FileRepository:
         limit: int,
         offset: int,
     ) -> tuple[list[dict[str, Any]], int]:
-        query: dict[str, Any] = {"owner_id": owner_id, "status": "active"}
+        query: dict[str, Any] = {"owner_id": owner_id}
+        if trashed:
+            # Files trashed one by one (the ones trashed with a folder appear under that folder).
+            query["status"] = "trashed"
+            query["trashed_with_folder"] = {"$ne": True}
+        else:
+            query["status"] = "active"
+            if folder != ALL_FOLDERS:
+                query["folder_id"] = folder  # None = top level ("My Files")
         if search:
             # re.escape: user input is matched literally, never as a regular expression.
             query["name_lower"] = {"$regex": re.escape(search.lower())}

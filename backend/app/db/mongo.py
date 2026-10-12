@@ -2,6 +2,7 @@
 
 Collections (docs/database.md §2):
     files          – metadata of every uploaded file
+    folders        – folder tree (each folder stores its ancestors)
     activity_logs  – append-only audit trail
 """
 
@@ -33,6 +34,17 @@ INDEXES: dict[str, list[IndexModel]] = {
         ),
         # Duplicate detection.
         IndexModel([("owner_id", ASCENDING), ("sha256", ASCENDING)], name="owner_sha256"),
+    ],
+    "folders": [
+        # No two active folders with the same name in the same place.
+        IndexModel(
+            [("owner_id", ASCENDING), ("parent_id", ASCENDING), ("name_lower", ASCENDING)],
+            name="unique_active_folder_name",
+            unique=True,
+            partialFilterExpression={"status": "active"},
+        ),
+        # "Everything inside this folder" (sub-folders at any depth).
+        IndexModel([("ancestors", ASCENDING)], name="ancestors"),
     ],
     "activity_logs": [
         IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_created"),

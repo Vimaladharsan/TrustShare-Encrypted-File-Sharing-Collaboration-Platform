@@ -5,11 +5,13 @@ from fastapi import APIRouter, Depends, File, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from pymongo.asynchronous.database import AsyncDatabase
 
-from app.api.deps import can_read_files, can_upload_files
+from app.api.deps import can_delete_files, can_read_files, can_update_files, can_upload_files
+from app.core.errors import AppError
 from app.db.mongo import get_mongo
 from app.models import User
-from app.repositories.file_repository import FileRepository
-from app.schemas.file import FileInfo, FileListResponse, StorageUsageResponse
+from app.repositories.file_repository import ALL_FOLDERS, FileRepository
+from app.repositories.folder_repository import FolderRepository
+from app.schemas.file import FileInfo, FileListResponse, FileUpdate, StorageUsageResponse
 from app.services.file_service import FileService
 from app.storage.local import LocalStorage, get_storage
 
@@ -32,16 +34,21 @@ def file_service(
 )
 async def upload_file(
     file: UploadFile = File(..., description="The file to upload"),
+    folder_id: str | None = Query(None, description="Folder to upload into (empty = top level)"),
     allow_duplicate: bool = Query(False, description="Keep both if an identical file exists"),
     user: User = Depends(can_upload_files),
     service: FileService = Depends(file_service),
 ) -> FileInfo:
-    doc = await service.upload(user, file, allow_duplicate)
+    doc = await service.upload(user, file, folder_id, allow_duplicate)
     return FileInfo.from_doc(doc)
 
 
 @router.get("", response_model=FileListResponse, summary="List my files")
 async def list_files(
+    folder_id: str | None = Query(
+        None, description='Folder to list (empty = top level, "all" = every folder)'
+    ),
+    trashed: bool = Query(False, description="List the trash instead"),
     q: str | None = Query(None, max_length=100, description="Search in file names"),
     category: Literal["document", "spreadsheet", "presentation", "image", "text"] | None = None,
     sort: Literal["name", "size", "date"] = "date",
@@ -51,8 +58,19 @@ async def list_files(
     user: User = Depends(can_read_files),
     db: AsyncDatabase = Depends(get_mongo),
 ) -> FileListResponse:
+    folder = None
+    if folder_id == ALL_FOLDERS:
+        folder = ALL_FOLDERS
+    elif folder_id:
+        found = await FolderRepository(db).get_active_owned(str(user.id), folder_id)
+        if found is None:
+            raise AppError("FOLDER_NOT_FOUND", "Folder not found.", 404)
+        folder = found["_id"]
+
     docs, total = await FileRepository(db).list_owned(
         str(user.id),
+        folder=folder,
+        trashed=trashed,
         search=q,
         category=category,
         sort=sort,
@@ -100,3 +118,46 @@ async def download_file(
             "Content-Length": str(doc["size_bytes"]),
         },
     )
+
+
+@router.patch("/{file_id}", response_model=FileInfo, summary="Rename and/or move a file")
+async def update_file(
+    file_id: str,
+    data: FileUpdate,
+    user: User = Depends(can_update_files),
+    service: FileService = Depends(file_service),
+) -> FileInfo:
+    # model_fields_set tells "folder_id": null (move to top level) apart from "not sent".
+    changes = data.model_dump(include=data.model_fields_set)
+    return FileInfo.from_doc(await service.update(user, file_id, changes))
+
+
+@router.post("/{file_id}/trash", status_code=status.HTTP_204_NO_CONTENT, summary="Move to trash")
+async def trash_file(
+    file_id: str,
+    user: User = Depends(can_update_files),
+    service: FileService = Depends(file_service),
+) -> None:
+    await service.trash(user, file_id)
+
+
+@router.post("/{file_id}/restore", response_model=FileInfo, summary="Restore from trash")
+async def restore_file(
+    file_id: str,
+    user: User = Depends(can_update_files),
+    service: FileService = Depends(file_service),
+) -> FileInfo:
+    return FileInfo.from_doc(await service.restore(user, file_id))
+
+
+@router.delete(
+    "/{file_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete forever (cannot be undone)",
+)
+async def delete_file(
+    file_id: str,
+    user: User = Depends(can_delete_files),
+    service: FileService = Depends(file_service),
+) -> None:
+    await service.delete_forever(user, file_id)
