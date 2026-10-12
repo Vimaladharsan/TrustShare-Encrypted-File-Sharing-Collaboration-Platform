@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     jwt_secret: SecretStr
     jwt_algorithm: str = "HS256"
     access_token_ttl_minutes: int = 15
+    refresh_token_ttl_days: int = 7
+    cookie_secure: bool = False  # True in production (HTTPS only); False for http://localhost
+
+    # Brute-force protection
+    max_failed_logins: int = 5
+    lockout_minutes: int = 15
+    login_rate_limit_per_minute: int = 10  # per IP address
+    register_rate_limit_per_minute: int = 5  # per IP address
 
     # Files
     default_quota_mb: int = 1024

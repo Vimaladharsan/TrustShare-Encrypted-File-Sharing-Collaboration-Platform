@@ -23,7 +23,12 @@ select = [
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI's dependency injection intentionally uses these calls as parameter defaults.
-extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.params.Depends"]
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Cookie",
+    "fastapi.params.Depends",
+]
 
 [tool.ruff.lint.per-file-ignores]
 # assert is how pytest checks things; test passwords are fake by design.

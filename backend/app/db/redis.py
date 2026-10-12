@@ -15,7 +15,12 @@ async def close_redis() -> None:
         await _redis.aclose()
 
 
-async def ping_redis() -> None:
+def get_redis() -> Redis:
+    """FastAPI dependency returning the shared Redis client (it pools connections itself)."""
     if _redis is None:
         raise RuntimeError("Redis is not initialised")
-    await _redis.ping()
+    return _redis
+
+
+async def ping_redis() -> None:
+    await get_redis().ping()
