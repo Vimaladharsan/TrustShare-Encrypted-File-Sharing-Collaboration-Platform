@@ -44,6 +44,8 @@ jobs:
       REDIS_PASSWORD: ci-password
       JWT_SECRET: ci-only-jwt-secret-that-is-at-least-32-characters-long
       MFA_ENCRYPTION_KEY: Y2ktb25seS1tZmEta2V5LW5vdC1hLXNlY3JldC0zMmI=
+      # The default /app/storage only exists inside our Docker image; CI needs a writable path.
+      STORAGE_DIR: /tmp/trustshare-storage
 
     steps:
       - uses: actions/checkout@v4
