@@ -21,8 +21,9 @@ export default [
       ...js.configs.recommended.rules, // common JavaScript bugs
       ...reactHooks.configs.recommended.rules, // correct use of useState / useEffect
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
-      // JSX components count as "used"; names starting with a capital letter are ignored.
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // Plain ESLint doesn't see <Component /> in JSX as a "use", so capitalised names
+      // (components) are ignored – both as variables and as destructured parameters.
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^[A-Z_]' }],
     },
   },
 ];

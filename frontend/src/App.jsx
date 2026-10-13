@@ -1,12 +1,15 @@
-import { Link, Route, Routes } from 'react-router';
+import { Link, Navigate, Route, Routes } from 'react-router';
 
+import DashboardLayout from './components/layout/DashboardLayout';
 import ProtectedRoute from './components/ProtectedRoute';
-import HomePage from './pages/HomePage';
+import FilesPage from './pages/FilesPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import StatusPage from './pages/StatusPage';
+import TrashPage from './pages/TrashPage';
 
-// URL → page mapping. Pages inside <ProtectedRoute> need a logged-in user.
+// URL → page mapping. Everything inside <ProtectedRoute> needs a logged-in user and is shown
+// inside the dashboard frame (sidebar + top bar).
 export default function App() {
   return (
     <Routes>
@@ -14,13 +17,18 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/status" element={<StatusPage />} />
       <Route
-        path="/"
         element={
           <ProtectedRoute>
-            <HomePage />
+            <DashboardLayout />
           </ProtectedRoute>
         }
-      />
+      >
+        <Route path="/" element={<Navigate to="/files" replace />} />
+        <Route path="/files" element={<FilesPage />} />
+        <Route path="/folders/:folderId" element={<FilesPage />} />
+        <Route path="/search" element={<FilesPage mode="search" />} />
+        <Route path="/trash" element={<TrashPage />} />
+      </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
