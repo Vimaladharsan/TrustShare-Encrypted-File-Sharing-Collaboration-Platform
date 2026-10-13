@@ -1,4 +1,4 @@
-"""Folder rules: create, list, breadcrumbs, rename, move, trash, restore.
+"""Folder rules: create, list, breadcrumbs, rename, move, trash, restore, delete forever.
 
 Only the owner can see or change a folder; anyone else gets 404.
 """
@@ -17,6 +17,7 @@ from app.models import User
 from app.repositories.folder_repository import FolderRepository
 from app.schemas.folder import Breadcrumb
 from app.services.activity_service import ActivityService
+from app.storage.local import LocalStorage
 
 
 def _not_found() -> AppError:
@@ -37,11 +38,14 @@ def clean_folder_name(raw: str) -> str:
 
 
 class FolderService:
-    def __init__(self, db: AsyncDatabase, request: Request) -> None:
+    def __init__(
+        self, db: AsyncDatabase, request: Request, storage: LocalStorage | None = None
+    ) -> None:
         self.folders = FolderRepository(db)
         self.files = db["files"]
         self.activity = ActivityService(db)
         self.request = request
+        self.storage = storage  # only needed to delete forever
 
     # ---------- reading ----------
 
@@ -200,6 +204,34 @@ class FolderService:
         )
         await self._log(user, "folder.restore", doc, {"name": doc["name"]})
         return await self.owned(user, folder_id)
+
+    async def delete_forever(self, user: User, folder_id: str) -> dict[str, int]:
+        """Permanently delete a trashed folder and EVERYTHING inside it (any depth):
+        the files' bytes in storage, their metadata, and the folders. Cannot be undone."""
+        doc = await self.owned(user, folder_id, active=False)
+        if doc["status"] != "trashed":
+            raise AppError("NOT_IN_TRASH", "Move the folder to the trash first.", 400)
+        if self.storage is None:
+            raise RuntimeError("FolderService needs storage to delete files")
+
+        folder_ids = [doc["_id"], *[f["_id"] for f in await self.folders.descendants(doc["_id"])]]
+        inside = await self.files.find(
+            {"owner_id": str(user.id), "folder_id": {"$in": folder_ids}},
+            {"storage_key": 1, "size_bytes": 1},
+        ).to_list(length=None)
+
+        for file in inside:  # bytes first: if this fails, the metadata still points to them
+            await self.storage.delete(file["storage_key"])
+        await self.files.delete_many({"_id": {"$in": [f["_id"] for f in inside]}})
+        await self.folders.delete_many(folder_ids)
+
+        counts = {
+            "folders": len(folder_ids),
+            "files": len(inside),
+            "bytes": sum(f["size_bytes"] for f in inside),
+        }
+        await self._log(user, "folder.delete", doc, {"name": doc["name"], **counts})
+        return counts
 
     async def _log(
         self, user: User, action: str, doc: dict[str, Any], details: dict[str, Any]

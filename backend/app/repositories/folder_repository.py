@@ -70,3 +70,6 @@ class FolderRepository:
 
     async def update_many(self, ids: list[ObjectId], changes: dict[str, Any]) -> None:
         await self.folders.update_many({"_id": {"$in": ids}}, {"$set": changes})
+
+    async def delete_many(self, ids: list[ObjectId]) -> None:
+        await self.folders.delete_many({"_id": {"$in": ids}})

@@ -89,3 +89,27 @@ export async function updateFolder(folderId, changes) {
 
 export const trashFolder = (folderId) => api.post(`/folders/${folderId}/trash`);
 export const restoreFolder = (folderId) => api.post(`/folders/${folderId}/restore`);
+export const deleteFolder = (folderId) => api.delete(`/folders/${folderId}`);
+
+// ---------- trash (bulk) ----------
+// Each returns { succeeded, failed: [{ id, type, code, message }] }.
+
+export async function restoreSelected(fileIds, folderIds) {
+  const { data } = await api.post('/trash/restore', { file_ids: fileIds, folder_ids: folderIds });
+  return data;
+}
+
+export async function deleteSelected(fileIds, folderIds) {
+  const { data } = await api.post('/trash/delete', { file_ids: fileIds, folder_ids: folderIds });
+  return data;
+}
+
+export async function restoreAll() {
+  const { data } = await api.post('/trash/restore-all');
+  return data;
+}
+
+export async function emptyTrash() {
+  const { data } = await api.post('/trash/empty');
+  return data;
+}

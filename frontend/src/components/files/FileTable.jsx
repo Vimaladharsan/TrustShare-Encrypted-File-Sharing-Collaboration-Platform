@@ -13,13 +13,29 @@ const COLUMNS = [
 /**
  * File list as a table. Click a column header to sort.
  * actionsFor(file) returns the ⋮ menu items for that file.
+ * Optional selection: pass `selected` (a Set of ids) and `onToggle(id)` to show checkboxes.
  */
-export default function FileTable({ files, sort, onSort, actionsFor }) {
+export default function FileTable({ files, sort, onSort, actionsFor, selected, onToggle }) {
+  const selectable = Boolean(selected && onToggle);
+  const allSelected = selectable && files.length > 0 && files.every((f) => selected.has(f.id));
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
       <table className="w-full text-sm">
         <thead className="bg-slate-50 text-left text-xs font-semibold text-slate-500">
           <tr>
+            {selectable && (
+              <th className="w-10 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={() =>
+                    files.forEach((f) => selected.has(f.id) === allSelected && onToggle(f.id))
+                  }
+                  aria-label="Select all files"
+                  className="size-4 rounded border-slate-300 accent-blue-600"
+                />
+              </th>
+            )}
             {COLUMNS.map((col) => (
               <th key={col.label} className={`px-4 py-3 ${col.className}`} scope="col">
                 {col.key && onSort ? (
@@ -50,7 +66,23 @@ export default function FileTable({ files, sort, onSort, actionsFor }) {
           {files.map((file) => {
             const { Icon, color } = fileIcon(file.category);
             return (
-              <tr key={file.id} className="hover:bg-slate-50">
+              <tr
+                key={file.id}
+                className={
+                  selectable && selected.has(file.id) ? 'bg-blue-50/60' : 'hover:bg-slate-50'
+                }
+              >
+                {selectable && (
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(file.id)}
+                      onChange={() => onToggle(file.id)}
+                      aria-label={`Select ${file.name}`}
+                      className="size-4 rounded border-slate-300 accent-blue-600"
+                    />
+                  </td>
+                )}
                 <td className="max-w-0 px-4 py-3">
                   <div className="flex items-center gap-3">
                     <Icon className={`size-5 shrink-0 ${color}`} aria-hidden="true" />

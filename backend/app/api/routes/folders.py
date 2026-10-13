@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, Request, status
 from pymongo.asynchronous.database import AsyncDatabase
 
-from app.api.deps import can_manage_folders, can_read_files
+from app.api.deps import can_delete_files, can_manage_folders, can_read_files
 from app.db.mongo import get_mongo
 from app.models import User
 from app.schemas.folder import (
@@ -12,12 +12,17 @@ from app.schemas.folder import (
     FolderUpdate,
 )
 from app.services.folder_service import FolderService
+from app.storage.local import LocalStorage, get_storage
 
 router = APIRouter(prefix="/folders", tags=["folders"])
 
 
-def folder_service(request: Request, db: AsyncDatabase = Depends(get_mongo)) -> FolderService:
-    return FolderService(db, request)
+def folder_service(
+    request: Request,
+    db: AsyncDatabase = Depends(get_mongo),
+    storage: LocalStorage = Depends(get_storage),
+) -> FolderService:
+    return FolderService(db, request, storage)
 
 
 @router.get("", response_model=FolderListResponse, summary="List folders")
@@ -89,3 +94,17 @@ async def restore_folder(
     service: FolderService = Depends(folder_service),
 ) -> FolderInfo:
     return FolderInfo.from_doc(await service.restore(user, folder_id))
+
+
+@router.delete(
+    "/{folder_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a trashed folder and everything inside it forever (cannot be undone)",
+    dependencies=[Depends(can_delete_files)],
+)
+async def delete_folder(
+    folder_id: str,
+    user: User = Depends(can_manage_folders),
+    service: FolderService = Depends(folder_service),
+) -> None:
+    await service.delete_forever(user, folder_id)
