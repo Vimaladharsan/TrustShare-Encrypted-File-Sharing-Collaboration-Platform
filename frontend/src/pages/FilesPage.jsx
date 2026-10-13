@@ -1,4 +1,13 @@
-import { Download, FolderInput, FolderPlus, Inbox, Pencil, SearchX, Trash2 } from 'lucide-react';
+import {
+  Download,
+  FolderInput,
+  FolderPlus,
+  Inbox,
+  Pencil,
+  SearchX,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
@@ -20,6 +29,7 @@ import Button from '../components/Button';
 import Breadcrumbs from '../components/files/Breadcrumbs';
 import FileTable from '../components/files/FileTable';
 import FolderGrid from '../components/files/FolderGrid';
+import UploadModal from '../components/files/UploadModal';
 import MoveDialog from '../components/MoveDialog';
 import NameDialog from '../components/NameDialog';
 import { Empty, ErrorState, Loading } from '../components/StateMessage';
@@ -95,6 +105,8 @@ export default function FilesPage({ mode = 'folder' }) {
   }
 
   const canEditFiles = can('file:update');
+  const canUpload = can('file:upload');
+  const currentFolderName = crumbs.length ? crumbs[crumbs.length - 1].name : 'My Files';
   const canManageFolders = can('folder:manage');
 
   const fileActions = (file) => [
@@ -150,11 +162,21 @@ export default function FilesPage({ mode = 'folder' }) {
         ) : (
           <Breadcrumbs crumbs={crumbs} />
         )}
-        {mode === 'folder' && canManageFolders && (
-          <Button variant="secondary" onClick={() => setDialog({ type: 'newFolder' })}>
-            <FolderPlus className="size-4" aria-hidden="true" />
-            New folder
-          </Button>
+        {mode === 'folder' && (
+          <div className="flex gap-2">
+            {canManageFolders && (
+              <Button variant="secondary" onClick={() => setDialog({ type: 'newFolder' })}>
+                <FolderPlus className="size-4" aria-hidden="true" />
+                New folder
+              </Button>
+            )}
+            {canUpload && (
+              <Button onClick={() => setDialog({ type: 'upload' })}>
+                <Upload className="size-4" aria-hidden="true" />
+                Upload
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
@@ -188,8 +210,15 @@ export default function FilesPage({ mode = 'folder' }) {
           <Empty
             icon={Inbox}
             title={category ? 'No files of this type here' : 'This folder is empty'}
-            text={can('file:upload') ? 'Upload files or create a folder to get started.' : ''}
-          />
+            text={canUpload ? 'Upload files or create a folder to get started.' : ''}
+          >
+            {canUpload && !category && (
+              <Button onClick={() => setDialog({ type: 'upload' })}>
+                <Upload className="size-4" aria-hidden="true" />
+                Upload files
+              </Button>
+            )}
+          </Empty>
         )}
         {status === 'ready' && !isEmpty && (
           <div className="space-y-6">
@@ -218,6 +247,17 @@ export default function FilesPage({ mode = 'folder' }) {
       </div>
 
       {/* ---------- dialogs ---------- */}
+      {dialog?.type === 'upload' && (
+        <UploadModal
+          folderId={folderId}
+          folderName={currentFolderName}
+          onUploaded={() => {
+            load();
+            refreshUsage();
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
       {dialog?.type === 'newFolder' && (
         <NameDialog
           title="New folder"

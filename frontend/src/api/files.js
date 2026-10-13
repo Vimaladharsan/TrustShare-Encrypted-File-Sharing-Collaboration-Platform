@@ -15,6 +15,27 @@ export async function listFiles({ folderId, trashed, q, category, sort, order } 
   return data.items;
 }
 
+/**
+ * Upload one file as multipart form data.
+ * onProgress(percent) is called as bytes are sent; signal lets the user cancel.
+ */
+export async function uploadFile(file, { folderId, allowDuplicate, onProgress, signal } = {}) {
+  const form = new FormData();
+  form.append('file', file);
+  const params = {};
+  if (folderId) params.folder_id = folderId;
+  if (allowDuplicate) params.allow_duplicate = true;
+  const { data } = await api.post('/files', form, {
+    params,
+    signal,
+    timeout: 0, // large files on slow connections can take longer than the default 30 s
+    onUploadProgress: (event) => {
+      if (event.total) onProgress?.(Math.round((event.loaded / event.total) * 100));
+    },
+  });
+  return data;
+}
+
 export async function getUsage() {
   const { data } = await api.get('/files/usage');
   return data;
