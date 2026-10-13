@@ -1,5 +1,9 @@
 @import 'tailwindcss';
 
+html {
+  scroll-behavior: smooth; /* landing page section links */
+}
+
 body {
   @apply bg-slate-50 text-slate-800 antialiased;
 }

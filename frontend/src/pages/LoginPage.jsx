@@ -1,4 +1,4 @@
-import { ShieldCheck } from 'lucide-react';
+import { Hash, Lock, Mail, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router';
 
@@ -12,7 +12,7 @@ export default function LoginPage() {
   const { status, login, completeMfa } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const goTo = location.state?.from || '/';
+  const goTo = location.state?.from || '/files';
 
   const [email, setEmail] = useState(location.state?.email || '');
   const [password, setPassword] = useState('');
@@ -70,6 +70,7 @@ export default function LoginPage() {
           </div>
           <FormField
             label="Verification code"
+            icon={Hash}
             value={code}
             onChange={(e) => setCode(e.target.value)}
             inputMode="numeric"
@@ -111,6 +112,7 @@ export default function LoginPage() {
       <form onSubmit={handleLogin} className="space-y-4">
         <FormField
           label="Email"
+          icon={Mail}
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -120,6 +122,7 @@ export default function LoginPage() {
         />
         <FormField
           label="Password"
+          icon={Lock}
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}

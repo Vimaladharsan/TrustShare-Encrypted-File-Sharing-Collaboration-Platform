@@ -1,4 +1,4 @@
-import { Check, Circle } from 'lucide-react';
+import { Check, Circle, Lock, Mail, User } from 'lucide-react';
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -27,7 +27,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  if (status === 'authenticated') return <Navigate to="/" replace />;
+  if (status === 'authenticated') return <Navigate to="/files" replace />;
 
   const passwordOk = RULES.every((rule) => rule.test(password));
   const matches = password === confirm;
@@ -64,6 +64,7 @@ export default function RegisterPage() {
       <form onSubmit={handleSubmit} className="space-y-4">
         <FormField
           label="Full name"
+          icon={User}
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           autoComplete="name"
@@ -71,6 +72,7 @@ export default function RegisterPage() {
         />
         <FormField
           label="Email"
+          icon={Mail}
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -80,6 +82,7 @@ export default function RegisterPage() {
         <div>
           <FormField
             label="Password"
+            icon={Lock}
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -103,6 +106,7 @@ export default function RegisterPage() {
         </div>
         <FormField
           label="Confirm password"
+          icon={Lock}
           type="password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
