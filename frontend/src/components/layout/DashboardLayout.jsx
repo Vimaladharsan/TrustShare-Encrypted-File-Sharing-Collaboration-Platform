@@ -1,4 +1,4 @@
-import { FolderOpen, Search, Trash2 } from 'lucide-react';
+import { FolderOpen, Search, Settings, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useSearchParams } from 'react-router';
 
@@ -10,6 +10,7 @@ import UserMenu from './UserMenu';
 const NAV = [
   { to: '/files', label: 'My Files', icon: FolderOpen },
   { to: '/trash', label: 'Trash', icon: Trash2 },
+  { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
 /** The workspace frame: sidebar + top bar around every dashboard page (<Outlet />). */
@@ -56,7 +57,7 @@ export default function DashboardLayout() {
           <SearchBox />
           <UserMenu />
         </header>
-        {/* Mobile: the sidebar is hidden, so show the two links here instead. */}
+        {/* Mobile: the sidebar is hidden, so show its links here instead. */}
         <nav className="flex gap-2 border-b border-slate-200 bg-white px-4 py-2 md:hidden">
           {NAV.map(({ to, label }) => (
             <NavLink

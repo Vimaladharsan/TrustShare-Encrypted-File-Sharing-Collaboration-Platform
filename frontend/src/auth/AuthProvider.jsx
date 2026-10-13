@@ -40,6 +40,11 @@ export default function AuthProvider({ children }) {
     return data;
   }, []);
 
+  // Reload the profile after the account changes (e.g. MFA turned on), so the UI stays in sync.
+  const refreshUser = useCallback(async () => {
+    setUser(await authApi.fetchMe());
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
@@ -55,10 +60,11 @@ export default function AuthProvider({ children }) {
       login,
       completeMfa,
       logout,
+      refreshUser,
       register: authApi.register,
       can: (permission) => Boolean(user?.permissions.includes(permission)),
     }),
-    [user, status, login, completeMfa, logout],
+    [user, status, login, completeMfa, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

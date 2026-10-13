@@ -1,11 +1,11 @@
-import { LogOut } from 'lucide-react';
+import { LogOut, Settings } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
 import { useAuth } from '../../auth/useAuth';
 
-/** Avatar with initials; opens a small menu with name, role and Log out. */
+/** Avatar with initials; opens a small menu with name, role, Settings and Log out. */
 export default function UserMenu() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -52,8 +52,19 @@ export default function UserMenu() {
           </span>
           <button
             type="button"
-            onClick={handleLogout}
+            onClick={() => {
+              setOpen(false);
+              navigate('/settings');
+            }}
             className="mt-3 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            <Settings className="size-4" aria-hidden="true" />
+            Settings
+          </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-slate-700 hover:bg-slate-50"
           >
             <LogOut className="size-4" aria-hidden="true" />
             Log out
