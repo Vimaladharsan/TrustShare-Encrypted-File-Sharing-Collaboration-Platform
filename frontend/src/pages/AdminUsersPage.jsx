@@ -172,6 +172,7 @@ export default function AdminUsersPage() {
                         <Badge tone={u.is_active ? 'green' : 'slate'}>
                           {u.is_active ? 'Active' : 'Disabled'}
                         </Badge>
+                        {!u.is_email_verified && <Badge tone="amber">Unverified</Badge>}
                         {u.mfa_enabled && (
                           <Badge tone="blue">
                             <ShieldCheck className="size-3" aria-hidden="true" /> 2-step

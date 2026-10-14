@@ -22,7 +22,23 @@ export default function SettingsPage() {
       <Card title="Profile">
         <dl className="grid gap-4 text-sm sm:grid-cols-2">
           <Item label="Name" value={user.full_name} />
-          <Item label="Email" value={user.email} />
+          <Item
+            label="Email"
+            value={
+              <span className="flex flex-wrap items-center gap-2">
+                {user.email}
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    user.is_email_verified
+                      ? 'bg-green-50 text-green-700'
+                      : 'bg-amber-50 text-amber-700'
+                  }`}
+                >
+                  {user.is_email_verified ? 'Verified' : 'Not verified'}
+                </span>
+              </span>
+            }
+          />
           <Item
             label="Role"
             value={

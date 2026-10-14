@@ -24,11 +24,13 @@ from app.schemas.auth import (
     RegisterRequest,
     ResetPasswordRequest,
     TokenResponse,
+    VerifyEmailRequest,
 )
 from app.schemas.mfa import MfaRequiredResponse, MfaVerifyRequest
 from app.schemas.user import UserResponse
 from app.services.auth_service import AuthService
 from app.services.email_service import EmailSender, get_email_sender
+from app.services.email_verification_service import EmailVerificationService
 from app.services.password_reset_service import PasswordResetService
 from app.services.session_service import SessionService
 
@@ -64,10 +66,16 @@ def clear_refresh_cookie(response: Response) -> None:
 )
 async def register(
     data: RegisterRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),
+    db: AsyncDatabase = Depends(get_mongo),
+    sender: EmailSender = Depends(get_email_sender),
 ) -> UserResponse:
     user = await AuthService(session, redis).register(data)
+    email = await EmailVerificationService(session, redis, db, request).create_email(user)
+    background_tasks.add_task(sender.send, email)  # "Verify your email", sent after the reply
     return UserResponse.from_user(user)
 
 
@@ -217,3 +225,44 @@ async def reset_password(
 ) -> MessageResponse:
     await service.reset(data.token, data.new_password)
     return MessageResponse(message="Your password has been changed. Please log in.")
+
+
+# ---------- email verification ----------
+
+
+@router.post(
+    "/verify-email",
+    response_model=MessageResponse,
+    summary="Confirm the email address with the link from the sign-up email",
+    dependencies=[Depends(rate_limit("forgot", "forgot_password_rate_limit_per_minute"))],
+)
+async def verify_email(
+    data: VerifyEmailRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+    db: AsyncDatabase = Depends(get_mongo),
+) -> MessageResponse:
+    await EmailVerificationService(session, redis, db, request).verify(data.token)
+    return MessageResponse(message="Your email is verified.")
+
+
+@router.post(
+    "/verify-email/resend",
+    response_model=MessageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Send a new verification email to the logged-in user",
+    dependencies=[Depends(rate_limit("forgot", "forgot_password_rate_limit_per_minute"))],
+)
+async def resend_verification(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+    db: AsyncDatabase = Depends(get_mongo),
+    sender: EmailSender = Depends(get_email_sender),
+) -> MessageResponse:
+    email = await EmailVerificationService(session, redis, db, request).resend(user)
+    background_tasks.add_task(sender.send, email)
+    return MessageResponse(message=f"We've sent a new verification link to {user.email}.")

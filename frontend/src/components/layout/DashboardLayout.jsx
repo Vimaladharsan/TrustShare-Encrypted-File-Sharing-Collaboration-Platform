@@ -7,6 +7,7 @@ import { useAuth } from '../../auth/useAuth';
 import Logo from '../Logo';
 import StorageMeter from './StorageMeter';
 import UserMenu from './UserMenu';
+import VerifyEmailBanner from './VerifyEmailBanner';
 
 const NAV = [
   { to: '/files', label: 'My Files', icon: FolderOpen },
@@ -62,6 +63,7 @@ export default function DashboardLayout() {
           <SearchBox />
           <UserMenu />
         </header>
+        <VerifyEmailBanner />
         {/* Mobile: the sidebar is hidden, so show its links here instead. */}
         <nav className="flex gap-2 border-b border-slate-200 bg-white px-4 py-2 md:hidden">
           {nav.map(({ to, label }) => (

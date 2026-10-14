@@ -44,3 +44,15 @@ export async function resetPassword(token, newPassword) {
   const { data } = await api.post('/auth/reset-password', { token, new_password: newPassword });
   return data.message;
 }
+
+// ---------- email verification ----------
+
+export async function verifyEmail(token) {
+  const { data } = await api.post('/auth/verify-email', { token });
+  return data.message;
+}
+
+export async function resendVerification() {
+  const { data } = await api.post('/auth/verify-email/resend');
+  return data.message;
+}

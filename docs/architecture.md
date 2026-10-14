@@ -241,6 +241,7 @@ All routes are under `/api`. Interactive docs: `http://localhost:8000/docs`.
 | GET | `/health` | public | Status of PostgreSQL, MongoDB, Redis |
 | POST | `/auth/register` | public | Create account, send verification email |
 | POST | `/auth/verify-email` | public | Confirm email with token |
+| POST | `/auth/verify-email/resend` | logged in | Send a new verification link (soft mode by default: unverified users can log in; `REQUIRE_EMAIL_VERIFICATION=true` blocks them) |
 | POST | `/auth/resend-verification` | public | Resend link (rate-limited) |
 | POST | `/auth/login` | public | Password login → tokens or MFA challenge |
 | POST | `/auth/mfa/verify` | public (challenge) | Second step with TOTP or backup code |

@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     mail_from_name: str = "TrustShare"
     frontend_url: str = "http://localhost:5173"  # where links in emails point to
     password_reset_minutes: int = 15
+    email_verification_hours: int = 24
+    # False = unverified users can log in (they see a reminder); True = they must verify first.
+    require_email_verification: bool = False
 
     # Files
     default_quota_mb: int = 1024

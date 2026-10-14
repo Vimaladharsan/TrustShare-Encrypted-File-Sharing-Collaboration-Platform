@@ -84,6 +84,28 @@ def _layout(title: str, body_html: str, button_text: str, link: str, footer: str
 </div>"""
 
 
+def verification_email(to: str, name: str, link: str, hours: int) -> Email:
+    safe_name = html.escape(name)
+    return Email(
+        to=to,
+        subject="Verify your TrustShare email",
+        text=(
+            f"Hi {name},\n\n"
+            "Welcome to TrustShare! Please confirm this is your email address by opening this "
+            f"link within {hours} hours:\n\n{link}\n\n"
+            "If you didn't create an account, you can ignore this email.\n"
+        ),
+        html=_layout(
+            "Verify your email",
+            f"<p>Hi {safe_name},</p><p>Welcome to TrustShare! Please confirm this is your email "
+            f"address. The link works once and expires in {hours} hours.</p>",
+            "Verify my email",
+            link,
+            "If you didn't create an account, you can ignore this email.",
+        ),
+    )
+
+
 def password_reset_email(to: str, name: str, link: str, minutes: int) -> Email:
     safe_name = html.escape(name)
     return Email(

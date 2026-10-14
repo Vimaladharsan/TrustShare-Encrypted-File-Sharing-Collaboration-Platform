@@ -12,6 +12,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import SettingsPage from './pages/SettingsPage';
 import StatusPage from './pages/StatusPage';
 import TrashPage from './pages/TrashPage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
 
 // URL → page mapping. "/" is the public landing page. Everything inside <ProtectedRoute> needs a
 // logged-in user and is shown inside the dashboard frame (sidebar + top bar).
@@ -23,6 +24,7 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/status" element={<StatusPage />} />
       <Route
         element={

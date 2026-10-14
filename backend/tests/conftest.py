@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.core.config import get_settings
 from app.main import app
 from app.models import Role, User
+from app.services.email_service import Email, get_email_sender
 
 TEST_EMAIL_DOMAIN = "@pytest.example.com"
 TEST_PASSWORD = "Str0ng!Passw0rd"
@@ -106,6 +107,29 @@ def client() -> Iterator[TestClient]:
     _delete_test_files(asyncio.run(_test_user_ids()))
     asyncio.run(_delete_test_users())
     clear_rate_limits()
+
+
+class FakeSender:
+    """Collects emails instead of sending them (tests must never send real email)."""
+
+    def __init__(self) -> None:
+        self.sent: list[Email] = []
+
+    def send(self, email: Email) -> None:
+        self.sent.append(email)
+
+    def links(self, path: str) -> list[Email]:
+        """Only the emails whose link goes to this page, e.g. "reset-password"."""
+        return [email for email in self.sent if f"/{path}?token=" in email.text]
+
+
+@pytest.fixture(autouse=True)
+def outbox() -> Iterator[FakeSender]:
+    """Every test gets a fresh fake email sender."""
+    sender = FakeSender()
+    app.dependency_overrides[get_email_sender] = lambda: sender
+    yield sender
+    app.dependency_overrides.pop(get_email_sender, None)
 
 
 @pytest.fixture(autouse=True)

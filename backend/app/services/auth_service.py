@@ -87,6 +87,12 @@ class AuthService:
             raise invalid_credentials()
         if not user.is_active:
             raise AppError("ACCOUNT_DISABLED", "This account has been disabled.", 403)
+        if get_settings().require_email_verification and not user.is_email_verified:
+            raise AppError(
+                "EMAIL_NOT_VERIFIED",
+                "Please verify your email first – use the link we sent when you signed up.",
+                403,
+            )
 
         await self.guard.clear(user.id)
         if user.mfa_enabled:

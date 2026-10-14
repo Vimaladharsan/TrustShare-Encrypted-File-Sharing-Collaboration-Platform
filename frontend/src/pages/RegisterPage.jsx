@@ -33,7 +33,9 @@ export default function RegisterPage() {
     setSubmitting(true);
     try {
       await register(fullName.trim(), email, password);
-      toast.success('Account created. You can log in now.');
+      toast.success(
+        'Account created. We sent a verification link to your email – you can log in now.',
+      );
       navigate('/login', { state: { email } });
     } catch (err) {
       setError(getErrorMessage(err));
