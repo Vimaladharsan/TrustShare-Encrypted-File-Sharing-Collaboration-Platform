@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import MfaBackupCode, Role, User
+from app.models import MfaBackupCode, OAuthAccount, Role, User
 
 
 class UserRepository:
@@ -42,6 +42,28 @@ class UserRepository:
             query.order_by(User.created_at.desc()).limit(limit).offset(offset)
         )
         return list(result.scalars().all()), total or 0
+
+    # ---------- linked Google (OAuth) accounts ----------
+
+    async def get_by_oauth(self, provider: str, provider_user_id: str) -> User | None:
+        result = await self.session.execute(
+            select(User)
+            .join(OAuthAccount, OAuthAccount.user_id == User.id)
+            .where(
+                OAuthAccount.provider == provider,
+                OAuthAccount.provider_user_id == provider_user_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def link_oauth(
+        self, user: User, provider: str, provider_user_id: str, email: str
+    ) -> None:
+        self.session.add(
+            OAuthAccount(
+                user_id=user.id, provider=provider, provider_user_id=provider_user_id, email=email
+            )
+        )
 
     async def count_active_with_role(self, role_name: str) -> int:
         count = await self.session.scalar(

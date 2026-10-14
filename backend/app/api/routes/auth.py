@@ -1,8 +1,10 @@
 import contextlib
 from typing import Any
+from urllib.parse import urlencode
 
 import jwt
 from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, Request, Response, status
+from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials
 from pymongo.asynchronous.database import AsyncDatabase
 from redis.asyncio import Redis
@@ -31,6 +33,11 @@ from app.schemas.user import UserResponse
 from app.services.auth_service import AuthService
 from app.services.email_service import EmailSender, get_email_sender
 from app.services.email_verification_service import EmailVerificationService
+from app.services.google_oauth_service import (
+    GoogleClient,
+    GoogleOAuthService,
+    get_google_client,
+)
 from app.services.password_reset_service import PasswordResetService
 from app.services.session_service import SessionService
 
@@ -266,3 +273,62 @@ async def resend_verification(
     email = await EmailVerificationService(session, redis, db, request).resend(user)
     background_tasks.add_task(sender.send, email)
     return MessageResponse(message=f"We've sent a new verification link to {user.email}.")
+
+
+# ---------- Google login ----------
+
+
+@router.get("/providers", summary="Which extra login methods are available (for the login page)")
+async def providers() -> dict[str, bool]:
+    return {"google": get_settings().google_enabled}
+
+
+def google_service(
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+    db: AsyncDatabase = Depends(get_mongo),
+    client: GoogleClient = Depends(get_google_client),
+) -> GoogleOAuthService:
+    return GoogleOAuthService(session, redis, db, request, client)
+
+
+def _to_frontend(path: str, **query: str) -> RedirectResponse:
+    url = f"{get_settings().frontend_url}{path}"
+    if query:
+        url += "?" + urlencode(query)
+    return RedirectResponse(url, status_code=status.HTTP_302_FOUND)
+
+
+@router.get(
+    "/google/login",
+    summary="Start Google login (redirects to Google)",
+    dependencies=[Depends(rate_limit("login", "login_rate_limit_per_minute"))],
+)
+async def google_login(service: GoogleOAuthService = Depends(google_service)) -> RedirectResponse:
+    try:
+        return RedirectResponse(await service.login_url(), status_code=status.HTTP_302_FOUND)
+    except AppError as exc:
+        return _to_frontend("/login", oauth_error=exc.message)
+
+
+@router.get("/google/callback", summary="Google sends the user back here after signing in")
+async def google_callback(
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    service: GoogleOAuthService = Depends(google_service),
+) -> RedirectResponse:
+    """Always ends in a redirect to our frontend – logged in, at the MFA step, or with a message."""
+    if error or not code or not state:  # e.g. the user pressed "Cancel" on Google's page
+        return _to_frontend("/login", oauth_error="Google sign-in was cancelled.")
+    try:
+        tokens, value = await service.finish(code, state)
+    except AppError as exc:
+        return _to_frontend("/login", oauth_error=exc.message)
+
+    if tokens is None:  # MFA is on: the login page asks for the 6-digit code next
+        return _to_frontend("/login", mfa_challenge=value)
+    response = _to_frontend("/auth/google")  # frontend then calls /auth/refresh with the cookie
+    set_refresh_cookie(response, value)
+    return response

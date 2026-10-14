@@ -1,24 +1,28 @@
 import { Hash, Lock, Mail, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
-import { Link, Navigate, useLocation, useNavigate } from 'react-router';
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router';
 
 import { getErrorMessage } from '../api/client';
 import { useAuth } from '../auth/useAuth';
 import AuthLayout from '../components/AuthLayout';
 import Button from '../components/Button';
 import FormField from '../components/FormField';
+import GoogleButton from '../components/GoogleButton';
 
 export default function LoginPage() {
   const { status, login, completeMfa } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [params] = useSearchParams();
   const goTo = location.state?.from || '/files';
 
   const [email, setEmail] = useState(location.state?.email || '');
   const [password, setPassword] = useState('');
-  const [challenge, setChallenge] = useState(null); // set when MFA is required
+  // Set when MFA is required – also after Google login, which comes back with ?mfa_challenge=…
+  const [challenge, setChallenge] = useState(params.get('mfa_challenge'));
   const [code, setCode] = useState('');
-  const [error, setError] = useState('');
+  // A failed Google login comes back with ?oauth_error=<message>.
+  const [error, setError] = useState(params.get('oauth_error') || '');
   const [submitting, setSubmitting] = useState(false);
 
   if (status === 'authenticated') return <Navigate to={goTo} replace />;
@@ -143,6 +147,7 @@ export default function LoginPage() {
           Log in
         </Button>
       </form>
+      <GoogleButton />
     </AuthLayout>
   );
 }

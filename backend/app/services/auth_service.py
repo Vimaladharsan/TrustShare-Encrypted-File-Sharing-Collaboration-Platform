@@ -125,6 +125,12 @@ class AuthService:
         await self.guard.clear(user.id)
         return await self._complete_login(user, ip, user_agent)
 
+    async def start_session(
+        self, user: User, ip: str, user_agent: str
+    ) -> tuple[TokenResponse, str]:
+        """Used by other ways of logging in (Google) once the user is identified."""
+        return await self._complete_login(user, ip, user_agent)
+
     async def _complete_login(
         self, user: User, ip: str, user_agent: str
     ) -> tuple[TokenResponse, str]:

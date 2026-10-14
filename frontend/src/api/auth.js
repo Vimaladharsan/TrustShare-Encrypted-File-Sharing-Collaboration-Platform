@@ -56,3 +56,11 @@ export async function resendVerification() {
   const { data } = await api.post('/auth/verify-email/resend');
   return data.message;
 }
+
+// ---------- Google login ----------
+
+/** Which extra login methods the server has set up, e.g. { google: true }. */
+export async function getProviders() {
+  const { data } = await api.get('/auth/providers');
+  return data;
+}

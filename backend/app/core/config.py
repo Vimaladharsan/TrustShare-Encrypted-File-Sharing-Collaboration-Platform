@@ -64,6 +64,16 @@ class Settings(BaseSettings):
     # False = unverified users can log in (they see a reminder); True = they must verify first.
     require_email_verification: bool = False
 
+    # Google login (OAuth 2.0 / OpenID Connect). Without client id + secret the button is hidden.
+    google_client_id: str = ""
+    google_client_secret: SecretStr = SecretStr("")
+    # Must match an "Authorized redirect URI" in Google Cloud Console exactly.
+    google_redirect_uri: str = "http://localhost:8000/api/auth/google/callback"
+
+    @property
+    def google_enabled(self) -> bool:
+        return bool(self.google_client_id and self.google_client_secret.get_secret_value())
+
     # Files
     default_quota_mb: int = 1024
     max_upload_mb: int = 25

@@ -232,6 +232,8 @@ sequenceDiagram
 
 If the linked account has MFA enabled, the callback redirects to the MFA step instead of finishing the login.
 
+Implementation notes: the authorization request also uses **PKCE** (S256; the code verifier is stored with the state in Redis), the ID token signature is checked against Google's published keys (`aud` = our client id, `iss` = Google), and errors (cancelled, expired state, unverified Google email, disabled account) redirect to `/login?oauth_error=…`.
+
 ## 4. API surface (Milestone 1)
 
 All routes are under `/api`. Interactive docs: `http://localhost:8000/docs`.

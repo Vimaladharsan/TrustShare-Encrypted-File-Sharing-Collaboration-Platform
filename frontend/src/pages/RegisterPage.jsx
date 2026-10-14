@@ -8,6 +8,7 @@ import { useAuth } from '../auth/useAuth';
 import AuthLayout from '../components/AuthLayout';
 import Button from '../components/Button';
 import FormField from '../components/FormField';
+import GoogleButton from '../components/GoogleButton';
 import PasswordChecklist from '../components/PasswordChecklist';
 import { passwordMeetsRules } from '../utils/passwordRules';
 
@@ -106,6 +107,7 @@ export default function RegisterPage() {
           Create account
         </Button>
       </form>
+      <GoogleButton />
     </AuthLayout>
   );
 }

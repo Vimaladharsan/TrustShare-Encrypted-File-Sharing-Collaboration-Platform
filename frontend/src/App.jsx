@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AdminUsersPage from './pages/AdminUsersPage';
 import FilesPage from './pages/FilesPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import GoogleCallbackPage from './pages/GoogleCallbackPage';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -25,6 +26,7 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/auth/google" element={<GoogleCallbackPage />} />
       <Route path="/status" element={<StatusPage />} />
       <Route
         element={
