@@ -255,7 +255,8 @@ All routes are under `/api`. Interactive docs: `http://localhost:8000/docs`.
 | POST | `/users/me/password` | logged in | Change password |
 | POST | `/users/me/mfa/setup` · `/mfa/enable` · `/mfa/disable` · `/mfa/backup-codes` | logged in | Manage TOTP |
 | GET | `/admin/users` | `user:read` | List/search users |
-| PATCH | `/admin/users/{id}` | `user:manage` | Change role, activate/deactivate, unlock |
+| PATCH | `/admin/users/{id}` | `user:manage` | Change role, activate/deactivate (not yourself; never the last admin) |
+| POST | `/admin/users/{id}/unlock` | `user:manage` | Clear a login lockout early |
 | GET | `/folders` · POST `/folders` | `file:read` · `folder:manage` | List children / create |
 | PATCH · DELETE | `/folders/{id}` | `folder:manage` | Rename, move, trash |
 | GET | `/folders/{id}/breadcrumbs` | `file:read` | Path to root |

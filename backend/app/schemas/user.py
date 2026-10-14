@@ -3,6 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from app.core.permissions import RoleName
 from app.models import User
 
 
@@ -36,6 +37,22 @@ class UserResponse(BaseModel):
         )
 
 
-class UserListResponse(BaseModel):
-    items: list[UserResponse]
+# ---------- admin user management ----------
+
+
+class AdminUserResponse(UserResponse):
+    """A user as seen on the admin page: also shows whether the account is locked out."""
+
+    is_locked: bool = False
+
+
+class AdminUserListResponse(BaseModel):
+    items: list[AdminUserResponse]
     total: int
+
+
+class AdminUserUpdate(BaseModel):
+    """Fields an admin may change. Anything left out stays as it is."""
+
+    role: RoleName | None = None
+    is_active: bool | None = None

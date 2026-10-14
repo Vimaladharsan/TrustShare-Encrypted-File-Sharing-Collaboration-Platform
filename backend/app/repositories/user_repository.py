@@ -43,6 +43,15 @@ class UserRepository:
         )
         return list(result.scalars().all()), total or 0
 
+    async def count_active_with_role(self, role_name: str) -> int:
+        count = await self.session.scalar(
+            select(func.count())
+            .select_from(User)
+            .join(Role, User.role_id == Role.id)
+            .where(Role.name == role_name, User.is_active.is_(True))
+        )
+        return count or 0
+
     # ---------- MFA backup codes ----------
 
     async def replace_backup_codes(self, user_id: uuid.UUID, code_hashes: list[str]) -> None:

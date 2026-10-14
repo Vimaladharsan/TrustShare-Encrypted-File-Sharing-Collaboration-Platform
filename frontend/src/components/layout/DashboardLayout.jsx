@@ -1,8 +1,9 @@
-import { FolderOpen, Search, Settings, Trash2 } from 'lucide-react';
+import { FolderOpen, Search, Settings, Trash2, UsersRound } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useSearchParams } from 'react-router';
 
 import { getUsage } from '../../api/files';
+import { useAuth } from '../../auth/useAuth';
 import Logo from '../Logo';
 import StorageMeter from './StorageMeter';
 import UserMenu from './UserMenu';
@@ -11,11 +12,15 @@ const NAV = [
   { to: '/files', label: 'My Files', icon: FolderOpen },
   { to: '/trash', label: 'Trash', icon: Trash2 },
   { to: '/settings', label: 'Settings', icon: Settings },
+  // Shown only to roles with this permission (the API checks it again).
+  { to: '/admin/users', label: 'Users', icon: UsersRound, permission: 'user:read' },
 ];
 
 /** The workspace frame: sidebar + top bar around every dashboard page (<Outlet />). */
 export default function DashboardLayout() {
+  const { can } = useAuth();
   const [usage, setUsage] = useState(null);
+  const nav = NAV.filter((item) => !item.permission || can(item.permission));
 
   const refreshUsage = useCallback(() => {
     getUsage()
@@ -32,7 +37,7 @@ export default function DashboardLayout() {
       <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200 bg-white p-4 md:flex">
         <Logo className="mb-6 px-2" />
         <nav className="flex flex-col gap-1">
-          {NAV.map(({ to, label, icon: Icon }) => (
+          {nav.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -59,7 +64,7 @@ export default function DashboardLayout() {
         </header>
         {/* Mobile: the sidebar is hidden, so show its links here instead. */}
         <nav className="flex gap-2 border-b border-slate-200 bg-white px-4 py-2 md:hidden">
-          {NAV.map(({ to, label }) => (
+          {nav.map(({ to, label }) => (
             <NavLink
               key={to}
               to={to}

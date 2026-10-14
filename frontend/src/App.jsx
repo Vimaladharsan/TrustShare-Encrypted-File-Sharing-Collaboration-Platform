@@ -2,6 +2,7 @@ import { Link, Route, Routes } from 'react-router';
 
 import DashboardLayout from './components/layout/DashboardLayout';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminUsersPage from './pages/AdminUsersPage';
 import FilesPage from './pages/FilesPage';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="/search" element={<FilesPage mode="search" />} />
         <Route path="/trash" element={<TrashPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/admin/users" element={<AdminUsersPage />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

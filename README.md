@@ -24,7 +24,7 @@ TrustShare is built milestone by milestone. **Milestone 1 (foundation) is comple
 
 ### Roles and permissions
 - **Admin**, **User** and **Guest** roles built from permissions such as `file:upload` or `user:read` – routes check permissions, not role names, so new roles need no code changes
-- Guests are read-only; only Admins can list users; Admins are created from the command line only
+- Guests are read-only; Admins create the first Admin from the command line, then manage users in the **Users** page: change roles, disable/enable accounts (disabled users are logged out everywhere), unlock lockouts – but never their own account or the last admin
 - Ownership checks on every file and folder (other users' items return 404)
 
 ### Secure upload
@@ -182,7 +182,7 @@ Interactive documentation is available at `/docs` while the backend is running.
 | Health | `GET /api/health` |
 | Auth | `POST /api/auth/register`, `/login`, `/mfa/verify`, `/refresh`, `/logout`, `/logout-all` |
 | Profile & MFA | `GET /api/users/me`, `GET /api/users/me/mfa`, `POST /api/users/me/mfa/setup`, `/enable`, `/disable` |
-| Admin | `GET /api/admin/users` (requires `user:read`) |
+| Admin | `GET /api/admin/users` (requires `user:read`), `PATCH /api/admin/users/{id}` (role, enable/disable), `POST /api/admin/users/{id}/unlock` (require `user:manage`) |
 | Files | `POST /api/files` (upload), `GET /api/files`, `GET /api/files/usage`, `GET/PATCH/DELETE /api/files/{id}`, `GET /api/files/{id}/download`, `POST /api/files/{id}/trash`, `/restore` |
 | Folders | `GET/POST /api/folders`, `GET/PATCH/DELETE /api/folders/{id}`, `POST /api/folders/{id}/trash`, `/restore` |
 | Trash | `POST /api/trash/restore`, `/delete`, `/restore-all`, `/empty` |

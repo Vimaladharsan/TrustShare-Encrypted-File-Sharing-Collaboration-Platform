@@ -44,6 +44,16 @@ class LoginGuard:
     async def clear(self, user_id: uuid.UUID) -> None:
         await self.redis.delete(f"login_fail:{user_id}")
 
+    async def locked_ids(self, user_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+        """Which of these accounts are locked right now (one round trip to Redis)."""
+        if not user_ids:
+            return set()
+        async with self.redis.pipeline(transaction=False) as pipe:
+            for user_id in user_ids:
+                pipe.exists(f"lockout:{user_id}")
+            results = await pipe.execute()
+        return {user_id for user_id, locked in zip(user_ids, results, strict=True) if locked}
+
     async def unlock(self, user_id: uuid.UUID) -> None:
         """Used by an admin to unlock an account early."""
         await self.redis.delete(f"lockout:{user_id}", f"login_fail:{user_id}")
