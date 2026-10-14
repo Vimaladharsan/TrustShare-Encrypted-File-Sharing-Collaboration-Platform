@@ -172,8 +172,9 @@ class GoogleOAuthService:
         if user.mfa_enabled:
             challenge_id, _ = await MfaService(self.session, self.redis).create_challenge(user.id)
             return None, challenge_id
-        return await AuthService(self.session, self.redis).start_session(
-            user, client_ip(self.request), self.request.headers.get("user-agent", "")
+        auth = AuthService(self.session, self.redis, self.activity, self.request)
+        return await auth.start_session(
+            user, client_ip(self.request), self.request.headers.get("user-agent", ""), "google"
         )
 
     async def _find_or_create(self, identity: GoogleIdentity) -> User:

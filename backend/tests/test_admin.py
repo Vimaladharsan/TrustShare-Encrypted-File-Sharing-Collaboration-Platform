@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from app.scripts.create_admin import make_admin
 from tests.conftest import TEST_PASSWORD
-from tests.test_auth import auth, login_token, register
+from tests.test_auth import auth, login_token, register, user_id
 
 
 @pytest.fixture
@@ -22,8 +22,8 @@ def admin_token(client: TestClient, new_email: Callable[[], str]) -> str:
 def make_user(client: TestClient, email: str) -> str:
     """Registers a normal user and returns their id."""
     response = register(client, email)
-    assert response.status_code == 201, response.text
-    return response.json()["id"]
+    assert response.status_code == 202, response.text
+    return user_id(client, email)
 
 
 def find_user(client: TestClient, token: str, email: str) -> dict:

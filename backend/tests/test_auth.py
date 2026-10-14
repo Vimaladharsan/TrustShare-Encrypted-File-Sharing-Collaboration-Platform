@@ -4,7 +4,7 @@ from collections.abc import Callable
 from fastapi.testclient import TestClient
 
 from app.scripts.create_admin import make_admin
-from tests.conftest import TEST_PASSWORD
+from tests.conftest import TEST_PASSWORD, FakeSender
 
 
 def register(client: TestClient, email: str, password: str = TEST_PASSWORD):
@@ -24,6 +24,12 @@ def auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def user_id(client: TestClient, email: str, password: str = TEST_PASSWORD) -> str:
+    """Registration no longer returns the account, so look it up by logging in."""
+    token = login_token(client, email, password)
+    return client.get("/api/users/me", headers=auth(token)).json()["id"]
+
+
 # ---------- registration ----------
 
 
@@ -33,12 +39,12 @@ def test_register_creates_user_with_user_role(
     email = new_email()
     response = register(client, email)
 
-    assert response.status_code == 201
-    body = response.json()
-    assert body["email"] == email
-    assert body["role"] == "user"
-    assert "file:upload" in body["permissions"]
-    assert "password" not in str(body).lower()  # no password or hash ever leaves the API
+    assert response.status_code == 202
+    me = client.get("/api/users/me", headers=auth(login_token(client, email))).json()
+    assert me["email"] == email
+    assert me["role"] == "user"
+    assert "file:upload" in me["permissions"]
+    assert "password_hash" not in me and "$2b$" not in str(me)  # the hash never leaves the API
 
 
 def test_register_rejects_weak_password(client: TestClient, new_email: Callable[[], str]) -> None:
@@ -48,16 +54,20 @@ def test_register_rejects_weak_password(client: TestClient, new_email: Callable[
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
-def test_register_rejects_duplicate_email_case_insensitively(
-    client: TestClient, new_email: Callable[[], str]
+def test_existing_email_gets_the_same_answer_and_the_owner_is_told(
+    client: TestClient, new_email: Callable[[], str], outbox: FakeSender
 ) -> None:
     email = new_email()
-    register(client, email)
+    first = register(client, email)
 
-    response = register(client, email.upper())
+    # Same address in capitals (emails are case-insensitive), and a different password.
+    second = register(client, email.upper(), password="An0ther!Passw0rd")
 
-    assert response.status_code == 409
-    assert response.json()["error"]["code"] == "EMAIL_TAKEN"
+    assert second.status_code == first.status_code == 202
+    assert second.json() == first.json()  # nothing reveals that the email was taken
+    notices = [e for e in outbox.sent if "already have" in e.subject]
+    assert len(notices) == 1 and notices[0].to == email
+    assert login_token(client, email)  # the original account and password are untouched
 
 
 # ---------- login ----------

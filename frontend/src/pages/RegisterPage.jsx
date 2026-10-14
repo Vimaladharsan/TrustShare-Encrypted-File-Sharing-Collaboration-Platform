@@ -33,10 +33,10 @@ export default function RegisterPage() {
     setError('');
     setSubmitting(true);
     try {
-      await register(fullName.trim(), email, password);
-      toast.success(
-        'Account created. We sent a verification link to your email – you can log in now.',
-      );
+      // The server answers the same for new and already-registered emails (no account
+      // discovery), so show its message rather than claiming "account created".
+      const { message } = await register(fullName.trim(), email, password);
+      toast.success(message, { duration: 8000 });
       navigate('/login', { state: { email } });
     } catch (err) {
       setError(getErrorMessage(err));

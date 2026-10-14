@@ -1,4 +1,4 @@
-import { api } from './client';
+import { api, setAccessToken } from './client';
 
 // The logged-in user's own account settings (see backend app/api/routes/users.py).
 
@@ -21,4 +21,14 @@ export async function enableMfa(code) {
 
 export async function disableMfa(password, code) {
   await api.post('/users/me/mfa/disable', { password, code });
+}
+
+/** Changes the password. Other devices are logged out; this one gets a new session. */
+export async function changePassword(currentPassword, newPassword) {
+  const { data } = await api.post('/users/me/password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+  });
+  setAccessToken(data.access_token); // the old token stopped working with the change
+  return data;
 }

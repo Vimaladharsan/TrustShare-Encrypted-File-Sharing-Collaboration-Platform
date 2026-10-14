@@ -1,11 +1,15 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, Response, status
+from pymongo.asynchronous.database import AsyncDatabase
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
+from app.api.routes.auth import set_refresh_cookie
+from app.db.mongo import get_mongo
 from app.db.postgres import get_db
 from app.db.redis import get_redis
 from app.models import User
+from app.schemas.auth import ChangePasswordRequest, TokenResponse
 from app.schemas.mfa import (
     MfaCodeRequest,
     MfaDisableRequest,
@@ -14,6 +18,7 @@ from app.schemas.mfa import (
     MfaStatusResponse,
 )
 from app.schemas.user import UserResponse
+from app.services.account_service import AccountService
 from app.services.mfa_service import MfaService
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -22,6 +27,28 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get("/me", response_model=UserResponse, summary="The logged-in user's profile")
 async def read_me(user: User = Depends(get_current_user)) -> UserResponse:
     return UserResponse.from_user(user)
+
+
+@router.post(
+    "/me/password",
+    response_model=TokenResponse,
+    summary="Change my password (logs out every other device; this one gets a new session)",
+)
+async def change_password(
+    data: ChangePasswordRequest,
+    request: Request,
+    response: Response,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+    db: AsyncDatabase = Depends(get_mongo),
+) -> TokenResponse:
+    service = AccountService(session, redis, db, request)
+    tokens, refresh_token = await service.change_password(
+        user, data.current_password, data.new_password
+    )
+    set_refresh_cookie(response, refresh_token)
+    return tokens
 
 
 # ---------- two-step verification (MFA) ----------

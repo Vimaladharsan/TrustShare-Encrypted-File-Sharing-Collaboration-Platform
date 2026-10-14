@@ -18,6 +18,7 @@ class UserResponse(BaseModel):
     is_active: bool
     is_email_verified: bool
     mfa_enabled: bool
+    has_password: bool  # False for accounts created with Google (they log in with Google)
     created_at: datetime
     last_login_at: datetime | None
 
@@ -32,6 +33,7 @@ class UserResponse(BaseModel):
             is_active=user.is_active,
             is_email_verified=user.is_email_verified,
             mfa_enabled=user.mfa_enabled,
+            has_password=user.password_hash is not None,
             created_at=user.created_at,
             last_login_at=user.last_login_at,
         )

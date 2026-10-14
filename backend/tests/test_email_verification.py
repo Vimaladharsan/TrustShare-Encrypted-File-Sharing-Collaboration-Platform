@@ -41,8 +41,8 @@ def test_sign_up_sends_a_verification_link(
 
     response = register(client, email)
 
-    assert response.status_code == 201
-    assert response.json()["is_email_verified"] is False
+    assert response.status_code == 202
+    assert me(client, email)["is_email_verified"] is False
     emails = outbox.links("verify-email")
     assert len(emails) == 1
     assert emails[0].to == email

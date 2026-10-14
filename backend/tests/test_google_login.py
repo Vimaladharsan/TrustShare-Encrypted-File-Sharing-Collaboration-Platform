@@ -16,7 +16,7 @@ from app.core.config import get_settings
 from app.main import app
 from app.models import User
 from app.services.google_oauth_service import GoogleIdentity, get_google_client
-from tests.test_auth import register
+from tests.test_auth import register, user_id
 
 
 class FakeGoogle:
@@ -109,7 +109,9 @@ def test_existing_account_with_same_email_is_linked(
     client: TestClient, new_email: Callable[[], str], google: FakeGoogle
 ) -> None:
     email = new_email()
-    user_id = register(client, email).json()["id"]
+    register(client, email)
+    registered_id = user_id(client, email)
+    client.cookies.clear()
     sub = uuid.uuid4().hex
 
     sign_in(client, google, email, sub)
@@ -119,7 +121,7 @@ def test_existing_account_with_same_email_is_linked(
     sign_in(client, google, new_email(), sub)
     second = client.post("/api/auth/refresh").json()["user"]
 
-    assert first["id"] == second["id"] == user_id
+    assert first["id"] == second["id"] == registered_id
 
 
 def test_state_must_match(client: TestClient, google: FakeGoogle) -> None:

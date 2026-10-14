@@ -53,6 +53,14 @@ export default function AuthProvider({ children }) {
     }
   }, [clearSession]);
 
+  const logoutAll = useCallback(async () => {
+    try {
+      await authApi.logoutAll();
+    } finally {
+      clearSession();
+    }
+  }, [clearSession]);
+
   const value = useMemo(
     () => ({
       user,
@@ -60,11 +68,12 @@ export default function AuthProvider({ children }) {
       login,
       completeMfa,
       logout,
+      logoutAll,
       refreshUser,
       register: authApi.register,
       can: (permission) => Boolean(user?.permissions.includes(permission)),
     }),
-    [user, status, login, completeMfa, logout, refreshUser],
+    [user, status, login, completeMfa, logout, logoutAll, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

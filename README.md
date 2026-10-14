@@ -16,9 +16,10 @@ TrustShare is built milestone by milestone. **Milestone 1 (foundation) is comple
 ## Features
 
 ### Authentication and sessions
-- Registration with password-strength rules (checked live in the UI and enforced on the server); passwords hashed with **bcrypt**
+- Registration with password-strength rules (checked live in the UI and enforced on the server); passwords hashed with **bcrypt**; the same answer for new and already-registered emails (the owner gets a notice email), so sign-up can't reveal who has an account
 - **JWT access tokens** (15 min, kept in memory only) and **rotating refresh tokens** (7 days, HttpOnly cookie, stored hashed in Redis) with reuse detection
-- Logout and logout from all devices
+- Logout, and **log out of all devices** from Settings
+- **Change password** in Settings (confirms the current one; other devices are logged out)
 - **Google login** (OAuth 2.0 Authorization Code flow with PKCE): ID token verified against Google's keys; links to an existing account with the same verified email, otherwise creates a User; MFA still required if enabled
 - **Email verification**: a single-use link (24 h) is emailed on sign-up; unverified users see a reminder with a Resend button (or are blocked from logging in with `REQUIRE_EMAIL_VERIFICATION=true`)
 - **Forgot password**: emailed single-use reset link (15 min, stored only as a hash); resetting logs out every device
@@ -46,7 +47,7 @@ TrustShare is built milestone by milestone. **Milestone 1 (foundation) is comple
 - Buttons adapt to the user's permissions (enforced by the backend regardless)
 
 ### Platform
-- **Activity log** in MongoDB for every important action, including rejected uploads (who, what, IP, user agent, request ID)
+- **Activity log** in MongoDB for every important action, including **login history** (successful logins with method, failed logins with reason, lockouts) and rejected uploads (who, what, IP, user agent, request ID)
 - Health endpoint that checks PostgreSQL, MongoDB and Redis
 - Standard JSON error format with request IDs, security headers, structured logging
 - Everything runs with Docker Compose; database migrations run automatically on start
@@ -188,7 +189,7 @@ Interactive documentation is available at `/docs` while the backend is running.
 |---|---|
 | Health | `GET /api/health` |
 | Auth | `POST /api/auth/register`, `/login`, `/mfa/verify`, `/refresh`, `/logout`, `/logout-all`, `/forgot-password`, `/reset-password`, `/verify-email`, `/verify-email/resend`; `GET /api/auth/providers`, `/google/login`, `/google/callback` |
-| Profile & MFA | `GET /api/users/me`, `GET /api/users/me/mfa`, `POST /api/users/me/mfa/setup`, `/enable`, `/disable` |
+| Profile & MFA | `GET /api/users/me`, `POST /api/users/me/password`, `GET /api/users/me/mfa`, `POST /api/users/me/mfa/setup`, `/enable`, `/disable` |
 | Admin | `GET /api/admin/users` (requires `user:read`), `PATCH /api/admin/users/{id}` (role, enable/disable), `POST /api/admin/users/{id}/unlock` (require `user:manage`) |
 | Files | `POST /api/files` (upload), `GET /api/files`, `GET /api/files/usage`, `GET/PATCH/DELETE /api/files/{id}`, `GET /api/files/{id}/download`, `GET /api/files/{id}/preview`, `POST /api/files/{id}/trash`, `/restore` |
 | Folders | `GET/POST /api/folders`, `GET/PATCH/DELETE /api/folders/{id}`, `POST /api/folders/{id}/trash`, `/restore` |

@@ -28,6 +28,15 @@ export async function logout() {
   }
 }
 
+/** Ends every session of this account, on all devices (this one included). */
+export async function logoutAll() {
+  try {
+    await api.post('/auth/logout-all');
+  } finally {
+    setAccessToken(null);
+  }
+}
+
 export async function fetchMe() {
   const { data } = await api.get('/users/me');
   return data;

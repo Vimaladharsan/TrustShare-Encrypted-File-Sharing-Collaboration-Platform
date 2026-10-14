@@ -29,9 +29,9 @@ from app.schemas.auth import (
     VerifyEmailRequest,
 )
 from app.schemas.mfa import MfaRequiredResponse, MfaVerifyRequest
-from app.schemas.user import UserResponse
+from app.services.activity_service import ActivityService
 from app.services.auth_service import AuthService
-from app.services.email_service import EmailSender, get_email_sender
+from app.services.email_service import EmailSender, account_exists_email, get_email_sender
 from app.services.email_verification_service import EmailVerificationService
 from app.services.google_oauth_service import (
     GoogleClient,
@@ -64,11 +64,17 @@ def clear_refresh_cookie(response: Response) -> None:
     response.delete_cookie(REFRESH_COOKIE, path=REFRESH_COOKIE_PATH)
 
 
+REGISTER_MESSAGE = (
+    "Thanks! We've sent you an email – check your inbox. "
+    "If this email is new, your account is ready and you can log in now."
+)
+
+
 @router.post(
     "/register",
-    response_model=UserResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Create a new account (role: user)",
+    response_model=MessageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Create a new account (role: user) – same answer whether or not the email is taken",
     dependencies=[Depends(rate_limit("register", "register_rate_limit_per_minute"))],
 )
 async def register(
@@ -79,11 +85,18 @@ async def register(
     redis: Redis = Depends(get_redis),
     db: AsyncDatabase = Depends(get_mongo),
     sender: EmailSender = Depends(get_email_sender),
-) -> UserResponse:
-    user = await AuthService(session, redis).register(data)
-    email = await EmailVerificationService(session, redis, db, request).create_email(user)
-    background_tasks.add_task(sender.send, email)  # "Verify your email", sent after the reply
-    return UserResponse.from_user(user)
+) -> MessageResponse:
+    user, created = await AuthService(session, redis).register(data)
+    if created:
+        email = await EmailVerificationService(session, redis, db, request).create_email(user)
+    else:
+        # Tell the real owner instead of telling the visitor "this email is taken".
+        base = get_settings().frontend_url
+        email = account_exists_email(
+            user.email, user.full_name, f"{base}/login", f"{base}/forgot-password"
+        )
+    background_tasks.add_task(sender.send, email)  # sent after the reply, same timing
+    return MessageResponse(message=REGISTER_MESSAGE)
 
 
 @router.post(
@@ -98,8 +111,10 @@ async def login(
     response: Response,
     session: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),
+    db: AsyncDatabase = Depends(get_mongo),
 ) -> TokenResponse | MfaRequiredResponse:
-    result, refresh_token = await AuthService(session, redis).login(
+    auth = AuthService(session, redis, ActivityService(db), request)  # logs login history
+    result, refresh_token = await auth.login(
         data, client_ip(request), request.headers.get("user-agent", "")
     )
     if refresh_token:  # no cookie until the second factor is passed
@@ -119,8 +134,10 @@ async def verify_mfa(
     response: Response,
     session: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),
+    db: AsyncDatabase = Depends(get_mongo),
 ) -> TokenResponse:
-    tokens, refresh_token = await AuthService(session, redis).verify_mfa(
+    auth = AuthService(session, redis, ActivityService(db), request)
+    tokens, refresh_token = await auth.verify_mfa(
         data, client_ip(request), request.headers.get("user-agent", "")
     )
     set_refresh_cookie(response, refresh_token)
@@ -176,15 +193,18 @@ async def logout(
     summary="Log out of every device",
 )
 async def logout_all(
+    request: Request,
     response: Response,
     user: User = Depends(get_current_user),
     payload: dict[str, Any] = Depends(get_token_payload),
     redis: Redis = Depends(get_redis),
+    db: AsyncDatabase = Depends(get_mongo),
 ) -> None:
     sessions = SessionService(redis)
     await sessions.revoke_all(user.id)
     await sessions.deny_access_token(payload["jti"], payload["exp"])
     clear_refresh_cookie(response)
+    await ActivityService(db).log(request, user, "auth.logout_all", resource_type="user")
 
 
 # ---------- forgot / reset password ----------

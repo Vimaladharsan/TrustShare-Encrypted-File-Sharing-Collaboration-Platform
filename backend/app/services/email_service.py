@@ -106,6 +106,32 @@ def verification_email(to: str, name: str, link: str, hours: int) -> Email:
     )
 
 
+def account_exists_email(to: str, name: str, login_link: str, reset_link: str) -> Email:
+    """Sent when someone signs up with an email that already has an account."""
+    safe_name = html.escape(name)
+    return Email(
+        to=to,
+        subject="You already have a TrustShare account",
+        text=(
+            f"Hi {name},\n\n"
+            "Someone tried to create a TrustShare account with this email address, but you "
+            "already have one.\n\n"
+            f"If it was you, just log in: {login_link}\n"
+            f"Forgot your password? Reset it here: {reset_link}\n\n"
+            "If it wasn't you, you can ignore this email – nothing has changed.\n"
+        ),
+        html=_layout(
+            "You already have an account",
+            f"<p>Hi {safe_name},</p><p>Someone tried to create a TrustShare account with this "
+            "email address, but you already have one. If it was you, just log in. "
+            f'Forgot your password? <a href="{html.escape(reset_link)}">Reset it here</a>.</p>',
+            "Log in",
+            login_link,
+            "If it wasn't you, you can ignore this email – nothing has changed.",
+        ),
+    )
+
+
 def password_reset_email(to: str, name: str, link: str, minutes: int) -> Email:
     safe_name = html.escape(name)
     return Email(

@@ -93,14 +93,15 @@ sequenceDiagram
     API->>API: Validate (Pydantic + password policy)
     API->>PG: SELECT user by email
     alt email already exists
-        API-->>FE: 201 (same response, no user enumeration)
+        API->>MAIL: Send "you already have an account" notice to the owner
+        API-->>FE: 202 (same response, no user enumeration)
     else new email
         API->>API: bcrypt.hash(password, cost 12)
         API->>PG: INSERT user (role = user, verified = false)
         API->>R: SET email_verify:{sha256(token)} = user_id, TTL 24h
         API->>MAIL: Send link /verify-email?token=...
         API->>MO: activity_logs ← auth.register
-        API-->>FE: 201 "Check your email"
+        API-->>FE: 202 "Check your email" (same message as above)
     end
     U->>FE: Click link in email
     FE->>API: POST /api/auth/verify-email {token}

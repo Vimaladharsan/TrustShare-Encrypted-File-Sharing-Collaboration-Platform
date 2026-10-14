@@ -1,17 +1,22 @@
-import { ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Lock, LogOut, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
-import { getMfaStatus, startMfaSetup } from '../api/account';
+import { changePassword, getMfaStatus, startMfaSetup } from '../api/account';
 import { getErrorMessage } from '../api/client';
 import { useAuth } from '../auth/useAuth';
 import Button from '../components/Button';
+import ConfirmDialog from '../components/ConfirmDialog';
+import FormField from '../components/FormField';
+import PasswordChecklist from '../components/PasswordChecklist';
 import MfaDisableDialog from '../components/settings/MfaDisableDialog';
 import MfaSetupDialog from '../components/settings/MfaSetupDialog';
 import { ErrorState, Loading } from '../components/StateMessage';
 import { formatDate } from '../utils/format';
+import { passwordMeetsRules } from '../utils/passwordRules';
 
-/** Account settings: profile details and two-step verification. */
+/** Account settings: profile, password, two-step verification and sessions. */
 export default function SettingsPage() {
   const { user } = useAuth();
 
@@ -64,8 +69,16 @@ export default function SettingsPage() {
         </div>
       </Card>
 
+      <Card title="Password">
+        <PasswordSection />
+      </Card>
+
       <Card title="Two-step verification">
         <MfaSection />
+      </Card>
+
+      <Card title="Sessions">
+        <SessionsSection />
       </Card>
     </div>
   );
@@ -165,6 +178,121 @@ function MfaSection() {
         />
       )}
     </>
+  );
+}
+
+function PasswordSection() {
+  const { user } = useAuth();
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  if (!user.has_password) {
+    return (
+      <p className="text-sm text-slate-600">
+        You sign in with Google, so your account has no password. To add one, use{' '}
+        <strong>Forgot password</strong> on the login page.
+      </p>
+    );
+  }
+
+  const matches = next === confirm;
+  const canSubmit = current && passwordMeetsRules(next) && matches;
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setSaving(true);
+    try {
+      await changePassword(current, next);
+      setCurrent('');
+      setNext('');
+      setConfirm('');
+      toast.success('Password changed. Your other devices have been logged out.');
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="max-w-md space-y-4">
+      <FormField
+        label="Current password"
+        icon={Lock}
+        type="password"
+        value={current}
+        onChange={(e) => setCurrent(e.target.value)}
+        autoComplete="current-password"
+        required
+      />
+      <div>
+        <FormField
+          label="New password"
+          icon={Lock}
+          type="password"
+          value={next}
+          onChange={(e) => setNext(e.target.value)}
+          autoComplete="new-password"
+          required
+        />
+        {next && <PasswordChecklist password={next} />}
+      </div>
+      <FormField
+        label="Confirm new password"
+        icon={Lock}
+        type="password"
+        value={confirm}
+        onChange={(e) => setConfirm(e.target.value)}
+        autoComplete="new-password"
+        hint={confirm && !matches ? 'Passwords do not match' : undefined}
+        required
+      />
+      {error && (
+        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </p>
+      )}
+      <Button type="submit" loading={saving} disabled={!canSubmit}>
+        Change password
+      </Button>
+    </form>
+  );
+}
+
+function SessionsSection() {
+  const { logoutAll } = useAuth();
+  const navigate = useNavigate();
+  const [confirming, setConfirming] = useState(false);
+
+  async function handleLogoutAll() {
+    await logoutAll();
+    toast.success('You have been logged out on every device.');
+    navigate('/login');
+  }
+
+  return (
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-slate-600">
+        Lost a device, or logged in on a shared computer? End every session of your account –
+        including this one.
+      </p>
+      <Button variant="secondary" onClick={() => setConfirming(true)} className="shrink-0">
+        <LogOut className="size-4" aria-hidden="true" /> Log out of all devices
+      </Button>
+      {confirming && (
+        <ConfirmDialog
+          title="Log out of all devices?"
+          message="Every device signed in to your account – this one too – will need to log in again."
+          confirmLabel="Log out everywhere"
+          onConfirm={handleLogoutAll}
+          onClose={() => setConfirming(false)}
+        />
+      )}
+    </div>
   );
 }
 
