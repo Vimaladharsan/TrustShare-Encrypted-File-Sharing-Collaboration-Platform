@@ -129,6 +129,15 @@ export default function LoginPage() {
           autoComplete="current-password"
           required
         />
+        <div className="-mt-2 text-right">
+          <Link
+            to="/forgot-password"
+            state={{ email }}
+            className="text-sm font-medium text-blue-600 hover:underline"
+          >
+            Forgot password?
+          </Link>
+        </div>
         {error && <ErrorBox message={error} />}
         <Button type="submit" loading={submitting} className="w-full">
           Log in

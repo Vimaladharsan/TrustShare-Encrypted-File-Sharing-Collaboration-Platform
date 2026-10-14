@@ -2,8 +2,9 @@ import contextlib
 from typing import Any
 
 import jwt
-from fastapi import APIRouter, Cookie, Depends, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials
+from pymongo.asynchronous.database import AsyncDatabase
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,13 +13,23 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.rate_limit import client_ip, rate_limit
 from app.core.security import decode_access_token
+from app.db.mongo import get_mongo
 from app.db.postgres import get_db
 from app.db.redis import get_redis
 from app.models import User
-from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
+from app.schemas.auth import (
+    ForgotPasswordRequest,
+    LoginRequest,
+    MessageResponse,
+    RegisterRequest,
+    ResetPasswordRequest,
+    TokenResponse,
+)
 from app.schemas.mfa import MfaRequiredResponse, MfaVerifyRequest
 from app.schemas.user import UserResponse
 from app.services.auth_service import AuthService
+from app.services.email_service import EmailSender, get_email_sender
+from app.services.password_reset_service import PasswordResetService
 from app.services.session_service import SessionService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -159,3 +170,50 @@ async def logout_all(
     await sessions.revoke_all(user.id)
     await sessions.deny_access_token(payload["jti"], payload["exp"])
     clear_refresh_cookie(response)
+
+
+# ---------- forgot / reset password ----------
+
+
+def reset_service(
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+    db: AsyncDatabase = Depends(get_mongo),
+) -> PasswordResetService:
+    return PasswordResetService(session, redis, db, request)
+
+
+@router.post(
+    "/forgot-password",
+    response_model=MessageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Email a password reset link (same answer whether or not the account exists)",
+    dependencies=[Depends(rate_limit("forgot", "forgot_password_rate_limit_per_minute"))],
+)
+async def forgot_password(
+    data: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    service: PasswordResetService = Depends(reset_service),
+    sender: EmailSender = Depends(get_email_sender),
+) -> MessageResponse:
+    email = await service.request_reset(data.email)
+    if email:
+        background_tasks.add_task(sender.send, email)  # sent after the response goes out
+    return MessageResponse(
+        message="If an account exists for this email, we've sent a link to reset the password."
+    )
+
+
+@router.post(
+    "/reset-password",
+    response_model=MessageResponse,
+    summary="Choose a new password using the link from the email (logs out every device)",
+    dependencies=[Depends(rate_limit("forgot", "forgot_password_rate_limit_per_minute"))],
+)
+async def reset_password(
+    data: ResetPasswordRequest,
+    service: PasswordResetService = Depends(reset_service),
+) -> MessageResponse:
+    await service.reset(data.token, data.new_password)
+    return MessageResponse(message="Your password has been changed. Please log in.")

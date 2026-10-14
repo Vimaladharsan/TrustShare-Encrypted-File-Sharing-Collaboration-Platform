@@ -1,4 +1,4 @@
-import { Check, Circle, Lock, Mail, User } from 'lucide-react';
+import { Lock, Mail, User } from 'lucide-react';
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -8,14 +8,8 @@ import { useAuth } from '../auth/useAuth';
 import AuthLayout from '../components/AuthLayout';
 import Button from '../components/Button';
 import FormField from '../components/FormField';
-
-// Same rules as the backend (app/schemas/auth.py). The backend checks again – this is for UX.
-const RULES = [
-  { label: 'At least 10 characters', test: (p) => p.length >= 10 },
-  { label: 'An uppercase and a lowercase letter', test: (p) => /[a-z]/.test(p) && /[A-Z]/.test(p) },
-  { label: 'A number', test: (p) => /\d/.test(p) },
-  { label: 'A symbol', test: (p) => /[^A-Za-z0-9]/.test(p) },
-];
+import PasswordChecklist from '../components/PasswordChecklist';
+import { passwordMeetsRules } from '../utils/passwordRules';
 
 export default function RegisterPage() {
   const { status, register } = useAuth();
@@ -29,7 +23,7 @@ export default function RegisterPage() {
 
   if (status === 'authenticated') return <Navigate to="/files" replace />;
 
-  const passwordOk = RULES.every((rule) => rule.test(password));
+  const passwordOk = passwordMeetsRules(password);
   const matches = password === confirm;
   const canSubmit = fullName.trim().length >= 2 && email && passwordOk && matches;
 
@@ -89,20 +83,7 @@ export default function RegisterPage() {
             autoComplete="new-password"
             required
           />
-          <ul className="mt-2 space-y-1">
-            {RULES.map((rule) => {
-              const ok = rule.test(password);
-              return (
-                <li
-                  key={rule.label}
-                  className={`flex items-center gap-2 text-xs ${ok ? 'text-green-600' : 'text-slate-500'}`}
-                >
-                  {ok ? <Check className="size-3.5" /> : <Circle className="size-3.5" />}
-                  {rule.label}
-                </li>
-              );
-            })}
-          </ul>
+          <PasswordChecklist password={password} />
         </div>
         <FormField
           label="Confirm password"

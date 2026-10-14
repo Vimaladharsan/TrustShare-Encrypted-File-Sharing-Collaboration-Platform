@@ -32,3 +32,15 @@ export async function fetchMe() {
   const { data } = await api.get('/users/me');
   return data;
 }
+
+// ---------- forgot / reset password ----------
+
+export async function forgotPassword(email) {
+  const { data } = await api.post('/auth/forgot-password', { email });
+  return data.message;
+}
+
+export async function resetPassword(token, newPassword) {
+  const { data } = await api.post('/auth/reset-password', { token, new_password: newPassword });
+  return data.message;
+}

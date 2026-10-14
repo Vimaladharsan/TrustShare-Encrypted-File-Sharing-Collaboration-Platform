@@ -5,7 +5,7 @@ Redis keys (all expire automatically):
     refresh_used:{hash}       -> user_id of an already-rotated token (for reuse detection)
     user_sessions:{user_id}   -> set of the user's active refresh-token hashes
     access_denylist:{jti}     -> access token revoked by logout (until it would expire anyway)
-    revoked_before:{user_id}  -> access tokens issued before this time are invalid (logout-all)
+    revoked_before:{user_id}  -> access tokens issued before this time (ms) are invalid (logout-all)
 """
 
 import hashlib
@@ -101,9 +101,9 @@ class SessionService:
             for token_hash in token_hashes:
                 pipe.delete(f"refresh:{token_hash}")
             pipe.delete(sessions_key)
-            # Access tokens issued before this second stop working (they last at most access_ttl).
-            # Whole seconds, because a JWT's "iat" claim is in whole seconds.
-            pipe.set(f"revoked_before:{user_id}", str(int(time.time())), ex=self.access_ttl)
+            # Access tokens issued before this moment stop working (they last at most access_ttl).
+            # Milliseconds, so a token issued earlier in the same second is caught too.
+            pipe.set(f"revoked_before:{user_id}", str(int(time.time() * 1000)), ex=self.access_ttl)
             await pipe.execute()
 
     async def deny_access_token(self, jti: str, expires_at: int) -> None:
@@ -112,9 +112,11 @@ class SessionService:
         if remaining > 0:
             await self.redis.set(f"access_denylist:{jti}", "1", ex=remaining)
 
-    async def is_access_token_revoked(self, user_id: uuid.UUID, jti: str, issued_at: int) -> bool:
+    async def is_access_token_revoked(
+        self, user_id: uuid.UUID, jti: str, issued_at_ms: int
+    ) -> bool:
         async with self.redis.pipeline(transaction=False) as pipe:
             pipe.exists(f"access_denylist:{jti}")
             pipe.get(f"revoked_before:{user_id}")
             denied, revoked_before = await pipe.execute()
-        return bool(denied) or (revoked_before is not None and issued_at < int(revoked_before))
+        return bool(denied) or (revoked_before is not None and issued_at_ms < int(revoked_before))

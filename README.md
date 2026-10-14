@@ -19,6 +19,7 @@ TrustShare is built milestone by milestone. **Milestone 1 (foundation) is comple
 - Registration with password-strength rules (checked live in the UI and enforced on the server); passwords hashed with **bcrypt**
 - **JWT access tokens** (15 min, kept in memory only) and **rotating refresh tokens** (7 days, HttpOnly cookie, stored hashed in Redis) with reuse detection
 - Logout and logout from all devices
+- **Forgot password**: emailed single-use reset link (15 min, stored only as a hash); resetting logs out every device
 - **Two-step verification (TOTP)** with QR-code setup for Google Authenticator and one-time backup codes
 - Account lockout after 5 failed logins (15 min) and per-IP rate limiting on login and registration
 
@@ -168,6 +169,8 @@ See [.env.example](.env.example).
 | `REDIS_PASSWORD` | Redis password |
 | `JWT_SECRET` | Signs access tokens (at least 32 characters) |
 | `MFA_ENCRYPTION_KEY` | Encrypts two-step verification secrets at rest |
+| `SMTP_USER` / `SMTP_PASSWORD` | Optional Gmail account + app password for sending emails (otherwise emails go to the backend log) |
+| `FRONTEND_URL` | Base URL used in email links (default `http://localhost:5173`) |
 
 Optional settings with defaults include `MAX_UPLOAD_MB` (25), `DEFAULT_QUOTA_MB` (1024), `ACCESS_TOKEN_TTL_MINUTES` (15), `REFRESH_TOKEN_TTL_DAYS` (7), `MAX_FAILED_LOGINS` (5) and `LOCKOUT_MINUTES` (15).
 
@@ -180,7 +183,7 @@ Interactive documentation is available at `/docs` while the backend is running.
 | Area | Endpoints |
 |---|---|
 | Health | `GET /api/health` |
-| Auth | `POST /api/auth/register`, `/login`, `/mfa/verify`, `/refresh`, `/logout`, `/logout-all` |
+| Auth | `POST /api/auth/register`, `/login`, `/mfa/verify`, `/refresh`, `/logout`, `/logout-all`, `/forgot-password`, `/reset-password` |
 | Profile & MFA | `GET /api/users/me`, `GET /api/users/me/mfa`, `POST /api/users/me/mfa/setup`, `/enable`, `/disable` |
 | Admin | `GET /api/admin/users` (requires `user:read`), `PATCH /api/admin/users/{id}` (role, enable/disable), `POST /api/admin/users/{id}/unlock` (require `user:manage`) |
 | Files | `POST /api/files` (upload), `GET /api/files`, `GET /api/files/usage`, `GET/PATCH/DELETE /api/files/{id}`, `GET /api/files/{id}/download`, `GET /api/files/{id}/preview`, `POST /api/files/{id}/trash`, `/restore` |

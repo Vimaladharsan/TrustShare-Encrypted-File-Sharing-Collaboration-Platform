@@ -95,6 +95,7 @@ def client() -> Iterator[TestClient]:
     settings = get_settings()
     settings.login_rate_limit_per_minute = 1000
     settings.register_rate_limit_per_minute = 1000
+    settings.forgot_password_rate_limit_per_minute = 1000
     clear_rate_limits()
 
     # Using TestClient as a context manager runs the app's startup/shutdown (DB connections).

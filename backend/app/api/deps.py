@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError
 from app.core.permissions import Perm
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, issued_at_ms
 from app.db.postgres import get_db
 from app.db.redis import get_redis
 from app.models import User
@@ -47,7 +47,7 @@ async def get_token_payload(
 
     # Logged out (this token) or logged out everywhere (all tokens before that moment).
     if await SessionService(redis).is_access_token_revoked(
-        user_id, payload.get("jti", ""), payload["iat"]
+        user_id, payload.get("jti", ""), issued_at_ms(payload)
     ):
         raise _invalid_token()
     return payload
@@ -64,7 +64,8 @@ async def get_current_user(
         raise _invalid_token()
 
     # Tokens issued before the last password change are no longer accepted.
-    if user.password_changed_at and payload["iat"] < user.password_changed_at.timestamp():
+    changed = user.password_changed_at
+    if changed and issued_at_ms(payload) < changed.timestamp() * 1000:
         raise _invalid_token()
     return user
 

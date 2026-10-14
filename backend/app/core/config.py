@@ -50,6 +50,16 @@ class Settings(BaseSettings):
     lockout_minutes: int = 15
     login_rate_limit_per_minute: int = 10  # per IP address
     register_rate_limit_per_minute: int = 5  # per IP address
+    forgot_password_rate_limit_per_minute: int = 5  # per IP address
+
+    # Email (Gmail SMTP). Without SMTP_USER/SMTP_PASSWORD, emails are written to the log instead.
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587  # STARTTLS
+    smtp_user: str = ""
+    smtp_password: SecretStr = SecretStr("")
+    mail_from_name: str = "TrustShare"
+    frontend_url: str = "http://localhost:5173"  # where links in emails point to
+    password_reset_minutes: int = 15
 
     # Files
     default_quota_mb: int = 1024

@@ -247,7 +247,7 @@ All routes are under `/api`. Interactive docs: `http://localhost:8000/docs`.
 | POST | `/auth/refresh` | refresh cookie | Rotate refresh token, new access token |
 | POST | `/auth/logout` | logged in | Revoke current session |
 | POST | `/auth/logout-all` | logged in | Revoke all sessions |
-| POST | `/auth/forgot-password` | public | Email reset link (always 200) |
+| POST | `/auth/forgot-password` | public | Email reset link (always 202, same answer for unknown emails) |
 | POST | `/auth/reset-password` | public (token) | Set new password, revoke sessions |
 | GET | `/auth/google/login` · `/auth/google/callback` | public | Google OAuth |
 | GET | `/users/me` | logged in | Profile, role, permissions, storage usage |

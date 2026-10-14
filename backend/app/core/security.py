@@ -1,6 +1,8 @@
 """Password hashing (bcrypt) and access tokens (JWT)."""
 
 import contextlib
+import hashlib
+import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
@@ -14,6 +16,16 @@ from app.core.config import get_settings
 
 # Cost factor 12 = 2^12 rounds: ~0.25 s per hash. Slow for attackers, unnoticeable for users.
 BCRYPT_ROUNDS = 12
+
+
+def new_url_token() -> str:
+    """Random token for links in emails (256 bits – impossible to guess)."""
+    return secrets.token_urlsafe(32)
+
+
+def hash_token(token: str) -> str:
+    """Only this hash is stored, so a database or Redis leak doesn't reveal usable links."""
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def hash_password(password: str) -> str:
@@ -59,13 +71,21 @@ def create_access_token(user_id: uuid.UUID, role: str) -> tuple[str, int]:
         "role": role,
         "type": "access",
         "jti": uuid.uuid4().hex,  # unique token id (used to revoke it on logout in Phase 3B)
-        "iat": now,  # issued at
+        "iat": now,  # issued at (whole seconds, as the JWT standard defines it)
+        # Same moment in milliseconds: "log out everywhere" and password changes block tokens
+        # issued before them – whole seconds would let a token from the same second through.
+        "iat_ms": int(now.timestamp() * 1000),
         "exp": now + lifetime,  # expires at
     }
     token = jwt.encode(
         payload, settings.jwt_secret.get_secret_value(), algorithm=settings.jwt_algorithm
     )
     return token, int(lifetime.total_seconds())
+
+
+def issued_at_ms(payload: dict[str, Any]) -> int:
+    """When a token was issued, in milliseconds (older tokens only have whole seconds)."""
+    return int(payload.get("iat_ms", payload["iat"] * 1000))
 
 
 def decode_access_token(token: str) -> dict[str, Any]:
