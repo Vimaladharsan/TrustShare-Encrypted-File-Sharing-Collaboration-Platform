@@ -61,6 +61,18 @@ export async function downloadFile(file) {
   URL.revokeObjectURL(url);
 }
 
+/** Types the browser can display (same list as the backend's PREVIEWABLE). */
+export const PREVIEWABLE = ['pdf', 'png', 'jpg', 'jpeg', 'txt', 'csv'];
+
+/**
+ * Fetches a file for the preview dialog. Like downloads, it goes through the API client so the
+ * login token is sent; the result is a Blob the page can show without saving it.
+ */
+export async function previewFile(fileId, signal) {
+  const response = await api.get(`/files/${fileId}/preview`, { responseType: 'blob', signal });
+  return response.data;
+}
+
 // ---------- folders ----------
 
 export async function listFolders({ parentId, trashed } = {}) {

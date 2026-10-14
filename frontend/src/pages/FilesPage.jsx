@@ -1,5 +1,6 @@
 import {
   Download,
+  Eye,
   FolderInput,
   FolderPlus,
   Inbox,
@@ -27,6 +28,7 @@ import {
 import { useAuth } from '../auth/useAuth';
 import Button from '../components/Button';
 import Breadcrumbs from '../components/files/Breadcrumbs';
+import FilePreviewDialog from '../components/files/FilePreviewDialog';
 import FileTable from '../components/files/FileTable';
 import FolderGrid from '../components/files/FolderGrid';
 import UploadModal from '../components/files/UploadModal';
@@ -110,6 +112,7 @@ export default function FilesPage({ mode = 'folder' }) {
   const canManageFolders = can('folder:manage');
 
   const fileActions = (file) => [
+    { label: 'Preview', icon: Eye, onClick: () => setDialog({ type: 'preview', item: file }) },
     { label: 'Download', icon: Download, onClick: () => run(() => downloadFile(file)) },
     canEditFiles && {
       label: 'Rename',
@@ -239,7 +242,13 @@ export default function FilesPage({ mode = 'folder' }) {
                 <h2 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
                   Files
                 </h2>
-                <FileTable files={files} sort={sort} onSort={toggleSort} actionsFor={fileActions} />
+                <FileTable
+                  files={files}
+                  sort={sort}
+                  onSort={toggleSort}
+                  actionsFor={fileActions}
+                  onOpen={(file) => setDialog({ type: 'preview', item: file })}
+                />
               </section>
             )}
           </div>
@@ -247,6 +256,13 @@ export default function FilesPage({ mode = 'folder' }) {
       </div>
 
       {/* ---------- dialogs ---------- */}
+      {dialog?.type === 'preview' && (
+        <FilePreviewDialog
+          file={dialog.item}
+          onDownload={() => run(() => downloadFile(dialog.item))}
+          onClose={() => setDialog(null)}
+        />
+      )}
       {dialog?.type === 'upload' && (
         <UploadModal
           folderId={folderId}

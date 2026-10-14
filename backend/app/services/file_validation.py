@@ -39,6 +39,9 @@ ALLOWED_TYPES: dict[str, FileType] = {
 
 ALLOWED_EXTENSIONS_TEXT = "PDF, DOCX, XLSX, PPTX, TXT, CSV, PNG, JPG"
 
+# Types the browser can show by itself. Office files would need converting, so: download only.
+PREVIEWABLE = {"pdf", "png", "jpg", "jpeg", "txt", "csv"}
+
 # Signatures at the very start of each format.
 MAGIC_BYTES: dict[str, tuple[bytes, ...]] = {
     "pdf": (b"%PDF-",),

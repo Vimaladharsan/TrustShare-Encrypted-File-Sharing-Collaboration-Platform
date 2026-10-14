@@ -29,6 +29,7 @@ from app.services.activity_service import ActivityService
 from app.services.file_validation import (
     ALLOWED_EXTENSIONS_TEXT,
     ALLOWED_TYPES,
+    PREVIEWABLE,
     clean_filename,
     content_matches,
     extension_of,
@@ -187,6 +188,23 @@ class FileService:
             self.request,
             user,
             "file.download",
+            resource_type="file",
+            resource_id=file_id,
+            details={"file_name": doc["original_name"]},
+        )
+        return doc, self.storage.open(doc["storage_key"])
+
+    async def preview(self, user: User, file_id: str) -> tuple[dict[str, Any], AsyncIterator]:
+        """Same access rules as download, but only for types the browser can display."""
+        doc = await self.get_for_read(user, file_id)
+        if doc["extension"] not in PREVIEWABLE:
+            raise AppError(
+                "PREVIEW_NOT_SUPPORTED", "This file type can't be previewed. Download it.", 415
+            )
+        await self.activity.log(
+            self.request,
+            user,
+            "file.preview",
             resource_type="file",
             resource_id=file_id,
             details={"file_name": doc["original_name"]},

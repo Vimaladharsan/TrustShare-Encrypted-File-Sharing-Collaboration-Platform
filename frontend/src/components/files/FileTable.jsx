@@ -14,8 +14,9 @@ const COLUMNS = [
  * File list as a table. Click a column header to sort.
  * actionsFor(file) returns the ⋮ menu items for that file.
  * Optional selection: pass `selected` (a Set of ids) and `onToggle(id)` to show checkboxes.
+ * Optional `onOpen(file)`: the file name becomes clickable (opens the preview).
  */
-export default function FileTable({ files, sort, onSort, actionsFor, selected, onToggle }) {
+export default function FileTable({ files, sort, onSort, actionsFor, selected, onToggle, onOpen }) {
   const selectable = Boolean(selected && onToggle);
   const allSelected = selectable && files.length > 0 && files.every((f) => selected.has(f.id));
   return (
@@ -86,9 +87,20 @@ export default function FileTable({ files, sort, onSort, actionsFor, selected, o
                 <td className="max-w-0 px-4 py-3">
                   <div className="flex items-center gap-3">
                     <Icon className={`size-5 shrink-0 ${color}`} aria-hidden="true" />
-                    <span className="truncate font-medium text-slate-800" title={file.name}>
-                      {file.name}
-                    </span>
+                    {onOpen ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpen(file)}
+                        className="truncate text-left font-medium text-slate-800 hover:text-blue-600 hover:underline"
+                        title={`Preview ${file.name}`}
+                      >
+                        {file.name}
+                      </button>
+                    ) : (
+                      <span className="truncate font-medium text-slate-800" title={file.name}>
+                        {file.name}
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td className="hidden px-4 py-3 text-slate-500 uppercase sm:table-cell">

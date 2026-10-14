@@ -99,6 +99,11 @@ async def get_file(
     return FileInfo.from_doc(await service.get_for_read(user, file_id))
 
 
+def _disposition(kind: str, name: str) -> str:
+    ascii_name = name.encode("ascii", "replace").decode().replace('"', "'")
+    return f"{kind}; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(name)}"
+
+
 @router.get("/{file_id}/download", summary="Download the file")
 async def download_file(
     file_id: str,
@@ -106,16 +111,40 @@ async def download_file(
     service: FileService = Depends(file_service),
 ) -> StreamingResponse:
     doc, chunks = await service.download(user, file_id)
-    name = doc["original_name"]
-    ascii_name = name.encode("ascii", "replace").decode().replace('"', "'")
     return StreamingResponse(
         chunks,
         media_type=doc["mime_type"],
         headers={
             # "attachment" = always save as a file, never open/execute inside the page.
-            "Content-Disposition": f'attachment; filename="{ascii_name}"; '
-            f"filename*=UTF-8''{quote(name)}",
+            "Content-Disposition": _disposition("attachment", doc["original_name"]),
             "Content-Length": str(doc["size_bytes"]),
+        },
+    )
+
+
+@router.get(
+    "/{file_id}/preview",
+    summary="Show the file in the browser (PDF, images, TXT, CSV only)",
+)
+async def preview_file(
+    file_id: str,
+    user: User = Depends(can_read_files),
+    service: FileService = Depends(file_service),
+) -> StreamingResponse:
+    doc, chunks = await service.preview(user, file_id)
+    # Text is always sent as plain text, so it can never be interpreted as HTML.
+    is_text = doc["extension"] in {"txt", "csv"}
+    media_type = "text/plain; charset=utf-8" if is_text else doc["mime_type"]
+    return StreamingResponse(
+        chunks,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": _disposition("inline", doc["original_name"]),
+            "Content-Length": str(doc["size_bytes"]),
+            # If the file is ever opened directly, it runs in a sandbox: no scripts, no forms,
+            # no access to our site's cookies or pages.
+            "Content-Security-Policy": "sandbox; default-src 'none'; img-src 'self'",
+            "Cache-Control": "private, no-store",
         },
     )
 

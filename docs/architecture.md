@@ -282,7 +282,7 @@ All routes are under `/api`. Interactive docs: `http://localhost:8000/docs`.
 | Brute force / credential stuffing | Redis rate limit (e.g. 5 login attempts/min/IP), lockout after 5 failures, optional MFA. |
 | User enumeration | Same response for "email exists"/"doesn't exist" on register, login, forgot-password. |
 | Privilege escalation | Permission checked on **every** route via dependency; ownership checked in services; role cannot be set at registration. |
-| Malicious upload | Allow-list + magic-byte check, 25 MB limit enforced while streaming, random stored names, files never executed or served with their original Content-Type unless safe; `Content-Disposition: attachment` for downloads, `X-Content-Type-Options: nosniff`. |
+| Malicious upload | Allow-list + magic-byte check, 25 MB limit enforced while streaming, random stored names, files never executed or served with their original Content-Type unless safe; `Content-Disposition: attachment` for downloads; previews only for PDF/images/TXT/CSV, text always sent as `text/plain`, with `Content-Security-Policy: sandbox`; `X-Content-Type-Options: nosniff`. |
 | Path traversal | Storage keys are server-generated UUIDs; user input never becomes a path. |
 | CSRF (OAuth) | Random `state` stored in Redis, single use. |
 | Secrets in code | `.env` (gitignored) loaded by pydantic-settings; `.env.example` documents keys. |

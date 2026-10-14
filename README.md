@@ -37,7 +37,7 @@ TrustShare is built milestone by milestone. **Milestone 1 (foundation) is comple
 ### File dashboard
 - Drive-like layout: sidebar, search across all folders, storage meter, account menu
 - Nested folders with breadcrumbs; create, rename and move files and folders
-- Category filters, sortable file table, download
+- Category filters, sortable file table, download, and **in-app preview** of PDFs, images and text files (served in a sandbox)
 - Trash with restore, bulk restore/delete, empty trash and permanent delete
 - Loading, empty and error states; responsive layout
 - Buttons adapt to the user's permissions (enforced by the backend regardless)
@@ -183,7 +183,7 @@ Interactive documentation is available at `/docs` while the backend is running.
 | Auth | `POST /api/auth/register`, `/login`, `/mfa/verify`, `/refresh`, `/logout`, `/logout-all` |
 | Profile & MFA | `GET /api/users/me`, `GET /api/users/me/mfa`, `POST /api/users/me/mfa/setup`, `/enable`, `/disable` |
 | Admin | `GET /api/admin/users` (requires `user:read`), `PATCH /api/admin/users/{id}` (role, enable/disable), `POST /api/admin/users/{id}/unlock` (require `user:manage`) |
-| Files | `POST /api/files` (upload), `GET /api/files`, `GET /api/files/usage`, `GET/PATCH/DELETE /api/files/{id}`, `GET /api/files/{id}/download`, `POST /api/files/{id}/trash`, `/restore` |
+| Files | `POST /api/files` (upload), `GET /api/files`, `GET /api/files/usage`, `GET/PATCH/DELETE /api/files/{id}`, `GET /api/files/{id}/download`, `GET /api/files/{id}/preview`, `POST /api/files/{id}/trash`, `/restore` |
 | Folders | `GET/POST /api/folders`, `GET/PATCH/DELETE /api/folders/{id}`, `POST /api/folders/{id}/trash`, `/restore` |
 | Trash | `POST /api/trash/restore`, `/delete`, `/restore-all`, `/empty` |
 

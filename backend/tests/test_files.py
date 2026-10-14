@@ -100,6 +100,56 @@ def test_download_returns_the_same_bytes_as_attachment(
     assert response.headers["x-content-type-options"] == "nosniff"
 
 
+def test_preview_shows_pdf_inline_in_a_sandbox(
+    client: TestClient, new_email: Callable[[], str]
+) -> None:
+    token = new_user(client, new_email())
+    file_id = upload(client, token, "notes.pdf", PDF).json()["id"]
+
+    response = client.get(f"/api/files/{file_id}/preview", headers=auth(token))
+
+    assert response.status_code == 200
+    assert response.content == PDF
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.headers["content-disposition"].startswith('inline; filename="notes.pdf"')
+    assert response.headers["content-security-policy"].startswith("sandbox")
+
+
+def test_preview_sends_text_as_plain_text(client: TestClient, new_email: Callable[[], str]) -> None:
+    token = new_user(client, new_email())
+    # Even if a .txt file contains HTML, it must never be shown as a web page.
+    file_id = upload(client, token, "page.txt", b"<script>alert(1)</script>").json()["id"]
+
+    response = client.get(f"/api/files/{file_id}/preview", headers=auth(token))
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+
+
+def test_preview_not_offered_for_office_files(
+    client: TestClient, new_email: Callable[[], str]
+) -> None:
+    token = new_user(client, new_email())
+    file_id = upload(client, token, "letter.docx", make_docx()).json()["id"]
+
+    response = client.get(f"/api/files/{file_id}/preview", headers=auth(token))
+
+    assert response.status_code == 415
+    assert response.json()["error"]["code"] == "PREVIEW_NOT_SUPPORTED"
+
+
+def test_preview_of_another_users_file_is_not_found(
+    client: TestClient, new_email: Callable[[], str]
+) -> None:
+    owner = new_user(client, new_email())
+    file_id = upload(client, owner, "private.pdf", PDF).json()["id"]
+    stranger = new_user(client, new_email())
+
+    response = client.get(f"/api/files/{file_id}/preview", headers=auth(stranger))
+
+    assert response.status_code == 404
+
+
 def test_upload_valid_word_document(client: TestClient, new_email: Callable[[], str]) -> None:
     token = new_user(client, new_email())
 
