@@ -470,8 +470,10 @@ Files are never re-encrypted; downloads keep working during rotation.
 | GET | `/files/recent` · `/files/storage` | logged in | Recent (from my activity) · Storage breakdown |
 | GET | `/activity/me?group=auth\|files\|sharing` | logged in | My own activity log |
 | GET | `/analytics/me?from&to&tz` | logged in | User File Analytics (days in the user's time zone; each metric vs the previous period of equal length) |
-| GET | `/admin/security/overview?from&to` | `audit:read` | Security Dashboard metrics and charts |
-| GET | `/admin/security/logins` · `/events` · `/audit` | `audit:read` | Recent logins, security events, audit log |
+| GET | `/admin/security/overview?from&to&tz` | `audit:read` | Security Dashboard: metrics vs previous period, logins/day, unauthorized & blocked/day, events by type, recent logins (IP + location), recent events |
+| GET | `/admin/security/logins?status` · `/admin/security/events?severity&type` | `audit:read` | Full login history · security events |
+| GET | `/admin/audit?q&group&status` | `audit:read` | Audit log of every user (search by email, action or IP) |
+| GET | `/admin/overview` | `user:read` | Admin Dashboard: users, storage per account (sizes only), sharing, activity/day, key versions, events (7 days) |
 
 ### 8.8 Deployment view (Milestone 2 – local)
 

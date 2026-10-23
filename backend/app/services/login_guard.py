@@ -32,7 +32,8 @@ class LoginGuard:
                 headers={"Retry-After": str(seconds_left)},
             )
 
-    async def record_failure(self, user_id: uuid.UUID) -> None:
+    async def record_failure(self, user_id: uuid.UUID) -> tuple[int, bool]:
+        """Count one failure. Returns (consecutive failures, whether the account is now locked)."""
         key = f"login_fail:{user_id}"
         failures = await self.redis.incr(key)
         if failures == 1:
@@ -40,6 +41,8 @@ class LoginGuard:
         if failures >= self.max_failures:
             await self.redis.set(f"lockout:{user_id}", "1", ex=self.window)
             await self.redis.delete(key)
+            return failures, True
+        return failures, False
 
     async def clear(self, user_id: uuid.UUID) -> None:
         await self.redis.delete(f"login_fail:{user_id}")

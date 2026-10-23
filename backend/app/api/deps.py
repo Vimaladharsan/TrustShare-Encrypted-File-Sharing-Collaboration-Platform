@@ -5,7 +5,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 import jwt
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +17,7 @@ from app.db.postgres import get_db
 from app.db.redis import get_redis
 from app.models import User
 from app.repositories.user_repository import UserRepository
+from app.services.security_events import record_security_event
 from app.services.session_service import SessionService
 
 # Reads "Authorization: Bearer <token>". auto_error=False so we return our own error format.
@@ -32,6 +33,7 @@ def _invalid_token() -> AppError:
 
 
 async def get_token_payload(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     redis: Redis = Depends(get_redis),
 ) -> dict[str, Any]:
@@ -41,8 +43,16 @@ async def get_token_payload(
     try:
         payload = decode_access_token(credentials.credentials)
         user_id = uuid.UUID(payload["sub"])
+    except jwt.ExpiredSignatureError as exc:
+        raise _invalid_token() from exc  # normal: the app refreshes it
     except (jwt.InvalidTokenError, ValueError) as exc:
-        # Expired, tampered with, signed with another key, or malformed.
+        # Tampered with, signed with another key, or malformed – worth a security event.
+        await record_security_event(
+            "unauthorized_access",
+            request=request,
+            message="Invalid or forged access token",
+            details={"path": request.url.path},
+        )
         raise _invalid_token() from exc
 
     # Logged out (this token) or logged out everywhere (all tokens before that moment).
@@ -73,8 +83,15 @@ async def get_current_user(
 def require_permission(permission: Perm) -> Callable[..., Awaitable[User]]:
     """Route guard: 401 if not logged in, 403 if the user's role lacks this permission."""
 
-    async def checker(user: User = Depends(get_current_user)) -> User:
+    async def checker(request: Request, user: User = Depends(get_current_user)) -> User:
         if permission not in user.permission_codes:
+            await record_security_event(
+                "unauthorized_access",
+                request=request,
+                user=user,
+                message="Access denied – missing permission",
+                details={"path": request.url.path, "permission": str(permission)},
+            )
             raise AppError("FORBIDDEN", "You don't have permission to do this.", status_code=403)
         return user
 

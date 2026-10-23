@@ -5,6 +5,7 @@ Collections (docs/database.md §2):
     folders        – folder tree (each folder stores its ancestors)
     activity_logs  – append-only audit trail
     favorites      – starred files (Milestone 2)
+    security_events – events for the admin Security Dashboard (Milestone 2)
 """
 
 from pymongo import ASCENDING, DESCENDING, AsyncMongoClient, IndexModel
@@ -55,6 +56,11 @@ INDEXES: dict[str, list[IndexModel]] = {
             [("details.owner_id", ASCENDING), ("action", ASCENDING), ("created_at", DESCENDING)],
             name="owner_action_created",
         ),
+    ],
+    "security_events": [
+        IndexModel([("created_at", DESCENDING)], name="created"),
+        IndexModel([("type", ASCENDING), ("created_at", DESCENDING)], name="type_created"),
+        IndexModel([("severity", ASCENDING), ("created_at", DESCENDING)], name="severity_created"),
     ],
     "favorites": [
         IndexModel([("user_id", ASCENDING), ("file_id", ASCENDING)], name="user_file", unique=True),

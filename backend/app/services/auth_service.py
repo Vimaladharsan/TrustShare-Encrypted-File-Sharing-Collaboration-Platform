@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import Request
 from redis.asyncio import Redis
@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.permissions import RoleName
+from app.core.rate_limit import client_ip
 from app.core.security import (
     create_access_token,
     hash_password,
@@ -26,9 +27,13 @@ from app.schemas.user import UserResponse
 from app.services.activity_service import ActivityService
 from app.services.login_guard import LoginGuard
 from app.services.mfa_service import MfaService
+from app.services.security_events import record_security_event
 from app.services.session_service import SessionService
 
 logger = logging.getLogger(__name__)
+
+SUSPICIOUS_FAILURES = 3  # wrong passwords/codes in a row → security event (lockout at 5)
+SUSPICIOUS_IP_FAILURES = 10  # failed sign-ins from one IP within 15 minutes
 
 
 # Same message for "no such email" and "wrong password": never reveal which emails exist.
@@ -70,13 +75,64 @@ class AuthService:
         if email:
             details["email"] = email  # who was tried, even if no such account exists
         await self._log(user, "auth.login.failed", "failure", details)
+        await self._watch_ip()
 
     async def _ensure_not_locked(self, user: User) -> None:
         try:
             await self.guard.ensure_not_locked(user.id)
         except AppError:
             await self._log(user, "auth.login.locked", "failure")
+            await record_security_event(
+                "blocked_request",
+                request=self.request,
+                user=user,
+                message="Sign-in attempt on a locked account",
+            )
             raise
+
+    async def _count_failure(self, user: User) -> None:
+        """Wrong password or code: count it, and raise security events at 3 failures / lockout."""
+        failures, locked = await self.guard.record_failure(user.id)
+        if locked:
+            await record_security_event(
+                "account_locked", request=self.request, user=user, details={"attempts": failures}
+            )
+        elif failures == SUSPICIOUS_FAILURES:
+            await record_security_event(
+                "multiple_failed_logins",
+                request=self.request,
+                user=user,
+                details={"attempts": failures},
+            )
+
+    async def _watch_ip(self) -> None:
+        """Many failed sign-ins from one IP within 15 minutes (e.g. trying many accounts)."""
+        if self.activity is None or self.request is None:
+            return
+        ip = client_ip(self.request)
+        recent = await self.activity.logs.count_documents(
+            {
+                "action": "auth.login.failed",
+                "ip_address": ip,
+                "created_at": {"$gte": datetime.now(UTC) - timedelta(minutes=15)},
+            }
+        )
+        if recent == SUSPICIOUS_IP_FAILURES:  # once, when the threshold is crossed
+            await record_security_event(
+                "suspicious_ip", request=self.request, details={"failed_logins_15min": recent}
+            )
+
+    async def _watch_new_ip(self, user: User) -> None:
+        """A successful sign-in from an IP this account never signed in from before."""
+        if self.activity is None or self.request is None:
+            return
+        ip = client_ip(self.request)
+        logs = self.activity.logs
+        previous = {"user_id": str(user.id), "action": "auth.login.success"}
+        if await logs.find_one(previous) and not await logs.find_one(
+            {**previous, "ip_address": ip}
+        ):
+            await record_security_event("new_ip_login", request=self.request, user=user)
 
     async def register(self, data: RegisterRequest) -> tuple[User, bool]:
         """Returns (user, created). For an email that's already registered nothing is created
@@ -124,7 +180,7 @@ class AuthService:
         # Checked before the password, so a locked account can't keep being guessed.
         await self._ensure_not_locked(user)
         if not await asyncio.to_thread(verify_password, data.password, user.password_hash):
-            await self.guard.record_failure(user.id)
+            await self._count_failure(user)
             logger.info("Failed login for user %s", user.id)
             await self._failed(user, "wrong_password")
             raise invalid_credentials()
@@ -163,7 +219,7 @@ class AuthService:
         # Wrong codes count towards the same lockout as wrong passwords.
         await self._ensure_not_locked(user)
         if not await self.mfa.verify_code(user, data.code):
-            await self.guard.record_failure(user.id)
+            await self._count_failure(user)
             await self._failed(user, "wrong_mfa_code")
             raise AppError("INVALID_MFA_CODE", "That code is not valid. Please try again.", 401)
 
@@ -183,6 +239,7 @@ class AuthService:
         user.last_login_at = datetime.now(UTC)
         await self.session.commit()  # also saves a used backup code, if one was used
         refresh_token = await self.sessions.create(user.id, ip, user_agent)
+        await self._watch_new_ip(user)  # before logging this sign-in
         await self._log(user, "auth.login.success", details={"method": method})
         return self._token_response(user), refresh_token
 

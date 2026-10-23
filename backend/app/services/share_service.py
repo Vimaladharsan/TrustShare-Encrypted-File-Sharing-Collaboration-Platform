@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.permissions import Perm
+from app.core.rate_limit import client_ip
 from app.models import Share, User
 from app.repositories.file_repository import FileRepository
 from app.repositories.share_repository import ShareRepository
@@ -42,9 +43,11 @@ from app.schemas.share import (
 )
 from app.services.activity_service import ActivityService
 from app.services.file_validation import PREVIEWABLE
+from app.services.security_events import record_security_event
 from app.storage.secure_store import SecureFileStore
 
 Action = Literal["info", "preview", "download"]
+DOWNLOAD_ANOMALY_THRESHOLD = 20
 
 
 def hash_token(token: str) -> str:
@@ -258,7 +261,7 @@ class ShareService:
     ) -> tuple[dict[str, Any], AsyncIterator[bytes]]:
         share = await self.shares.by_token_hash(hash_token(token))
         if share is None:
-            await self._denied(None, "SHARE_NOT_FOUND")
+            await self._invalid_link()
             raise _share_not_found()
         return await self._open(share, action, visitor=None)
 
@@ -267,7 +270,7 @@ class ShareService:
     async def _resolve_link(self, token: str, action: Action) -> tuple[Share, dict, User]:
         share = await self.shares.by_token_hash(hash_token(token))
         if share is None:
-            await self._denied(None, "SHARE_NOT_FOUND")
+            await self._invalid_link()
             raise _share_not_found()
         file, owner = await self._check(share, action, visitor=None)
         return share, file, owner
@@ -315,6 +318,8 @@ class ShareService:
         await self.session.commit()
 
         chunks = await self.storage.open(file)  # decrypt + verify (raises before sending)
+        if action == "download" and share.share_type == "link":
+            await self._watch_downloads(share)
         await self.activity.log(
             self.request,
             visitor,
@@ -348,6 +353,33 @@ class ShareService:
             status="failure",
             details={"reason": reason, "share_id": str(share_ref) if share_ref else None},
         )
+
+    async def _invalid_link(self) -> None:
+        await self._denied(None, "SHARE_NOT_FOUND")
+        await record_security_event(
+            "unauthorized_access",
+            request=self.request,
+            severity="low",
+            message="Invalid share link used",
+        )
+
+    async def _watch_downloads(self, share: Share) -> None:
+        """Many downloads through one link from one IP in 10 minutes looks like scraping."""
+        ip = client_ip(self.request)
+        recent = await self.activity.logs.count_documents(
+            {
+                "action": "file.download",
+                "details.share_id": str(share.id),
+                "ip_address": ip,
+                "created_at": {"$gte": datetime.now(UTC) - timedelta(minutes=10)},
+            }
+        )
+        if recent + 1 == DOWNLOAD_ANOMALY_THRESHOLD:  # this download is not logged yet
+            await record_security_event(
+                "download_anomaly",
+                request=self.request,
+                details={"share_id": str(share.id), "downloads_10min": recent + 1},
+            )
 
     # ---------- helpers ----------
 

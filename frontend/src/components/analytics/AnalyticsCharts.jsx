@@ -171,7 +171,7 @@ export function SharesChart({ days }) {
   );
 }
 
-function StackedBars({ days, series }) {
+export function StackedBars({ days, series }) {
   return (
     <div className="h-56">
       <ResponsiveContainer width="100%" height="100%">

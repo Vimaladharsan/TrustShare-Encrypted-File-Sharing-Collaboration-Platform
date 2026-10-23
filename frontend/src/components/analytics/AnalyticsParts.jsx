@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { changeLabel, isoDay, presetRange } from '../../utils/charts';
 import Button from '../Button';
 
-/** A headline number with its change vs the previous period (mockup: 4 cards on top). */
-export function SummaryCard({ icon: Icon, tone, label, value, sub, metric }) {
+/** A headline number with its change vs the previous period (mockup: 4 cards on top).
+ * `upIsBad`: for failures and threats a rise is shown in red, a drop in green. */
+export function SummaryCard({ icon: Icon, tone, label, value, sub, metric, upIsBad = false }) {
   const change = metric ? changeLabel(metric) : null;
   const up = metric && metric.value >= metric.previous;
+  const good = metric && (metric.value === metric.previous || up !== upIsBad);
   return (
     <div className="flex min-w-0 gap-4 rounded-xl border border-slate-200 bg-white p-4">
       <span className={`flex size-11 shrink-0 items-center justify-center rounded-lg ${tone}`}>
@@ -21,7 +23,7 @@ export function SummaryCard({ icon: Icon, tone, label, value, sub, metric }) {
           {change && (
             <span
               className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-medium ${
-                up ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                good ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
               }`}
               title="Compared with the previous period of the same length"
             >

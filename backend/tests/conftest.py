@@ -57,15 +57,26 @@ def _delete_test_files(user_ids: list[str]) -> None:
     mongo = MongoClient(settings.mongo_url)
     try:
         db = mongo[settings.mongo_db]
+        # Security events about test files (e.g. tampered-file tests) carry only the file id.
+        file_ids = [str(doc["_id"]) for doc in db["files"].find({"owner_id": {"$in": user_ids}})]
+        db["security_events"].delete_many({"details.file_id": {"$in": file_ids}})
         db["files"].delete_many({"owner_id": {"$in": user_ids}})
         db["folders"].delete_many({"owner_id": {"$in": user_ids}})
         db["favorites"].delete_many({"user_id": {"$in": user_ids}})
         db["activity_logs"].delete_many({"user_id": {"$in": user_ids}})
+        # Link visitors have no account: their downloads of test files carry only the owner.
+        db["activity_logs"].delete_many({"details.owner_id": {"$in": user_ids}})
         # Failed logins for made-up test emails have no user id – match them by email.
         test_email = {"$regex": f"{re.escape(TEST_EMAIL_DOMAIN)}$"}
         db["activity_logs"].delete_many({"details.email": test_email})
         # Logs of test accounts that a test deleted (their ids are gone from PostgreSQL).
         db["activity_logs"].delete_many({"actor_email": test_email})
+        # Security events of test accounts, and of anonymous test requests (the test client's
+        # address is literally "testclient").
+        db["security_events"].delete_many(
+            {"$or": [{"user_id": {"$in": user_ids}}, {"actor_email": test_email}]}
+        )
+        db["security_events"].delete_many({"ip_address": "testclient"})
     finally:
         mongo.close()
     for user_id in user_ids:

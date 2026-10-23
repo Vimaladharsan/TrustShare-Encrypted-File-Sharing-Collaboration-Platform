@@ -35,10 +35,14 @@ from app.services.file_validation import (
     extension_of,
     office_structure_ok,
 )
+from app.services.security_events import record_security_event
 from app.storage.local import CHUNK_SIZE
 from app.storage.secure_store import SecureFileStore
 
 logger = logging.getLogger(__name__)
+
+
+TYPE_MISMATCH = "The file's content does not match its extension."
 
 
 def _not_found() -> AppError:
@@ -93,6 +97,7 @@ class FileService:
             finally:
                 await asyncio.to_thread(temp.unlink, missing_ok=True)
         except AppError as exc:
+            await self._security_check(user, name, exc)
             await self.activity.log(
                 self.request,
                 user,
@@ -164,10 +169,19 @@ class FileService:
 
     @staticmethod
     def _type_mismatch() -> AppError:
-        return AppError(
-            "UNSUPPORTED_FILE_TYPE",
-            "The file's content does not match its extension.",
-            415,
+        return AppError("UNSUPPORTED_FILE_TYPE", TYPE_MISMATCH, 415)
+
+    async def _security_check(self, user: User, name: str, exc: AppError) -> None:
+        """Rejected uploads worth an admin's attention: disguised files and disallowed types."""
+        if exc.code != "UNSUPPORTED_FILE_TYPE":
+            return
+        disguised = exc.message == TYPE_MISMATCH  # e.g. a program renamed to report.pdf
+        await record_security_event(
+            "file_threat" if disguised else "policy_violation",
+            request=self.request,
+            user=user,
+            message="File content does not match its extension" if disguised else None,
+            details={"file_name": name},
         )
 
     @staticmethod

@@ -23,6 +23,34 @@ export const SHARE_SERIES = [
   { key: 'direct', label: 'Direct shares (people)', color: SERIES[1] },
 ];
 
+// Status colours are reserved for states (never reused as a series) and always come with a label.
+export const STATUS = {
+  good: '#0ca30c',
+  warning: '#fab219',
+  serious: '#ec835a',
+  critical: '#d03b3b',
+};
+export const OTHER = '#94a3b8';
+
+export const LOGIN_SERIES = [
+  { key: 'success', label: 'Successful logins', color: STATUS.good },
+  { key: 'failed', label: 'Failed logins', color: STATUS.critical },
+];
+
+export const ACCESS_SERIES = [
+  { key: 'unauthorized', label: 'Unauthorized attempts', color: SERIES[0] },
+  { key: 'blocked', label: 'Blocked requests', color: SERIES[1] },
+];
+
+// Each event type keeps the same colour everywhere; rarer types are grouped as "Other".
+export const EVENT_TYPE_COLORS = {
+  multiple_failed_logins: SERIES[0],
+  unauthorized_access: SERIES[1],
+  blocked_request: SERIES[2],
+  file_threat: SERIES[3],
+  new_ip_login: SERIES[4],
+};
+
 // Recessive chart chrome (grid, axes) – text uses ink colours, never series colours.
 export const GRID = '#e2e8f0';
 export const AXIS_TEXT = '#64748b';

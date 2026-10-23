@@ -30,6 +30,7 @@ from app.repositories.user_repository import UserRepository
 from app.schemas.user import AdminUserResponse, AdminUserUpdate, UserResponse
 from app.services.activity_service import ActivityService
 from app.services.login_guard import LoginGuard
+from app.services.security_events import record_security_event
 from app.services.session_service import SessionService
 from app.storage.secure_store import SecureFileStore
 
@@ -104,6 +105,7 @@ class AdminService:
             resource_id=str(user.id),
             details={"email": user.email, "changes": changes},
         )
+        await self._admin_event(admin, f"Changed account {user.email}", changes)
         return await self._response(user)
 
     async def unlock(self, admin: User, user_id: uuid.UUID) -> AdminUserResponse:
@@ -119,6 +121,7 @@ class AdminService:
             resource_id=str(user.id),
             details={"email": user.email},
         )
+        await self._admin_event(admin, f"Unlocked account {user.email}", {})
         return await self._response(user)
 
     async def delete_inactive(self, admin: User, user_id: uuid.UUID) -> None:
@@ -170,6 +173,14 @@ class AdminService:
                 "files_deleted": len(files),
                 "bytes_freed": sum(doc["size_bytes"] for doc in files),
             },
+        )
+        await self._admin_event(
+            admin, f"Deleted inactive account {email}", {"files_deleted": len(files)}
+        )
+
+    async def _admin_event(self, admin: User, message: str, details: dict) -> None:
+        await record_security_event(
+            "admin_action", request=self.request, user=admin, message=message, details=details
         )
 
     async def _response(self, user: User) -> AdminUserResponse:

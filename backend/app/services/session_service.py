@@ -18,6 +18,7 @@ from redis.asyncio import Redis
 
 from app.core.config import get_settings
 from app.core.errors import AppError
+from app.services.security_events import record_security_event
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,7 @@ class SessionService:
                 # An old token came back: someone has a copy. Log out every device.
                 logger.warning("Refresh token reuse detected for user %s", reused_by)
                 await self.revoke_all(uuid.UUID(reused_by))
+                await record_security_event("token_reuse", ip=ip, details={"user_id": reused_by})
             raise _invalid_session()
 
         user_id = uuid.UUID(session["user_id"])

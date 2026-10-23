@@ -16,4 +16,9 @@ export default defineConfig({
       '/api': process.env.VITE_PROXY_TARGET || 'http://localhost:8000',
     },
   },
+  build: {
+    // The core app (React, router, icons) is ~500 kB before gzip (~155 kB gzipped); charts and
+    // admin pages are already split off and loaded on demand.
+    chunkSizeWarningLimit: 600,
+  },
 });

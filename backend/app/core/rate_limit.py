@@ -30,6 +30,15 @@ def rate_limit(scope: str, limit_setting: str) -> Callable[..., Awaitable[None]]
         if count == 1:
             await redis.expire(key, 60)
         if count > limit:
+            if count == limit + 1:  # one event per IP and minute, not one per request
+                from app.services.security_events import record_security_event
+
+                await record_security_event(
+                    "blocked_request",
+                    request=request,
+                    message="Rate limit exceeded",
+                    details={"scope": scope, "limit_per_minute": limit},
+                )
             raise AppError(
                 "RATE_LIMITED",
                 "Too many requests. Please wait a minute and try again.",

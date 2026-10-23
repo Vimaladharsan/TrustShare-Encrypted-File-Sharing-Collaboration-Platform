@@ -36,6 +36,7 @@ from app.services.encryption_service import (
     decrypt_stream,
     encrypt_file,
 )
+from app.services.security_events import record_security_event
 from app.storage.local import LocalStorage, get_storage
 from app.storage.s3 import S3Storage, get_s3_storage
 
@@ -111,11 +112,13 @@ class SecureFileStore:
         stored = await self.keys.get(file_id)
         if stored is None:
             logger.error("Encryption key missing for file %s", file_id)
+            await _file_threat(file_id, "encryption key missing")
             raise integrity_error()
         try:
             dek = self.encryption.open_file_key(file_id, stored)
         except DecryptionError as exc:
             logger.error("Could not unwrap the key of file %s: %s", file_id, exc)
+            await _file_threat(file_id, "key could not be unwrapped")
             raise integrity_error() from exc
 
         plaintext = decrypt_stream(dek, file_id, self.objects.open(doc["storage_key"]))
@@ -123,6 +126,7 @@ class SecureFileStore:
             first = await anext(plaintext)  # check the start now, so errors become a clean 500
         except DecryptionError as exc:
             logger.error("Integrity check failed for file %s: %s", file_id, exc)
+            await _file_threat(file_id, "encrypted data failed its integrity check")
             raise integrity_error() from exc
         return _chain(first, plaintext, file_id)
 
@@ -138,6 +142,14 @@ class SecureFileStore:
             await self.legacy.delete(doc["storage_key"])
         await ShareRepository(self.session).delete_for_file(file_id)
         await self.session.commit()
+
+
+async def _file_threat(file_id: str, reason: str) -> None:
+    await record_security_event(
+        "file_threat",
+        message="Stored file failed its security check",
+        details={"file_id": file_id, "reason": reason},
+    )
 
 
 def _encrypt_to(dek: bytes, file_id: str, source: Path, target: Path) -> int:

@@ -271,6 +271,7 @@ Indexes: `{ user_id: 1, created_at: -1 }`, `{ action: 1, created_at: -1 }`, `{ i
   "_id": ObjectId("…"),
   "type": "multiple_failed_logins",
   "severity": "high",
+  "message": "Multiple failed sign-in attempts",
   "user_id": "6f1c2a3e-…",
   "actor_email": "priya@example.com",
   "ip_address": "192.168.1.45",
@@ -282,7 +283,7 @@ Indexes: `{ user_id: 1, created_at: -1 }`, `{ action: 1, created_at: -1 }`, `{ i
 
 | Field | Notes |
 |---|---|
-| type | `multiple_failed_logins`, `account_locked`, `unauthorized_access` (401/403), `blocked_request` (429 / lockout), `suspicious_ip`, `policy_violation` (e.g. rejected upload type), `file_threat` (fake file type, tampered ciphertext), `download_anomaly`, `admin_action`. |
+| type | `multiple_failed_logins` (3 in a row), `account_locked`, `suspicious_ip` (10 failed sign-ins from one IP in 15 min), `new_ip_login`, `token_reuse` (refresh token replayed → all sessions ended), `unauthorized_access` (403, forged token, invalid share link), `blocked_request` (429 / attempt on a locked account), `policy_violation` (disallowed upload type), `file_threat` (content ≠ extension, tampered ciphertext, missing key), `download_anomaly` (20 link downloads from one IP in 10 min), `admin_action`. Written by `app/services/security_events.py`; never contains secrets. |
 | severity | `high`, `medium`, `low`, `info`. |
 
 Indexes: `{ created_at: -1 }`, `{ type: 1, created_at: -1 }`, `{ severity: 1, created_at: -1 }`.

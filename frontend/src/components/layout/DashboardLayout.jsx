@@ -11,8 +11,8 @@ import {
   Share2,
   ShieldCheck,
   Star,
+  ShieldEllipsis,
   Trash2,
-  UsersRound,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useSearchParams } from 'react-router';
@@ -43,7 +43,7 @@ const NAV = [
     { to: '/security', label: 'Security', icon: ShieldCheck },
     { to: '/settings', label: 'Settings', icon: Settings },
   ],
-  [{ to: '/admin/users', label: 'Users', icon: UsersRound, permission: 'user:read' }],
+  [{ to: '/admin', label: 'Admin panel', icon: ShieldEllipsis, permission: 'user:read' }],
 ];
 
 /** The workspace frame: sidebar + top bar around every dashboard page (<Outlet />). */

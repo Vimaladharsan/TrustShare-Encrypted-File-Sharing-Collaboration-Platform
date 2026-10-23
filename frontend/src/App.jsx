@@ -1,11 +1,11 @@
 import { lazy, Suspense } from 'react';
 import { Link, Route, Routes } from 'react-router';
 
+import AdminLayout from './components/layout/AdminLayout';
 import DashboardLayout from './components/layout/DashboardLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { Loading } from './components/StateMessage';
 import ActivityPage from './pages/ActivityPage';
-import AdminUsersPage from './pages/AdminUsersPage';
 import DashboardPage from './pages/DashboardPage';
 import FavoritesPage from './pages/FavoritesPage';
 import FilesPage from './pages/FilesPage';
@@ -26,8 +26,18 @@ import StoragePage from './pages/StoragePage';
 import TrashPage from './pages/TrashPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 
-// The charts library is large, so the analytics page is downloaded only when it is opened.
+// The charts library is large, so pages with charts are downloaded only when they are opened.
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
+// Admin pages are only for admins, so they are downloaded only when an admin opens them.
+const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'));
+const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'));
+const AdminStoragePage = lazy(() => import('./pages/admin/AdminStoragePage'));
+const AdminSharingPage = lazy(() => import('./pages/admin/AdminSharingPage'));
+const SystemPage = lazy(() => import('./pages/admin/SystemPage'));
+const AdminActivityPage = lazy(() => import('./pages/admin/AdminActivityPage'));
+const SecurityDashboardPage = lazy(() => import('./pages/admin/SecurityDashboardPage'));
+
+const lazyPage = (page) => <Suspense fallback={<Loading />}>{page}</Suspense>;
 
 // URL → page mapping. "/" is the public landing page. Everything inside <ProtectedRoute> needs a
 // logged-in user and is shown inside the dashboard frame (sidebar + top bar).
@@ -61,18 +71,26 @@ export default function App() {
         <Route path="/favorites" element={<FavoritesPage />} />
         <Route path="/trash" element={<TrashPage />} />
         <Route path="/storage" element={<StoragePage />} />
-        <Route
-          path="/analytics"
-          element={
-            <Suspense fallback={<Loading />}>
-              <AnalyticsPage />
-            </Suspense>
-          }
-        />
+        <Route path="/analytics" element={lazyPage(<AnalyticsPage />)} />
         <Route path="/activity" element={<ActivityPage />} />
         <Route path="/security" element={<SecurityPage />} />
         <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/admin/users" element={<AdminUsersPage />} />
+      </Route>
+      {/* Admin panel – its own dark frame. Every API call behind it checks permissions. */}
+      <Route
+        element={
+          <ProtectedRoute>
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/admin" element={lazyPage(<AdminDashboardPage />)} />
+        <Route path="/admin/users" element={lazyPage(<AdminUsersPage />)} />
+        <Route path="/admin/storage" element={lazyPage(<AdminStoragePage />)} />
+        <Route path="/admin/sharing" element={lazyPage(<AdminSharingPage />)} />
+        <Route path="/admin/security" element={lazyPage(<SecurityDashboardPage />)} />
+        <Route path="/admin/system" element={lazyPage(<SystemPage />)} />
+        <Route path="/admin/activity" element={lazyPage(<AdminActivityPage />)} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
