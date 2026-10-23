@@ -195,6 +195,7 @@ Interactive documentation is available at `/docs` while the backend is running.
 | Folders | `GET/POST /api/folders`, `GET/PATCH/DELETE /api/folders/{id}`, `POST /api/folders/{id}/trash`, `/restore` |
 | Trash | `POST /api/trash/restore`, `/delete`, `/restore-all`, `/empty` |
 | Sharing (M2) | `POST/GET /api/files/{id}/shares` (create link or direct share / list), `GET /api/shares/sent`, `GET /api/shares/received`, `DELETE /api/shares/{id}` (revoke), `GET /api/shares/{id}/preview` · `/download` (recipient) |
+| Analytics (M2) | `GET /api/analytics/me?from&to&tz`, `GET /api/files/storage`, `GET /api/files/recent`, `GET /api/files/favorites`, `PUT/DELETE /api/files/{id}/favorite`, `GET /api/activity/me` |
 | Public links (M2) | `GET /api/s/{token}` · `/preview` · `/download` – no login, rate-limited per IP |
 
 ## Roadmap

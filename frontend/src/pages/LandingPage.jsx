@@ -126,7 +126,7 @@ export default function LandingPage() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                to={loggedIn ? '/files' : '/register'}
+                to={loggedIn ? '/dashboard' : '/register'}
                 className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-3 font-medium text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700"
               >
                 {loggedIn ? 'Open my files' : 'Get started – it’s free'}
@@ -262,7 +262,7 @@ export default function LandingPage() {
         </h2>
         <p className="mt-3 text-slate-600">Create a free account and upload your first file.</p>
         <Link
-          to={loggedIn ? '/files' : '/register'}
+          to={loggedIn ? '/dashboard' : '/register'}
           className="mt-8 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-3 font-medium text-white hover:bg-blue-700"
         >
           {loggedIn ? 'Open my files' : 'Create your account'}

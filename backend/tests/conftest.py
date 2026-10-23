@@ -59,6 +59,7 @@ def _delete_test_files(user_ids: list[str]) -> None:
         db = mongo[settings.mongo_db]
         db["files"].delete_many({"owner_id": {"$in": user_ids}})
         db["folders"].delete_many({"owner_id": {"$in": user_ids}})
+        db["favorites"].delete_many({"user_id": {"$in": user_ids}})
         db["activity_logs"].delete_many({"user_id": {"$in": user_ids}})
         # Failed logins for made-up test emails have no user id – match them by email.
         test_email = {"$regex": f"{re.escape(TEST_EMAIL_DOMAIN)}$"}

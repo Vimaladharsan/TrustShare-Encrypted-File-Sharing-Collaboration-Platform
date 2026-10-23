@@ -23,6 +23,7 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.permissions import RoleName
 from app.models import User
+from app.repositories.favorite_repository import FavoriteRepository
 from app.repositories.file_repository import FileRepository
 from app.repositories.folder_repository import FolderRepository
 from app.repositories.user_repository import UserRepository
@@ -151,6 +152,7 @@ class AdminService:
             await self.storage.delete(doc)  # encrypted object + its key (crypto-shredding)
         await FileRepository(self.db).delete_all_owned(owner_id)
         await FolderRepository(self.db).delete_all_owned(owner_id)
+        await FavoriteRepository(self.db).delete_for_user(owner_id)
 
         await self.users.delete(user_id)
         await self.session.commit()

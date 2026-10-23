@@ -7,6 +7,8 @@ import {
   Pencil,
   SearchX,
   Share2,
+  Star,
+  StarOff,
   Trash2,
   Upload,
 } from 'lucide-react';
@@ -14,6 +16,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 
+import { starFile, unstarFile } from '../api/analytics';
 import { getErrorMessage } from '../api/client';
 import {
   createFolder,
@@ -116,6 +119,17 @@ export default function FilesPage({ mode = 'folder' }) {
   const fileActions = (file) => [
     { label: 'Preview', icon: Eye, onClick: () => setDialog({ type: 'preview', item: file }) },
     { label: 'Download', icon: Download, onClick: () => run(() => downloadFile(file)) },
+    file.is_favorite
+      ? {
+          label: 'Remove from favorites',
+          icon: StarOff,
+          onClick: () => run(() => unstarFile(file.id), 'Removed from favorites'),
+        }
+      : {
+          label: 'Add to favorites',
+          icon: Star,
+          onClick: () => run(() => starFile(file.id), 'Added to favorites'),
+        },
     can('share:create') && {
       label: 'Share',
       icon: Share2,

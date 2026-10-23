@@ -466,8 +466,10 @@ Files are never re-encrypted; downloads keep working during rotation.
 | DELETE | `/shares/{share_id}` | owner | Revoke |
 | GET | `/shares/{share_id}/preview` · `/shares/{share_id}/download` | recipient | Open a file shared with me |
 | GET | `/s/{token}` · `/s/{token}/preview` · `/s/{token}/download` | public (token) | Link visitor access |
-| POST/DELETE | `/files/{id}/favorite` | owner / recipient | Favorites |
-| GET | `/analytics/me?from&to` | logged in | User File Analytics |
+| PUT/DELETE | `/files/{id}/favorite` · GET `/files/favorites` | owner | Favorites (star own files) |
+| GET | `/files/recent` · `/files/storage` | logged in | Recent (from my activity) · Storage breakdown |
+| GET | `/activity/me?group=auth\|files\|sharing` | logged in | My own activity log |
+| GET | `/analytics/me?from&to&tz` | logged in | User File Analytics (days in the user's time zone; each metric vs the previous period of equal length) |
 | GET | `/admin/security/overview?from&to` | `audit:read` | Security Dashboard metrics and charts |
 | GET | `/admin/security/logins` · `/events` · `/audit` | `audit:read` | Recent logins, security events, audit log |
 

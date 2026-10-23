@@ -14,7 +14,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [params] = useSearchParams();
-  const goTo = location.state?.from || '/files';
+  const goTo = location.state?.from || '/dashboard';
 
   const [email, setEmail] = useState(location.state?.email || '');
   const [password, setPassword] = useState('');

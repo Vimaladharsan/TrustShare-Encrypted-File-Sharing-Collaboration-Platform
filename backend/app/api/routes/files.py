@@ -10,9 +10,12 @@ from app.api.deps import can_delete_files, can_read_files, can_update_files, can
 from app.core.errors import AppError
 from app.db.mongo import get_mongo
 from app.models import User
-from app.repositories.file_repository import ALL_FOLDERS, FileRepository
+from app.repositories.favorite_repository import FavoriteRepository
+from app.repositories.file_repository import ALL_FOLDERS, FileRepository, to_object_id
 from app.repositories.folder_repository import FolderRepository
+from app.schemas.analytics import RecentFilesResponse, StorageReport
 from app.schemas.file import FileInfo, FileListResponse, FileUpdate, StorageUsageResponse
+from app.services.analytics_service import AnalyticsService
 from app.services.file_service import FileService
 from app.storage.secure_store import SecureFileStore, get_file_store
 
@@ -79,7 +82,11 @@ async def list_files(
         limit=limit,
         offset=offset,
     )
-    return FileListResponse(items=[FileInfo.from_doc(d) for d in docs], total=total)
+    starred = set(
+        await FavoriteRepository(db).file_ids(str(user.id), [str(d["_id"]) for d in docs])
+    )
+    items = [FileInfo.from_doc(d, str(d["_id"]) in starred) for d in docs]
+    return FileListResponse(items=items, total=total)
 
 
 @router.get("/usage", response_model=StorageUsageResponse, summary="My storage used vs quota")
@@ -91,6 +98,47 @@ async def storage_usage(
     return StorageUsageResponse(used_bytes=used, quota_bytes=user.storage_quota_bytes)
 
 
+@router.get("/favorites", response_model=FileListResponse, summary="My starred files")
+async def list_favorites(
+    user: User = Depends(can_read_files),
+    db: AsyncDatabase = Depends(get_mongo),
+) -> FileListResponse:
+    ids = await FavoriteRepository(db).file_ids(str(user.id))
+    oids = [oid for file_id in ids if (oid := to_object_id(file_id))]
+    docs = (
+        await db["files"]
+        .find({"_id": {"$in": oids}, "owner_id": str(user.id), "status": "active"})
+        .to_list(length=None)
+    )
+    by_id = {str(doc["_id"]): doc for doc in docs}
+    items = [FileInfo.from_doc(by_id[i], True) for i in ids if i in by_id]  # newest star first
+    return FileListResponse(items=items, total=len(items))
+
+
+@router.get(
+    "/recent",
+    response_model=RecentFilesResponse,
+    summary="My files I recently uploaded, opened, downloaded, renamed or moved",
+)
+async def recent_files(
+    user: User = Depends(can_read_files),
+    db: AsyncDatabase = Depends(get_mongo),
+) -> RecentFilesResponse:
+    return RecentFilesResponse(items=await AnalyticsService(db).recent_files(user))
+
+
+@router.get(
+    "/storage",
+    response_model=StorageReport,
+    summary="Storage page: used / available, by file type, trash, largest files",
+)
+async def storage_report(
+    user: User = Depends(can_read_files),
+    db: AsyncDatabase = Depends(get_mongo),
+) -> StorageReport:
+    return await AnalyticsService(db).storage(user)
+
+
 @router.get("/{file_id}", response_model=FileInfo, summary="File details")
 async def get_file(
     file_id: str,
@@ -98,6 +146,28 @@ async def get_file(
     service: FileService = Depends(file_service),
 ) -> FileInfo:
     return FileInfo.from_doc(await service.get_for_read(user, file_id))
+
+
+@router.put("/{file_id}/favorite", status_code=status.HTTP_204_NO_CONTENT, summary="Star a file")
+async def star_file(
+    file_id: str,
+    user: User = Depends(can_read_files),
+    service: FileService = Depends(file_service),
+    db: AsyncDatabase = Depends(get_mongo),
+) -> None:
+    doc = await service.get_for_read(user, file_id)  # own files only
+    await FavoriteRepository(db).add(str(user.id), str(doc["_id"]))
+
+
+@router.delete(
+    "/{file_id}/favorite", status_code=status.HTTP_204_NO_CONTENT, summary="Remove the star"
+)
+async def unstar_file(
+    file_id: str,
+    user: User = Depends(can_read_files),
+    db: AsyncDatabase = Depends(get_mongo),
+) -> None:
+    await FavoriteRepository(db).remove(str(user.id), file_id)
 
 
 def _disposition(kind: str, name: str) -> str:

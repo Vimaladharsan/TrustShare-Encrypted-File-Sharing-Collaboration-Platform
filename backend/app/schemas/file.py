@@ -18,9 +18,10 @@ class FileInfo(BaseModel):
     status: Literal["active", "trashed"]
     created_at: datetime
     updated_at: datetime
+    is_favorite: bool = False  # starred by the logged-in user
 
     @classmethod
-    def from_doc(cls, doc: dict[str, Any]) -> "FileInfo":
+    def from_doc(cls, doc: dict[str, Any], is_favorite: bool = False) -> "FileInfo":
         return cls(
             id=str(doc["_id"]),
             name=doc["original_name"],
@@ -33,6 +34,7 @@ class FileInfo(BaseModel):
             status=doc["status"],
             created_at=doc["created_at"],
             updated_at=doc["updated_at"],
+            is_favorite=is_favorite,
         )
 
 

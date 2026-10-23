@@ -34,7 +34,7 @@ export default function VerifyEmailPage() {
     if (state === 'done' && authStatus === 'authenticated') refreshUser().catch(() => {});
   }, [state, authStatus, refreshUser]);
 
-  const next = authStatus === 'authenticated' ? '/files' : '/login';
+  const next = authStatus === 'authenticated' ? '/dashboard' : '/login';
   const nextLabel = authStatus === 'authenticated' ? 'Go to my files' : 'Log in';
 
   return (

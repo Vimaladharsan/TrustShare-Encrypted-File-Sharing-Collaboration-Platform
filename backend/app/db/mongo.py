@@ -4,6 +4,7 @@ Collections (docs/database.md §2):
     files          – metadata of every uploaded file
     folders        – folder tree (each folder stores its ancestors)
     activity_logs  – append-only audit trail
+    favorites      – starred files (Milestone 2)
 """
 
 from pymongo import ASCENDING, DESCENDING, AsyncMongoClient, IndexModel
@@ -49,6 +50,14 @@ INDEXES: dict[str, list[IndexModel]] = {
     "activity_logs": [
         IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_created"),
         IndexModel([("action", ASCENDING), ("created_at", DESCENDING)], name="action_created"),
+        # File Analytics: downloads of an owner's files (direct-share and link downloads too).
+        IndexModel(
+            [("details.owner_id", ASCENDING), ("action", ASCENDING), ("created_at", DESCENDING)],
+            name="owner_action_created",
+        ),
+    ],
+    "favorites": [
+        IndexModel([("user_id", ASCENDING), ("file_id", ASCENDING)], name="user_file", unique=True),
     ],
 }
 

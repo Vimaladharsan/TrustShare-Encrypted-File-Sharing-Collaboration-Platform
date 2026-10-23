@@ -192,7 +192,12 @@ class FileService:
             "file.download",
             resource_type="file",
             resource_id=file_id,
-            details={"file_name": doc["original_name"]},
+            # owner_id + via: the owner's File Analytics counts downloads of their files.
+            details={
+                "file_name": doc["original_name"],
+                "owner_id": doc["owner_id"],
+                "via": "owner",
+            },
         )
         return doc, await self.storage.open(doc)
 

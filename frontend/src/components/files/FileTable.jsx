@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp } from 'lucide-react';
+import { ArrowDown, ArrowUp, Star } from 'lucide-react';
 
 import { fileIcon, formatBytes, formatDate } from '../../utils/format';
 import ActionMenu from '../ActionMenu';
@@ -100,6 +100,12 @@ export default function FileTable({ files, sort, onSort, actionsFor, selected, o
                       <span className="truncate font-medium text-slate-800" title={file.name}>
                         {file.name}
                       </span>
+                    )}
+                    {file.is_favorite && (
+                      <Star
+                        className="size-3.5 shrink-0 fill-amber-400 text-amber-400"
+                        aria-label="Favorite"
+                      />
                     )}
                   </div>
                 </td>
