@@ -135,11 +135,31 @@ cp .env.example .env    # then replace every "change-me" value
 docker compose up -d --build
 ```
 
-- Frontend: http://localhost:5173
+- **App over HTTPS: https://localhost:8443** (Caddy reverse proxy, TLS 1.3)
+- Frontend (plain HTTP, development): http://localhost:5173
 - API docs (Swagger): http://localhost:8000/docs
 - Health check: http://localhost:8000/api/health
+- Object storage console (RustFS): http://localhost:9001/rustfs/console/
 
 Migrations run automatically when the backend container starts.
+
+### HTTPS (local)
+
+The `caddy` service terminates TLS with certificates from its own local certificate authority and
+forwards `/api/*` to FastAPI and everything else to the React app. The backend reads the visitor's
+real IP from `X-Forwarded-For`, but only from proxies inside the Docker network.
+
+Browsers warn until they trust Caddy's root certificate. To trust it for your Windows user only:
+
+```powershell
+docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt ..\caddy-root.crt
+Import-Certificate -FilePath ..\caddy-root.crt -CertStoreLocation Cert:\CurrentUser\Root
+```
+
+(Or double-click the file → Install Certificate → Current User → "Trusted Root Certification
+Authorities".) The certificate stays valid across restarts because Caddy keeps it in the
+`caddydata` volume. To make emailed links and share links use HTTPS too, set
+`FRONTEND_URL=https://localhost:8443` in `.env`.
 
 ### Create an admin and demo data
 

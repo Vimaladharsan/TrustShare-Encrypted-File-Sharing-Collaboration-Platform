@@ -1,0 +1,33 @@
+# Local HTTPS for TrustShare (Milestone 2): https://localhost:8443
+#
+# Caddy terminates TLS (TLS 1.2/1.3, HTTP/2 and HTTP/3) with certificates from its own local
+# certificate authority ("tls internal") and forwards plain HTTP inside the private Docker
+# network: /api/* → FastAPI, everything else → the React app (incl. Vite's live-reload websocket).
+# To remove the browser warning, trust Caddy's root certificate once (see README → HTTPS).
+# In production the same file gets a real domain and a public certificate (Let's Encrypt).
+
+{
+	# Local only: no extra redirect server on port 80, and no attempt to install the root
+	# certificate inside the container.
+	auto_https disable_redirects
+	skip_install_trust
+}
+
+https://localhost:8443 {
+	tls internal
+	encode zstd gzip
+
+	header {
+		-Server
+		# HSTS is left out on purpose: on "localhost" it would also force HTTPS on the plain
+		# development ports (5173, 8000). Production adds Strict-Transport-Security.
+	}
+
+	# Caddy adds X-Forwarded-For / -Proto / -Host, so the backend sees the visitor's real IP.
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+	handle {
+		reverse_proxy frontend:5173
+	}
+}

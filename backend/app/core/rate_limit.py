@@ -15,8 +15,13 @@ from app.db.redis import get_redis
 
 
 def client_ip(request: Request) -> str:
-    # In production behind a reverse proxy, Uvicorn's --proxy-headers sets the real client IP.
-    return request.client.host if request.client else "unknown"
+    """The visitor's IP. Behind Caddy / the Vite proxy, Uvicorn's --proxy-headers has already
+    replaced the proxy's address with the one from X-Forwarded-For (trusted proxies only)."""
+    if not request.client:
+        return "unknown"
+    host = request.client.host
+    # "::ffff:172.18.0.1" is the IPv4 address 172.18.0.1 written as IPv6 – count it as one.
+    return host.removeprefix("::ffff:")
 
 
 def rate_limit(scope: str, limit_setting: str) -> Callable[..., Awaitable[None]]:

@@ -479,5 +479,7 @@ Files are never re-encrypted; downloads keep working during rotation.
 
 `docker compose` gains a **`rustfs`** service (RustFS – open-source S3-compatible object storage, private bucket
 created on start, console on :9001/rustfs/console/). Leaving `S3_ENDPOINT_URL` empty and putting real AWS credentials in `.env`
-switches the same code to **AWS S3**. HTTPS locally is provided by a Caddy reverse proxy with a trusted
-local certificate (Phase 9).
+switches the same code to **AWS S3**. HTTPS locally is provided by a **Caddy** reverse proxy at `https://localhost:8443`
+(`caddy/Caddyfile`: TLS 1.3 with Caddy's local CA, HTTP/2 + HTTP/3, `/api/*` → backend, rest → frontend).
+Uvicorn runs with `--proxy-headers --forwarded-allow-ips 172.16.0.0/12`, so the client IP used by logs and
+rate limits comes from `X-Forwarded-For` – trusted only from proxies inside the Docker network.

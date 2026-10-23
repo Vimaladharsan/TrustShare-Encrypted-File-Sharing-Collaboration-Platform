@@ -12,8 +12,9 @@ export default defineConfig({
     watch:
       process.env.VITE_USE_POLLING === 'true' ? { usePolling: true, interval: 300 } : undefined,
     // The browser calls /api on its own origin; Vite forwards those requests to FastAPI.
+    // xfwd: pass the visitor's IP on (X-Forwarded-For) so logs and rate limits see the real one.
     proxy: {
-      '/api': process.env.VITE_PROXY_TARGET || 'http://localhost:8000',
+      '/api': { target: process.env.VITE_PROXY_TARGET || 'http://localhost:8000', xfwd: true },
     },
   },
   build: {

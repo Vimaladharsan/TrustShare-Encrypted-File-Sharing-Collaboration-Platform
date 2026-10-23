@@ -217,3 +217,20 @@ def test_system_overview_shows_sizes_but_no_file_names(
     assert "very-private-name" not in response.text
     assert data["users"]["total"] >= 2 and data["keys"]["active_version"] >= 1
     assert len(data["activity_by_day"]) == 30
+
+
+# ---------- helpers behind the reports ----------
+
+
+def test_client_ip_and_location_helpers() -> None:
+    from starlette.requests import Request
+
+    from app.core.rate_limit import client_ip
+    from app.services.admin_reports_service import ip_location
+
+    mapped = Request({"type": "http", "client": ("::ffff:10.0.0.5", 1234), "headers": []})
+
+    assert client_ip(mapped) == "10.0.0.5"  # IPv4 written as IPv6 counts as the same visitor
+    assert ip_location("172.18.0.1") == "Local network"
+    assert ip_location("8.8.8.8") == "Unknown (public IP)"
+    assert ip_location("testclient") == "Unknown"

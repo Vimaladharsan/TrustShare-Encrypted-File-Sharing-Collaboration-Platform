@@ -21,8 +21,8 @@ const FEATURES = [
   },
   {
     icon: Lock,
-    title: 'Secure connection',
-    text: 'Your browser talks to TrustShare over HTTPS/TLS in production, so nothing can be read on the way.',
+    title: 'HTTPS / TLS',
+    text: 'Traffic is encrypted with TLS through a reverse proxy (locally https://localhost:8443), so nothing can be read or changed on the way.',
   },
   {
     icon: KeyRound,
