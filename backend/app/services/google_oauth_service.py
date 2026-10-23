@@ -96,6 +96,9 @@ class GoogleClient:
             algorithms=["RS256"],
             audience=get_settings().google_client_id,  # issued for OUR app, not another one
             issuer=GOOGLE_ISSUERS,
+            # Allow small clock differences between our server and Google (e.g. a laptop clock
+            # a few seconds behind) – otherwise a fresh token looks "issued in the future".
+            leeway=60,
         )
 
     async def identify(self, code: str, code_verifier: str) -> GoogleIdentity:
