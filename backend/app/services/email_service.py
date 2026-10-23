@@ -152,3 +152,48 @@ def password_reset_email(to: str, name: str, link: str, minutes: int) -> Email:
             "If you didn't ask for this, ignore this email – your password stays the same.",
         ),
     )
+
+
+def file_shared_email(
+    to: str,
+    name: str,
+    owner_name: str,
+    owner_email: str,
+    file_name: str,
+    can_download: bool,
+    expires: str | None,
+    link: str,
+) -> Email:
+    """Tells a registered user that a file was shared with them. Contains no file content – the
+    file itself only opens after they log in."""
+    access = "view and download" if can_download else "view (preview only)"
+    until = f" until {expires}" if expires else ""
+    safe = {
+        k: html.escape(v)
+        for k, v in {
+            "name": name,
+            "owner": owner_name,
+            "file": file_name,
+            "email": owner_email,
+        }.items()
+    }
+    return Email(
+        to=to,
+        subject=f'{owner_name} shared "{file_name}" with you on TrustShare',
+        text=(
+            f"Hi {name},\n\n"
+            f'{owner_name} ({owner_email}) shared the file "{file_name}" with you.\n'
+            f"You can {access}{until}.\n\n"
+            f'Open it under "Shared with me" after logging in:\n{link}\n\n'
+            "Not expecting this? You can ignore this email; the owner can revoke access any time.\n"
+        ),
+        html=_layout(
+            "A file was shared with you",
+            f"<p>Hi {safe['name']},</p><p><strong>{safe['owner']}</strong> ({safe['email']}) "
+            f"shared the file <strong>{safe['file']}</strong> with you. You can {access}{until}."
+            "</p><p>The file stays encrypted on TrustShare and opens after you log in.</p>",
+            "Open Shared with me",
+            link,
+            "Not expecting this? You can ignore this email; the owner can revoke access any time.",
+        ),
+    )

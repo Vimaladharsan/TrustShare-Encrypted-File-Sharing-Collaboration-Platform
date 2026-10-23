@@ -17,7 +17,7 @@ TrustShare is built milestone by milestone. **Milestone 1** (foundation: auth, R
 
 ### Authentication and sessions
 - Registration with password-strength rules (checked live in the UI and enforced on the server); passwords hashed with **bcrypt**; the same answer for new and already-registered emails (the owner gets a notice email), so sign-up can't reveal who has an account
-- **JWT access tokens** (15 min, kept in memory only) and **rotating refresh tokens** (7 days, HttpOnly cookie, stored hashed in Redis) with reuse detection
+- **JWT access tokens** (15 min, kept in memory only) and **rotating refresh tokens** (7 days, HttpOnly cookie, stored hashed in Redis) with reuse detection (a 10-second grace window lets the same browser retry a just-rotated token – two tabs or fast reloads – without being logged out)
 - Logout, and **log out of all devices** from Settings
 - **Change password** in Settings (confirms the current one; other devices are logged out)
 - **Google login** (OAuth 2.0 Authorization Code flow with PKCE): ID token verified against Google's keys; links to an existing account with the same verified email, otherwise creates a User; MFA still required if enabled
@@ -55,7 +55,7 @@ TrustShare is built milestone by milestone. **Milestone 1** (foundation: auth, R
 
 ### Secure sharing (Milestone 2)
 - **Share links** for anyone (no account): view-only or view & download, expiry (max 30 days), optional download limit, instant revoke; 256-bit tokens stored only as SHA-256 hashes and hidden in logs
-- **Direct sharing** with registered users ("Shared with me" / "Shared by me")
+- **Direct sharing** with registered users ("Shared with me" / "Shared by me"); the recipient gets an email notice
 - Every access re-checks revocation, expiry, limit, file status and the owner's account and permissions – trashing a file or disabling its owner stops all links at once
 
 ### Dashboards (Milestone 2)
@@ -122,7 +122,7 @@ TrustShare/
 │   │   ├── models/         # SQLAlchemy models
 │   │   ├── repositories/   # Data access
 │   │   ├── schemas/        # Pydantic request/response models
-│   │   ├── scripts/        # create_admin, seed_demo, encrypt_existing_files, rotate_keys, remove_test_accounts
+│   │   ├── scripts/        # create_admin, seed_demo, encrypt_existing_files, rotate_keys, copy_objects, remove_test_accounts
 │   │   ├── services/       # Business logic (auth, MFA, upload, encryption, sharing, analytics, security events)
 │   │   └── storage/        # S3 object storage + SecureFileStore (encrypt on write, verify + decrypt on read)
 │   ├── alembic/            # Database migrations
@@ -183,6 +183,22 @@ Import-Certificate -FilePath ..\caddy-root.crt -CertStoreLocation Cert:\CurrentU
 Authorities".) The certificate stays valid across restarts because Caddy keeps it in the
 `caddydata` volume. To make emailed links and share links use HTTPS too, set
 `FRONTEND_URL=https://localhost:8443` in `.env`.
+
+### Using real AWS S3 instead of RustFS
+
+The code speaks the plain S3 API, so switching is configuration only:
+
+1. AWS console → **S3** → create a bucket (e.g. in `ap-south-1`), keep **Block all public access**
+   on, default encryption SSE-S3 on (an extra layer – the objects are already AES-256-GCM encrypted).
+2. **IAM** → create a user for the app (no console access) with the least-privilege policy in
+   [docs/aws-iam-policy.json](docs/aws-iam-policy.json) (replace `YOUR-BUCKET-NAME`), then create an
+   access key for it.
+3. In `.env`: `S3_ENDPOINT_URL=` (empty), `S3_REGION=ap-south-1`, `S3_BUCKET=<bucket>`,
+   `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` = the new key → `docker compose up -d --force-recreate backend`.
+4. Copy the existing encrypted objects across (no decryption needed – file keys stay valid):
+   `docker compose exec backend python -m app.scripts.copy_objects --from-endpoint http://rustfs:9000`
+
+Switching back = restore the RustFS values in `.env` and recreate the backend.
 
 ### Create an admin and demo data
 

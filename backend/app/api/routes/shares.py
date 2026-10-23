@@ -7,7 +7,7 @@ Public:     GET /s/{token} · /s/{token}/preview · /s/{token}/download (no logi
 
 import uuid
 
-from fastapi import APIRouter, Depends, Path, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Path, Request, status
 from fastapi.responses import StreamingResponse
 from pymongo.asynchronous.database import AsyncDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,7 +26,8 @@ from app.schemas.share import (
     ShareCreated,
     ShareListResponse,
 )
-from app.services.share_service import ShareService
+from app.services.email_service import EmailSender, get_email_sender
+from app.services.share_service import ShareService, direct_share_email
 from app.storage.secure_store import SecureFileStore, get_file_store
 
 router = APIRouter(tags=["sharing"])
@@ -62,10 +63,15 @@ def share_service(
 async def create_share(
     file_id: str,
     data: ShareCreate,
+    background_tasks: BackgroundTasks,
     user: User = Depends(can_share),
     service: ShareService = Depends(share_service),
+    sender: EmailSender = Depends(get_email_sender),
 ) -> ShareCreated:
-    return await service.create(user, file_id, data)
+    created = await service.create(user, file_id, data)
+    if created.share_type == "user":  # tell the recipient (sent after the response)
+        background_tasks.add_task(sender.send, direct_share_email(user, created))
+    return created
 
 
 @router.get(

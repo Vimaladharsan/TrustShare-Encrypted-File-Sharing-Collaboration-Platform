@@ -20,9 +20,12 @@ def register_and_login(client: TestClient, email: str) -> tuple[str, str]:
     return response.json()["access_token"], response.cookies["refresh_token"]
 
 
-def refresh_with(client: TestClient, refresh_token: str):
+def refresh_with(client: TestClient, refresh_token: str, user_agent: str = "testclient"):
     client.cookies.clear()
-    return client.post("/api/auth/refresh", headers={"Cookie": f"refresh_token={refresh_token}"})
+    return client.post(
+        "/api/auth/refresh",
+        headers={"Cookie": f"refresh_token={refresh_token}", "User-Agent": user_agent},
+    )
 
 
 def auth(token: str) -> dict[str, str]:
@@ -65,10 +68,40 @@ def test_reusing_an_old_refresh_token_revokes_every_session(
     _, first = register_and_login(client, new_email())
     second = refresh_with(client, first).cookies["refresh_token"]
 
-    reuse = refresh_with(client, first)  # an attacker replays the old token
+    reuse = refresh_with(client, first, user_agent="attacker-browser")  # a stolen copy
 
     assert reuse.status_code == 401
     # Theft detected: even the legitimate newer token no longer works.
+    assert refresh_with(client, second).status_code == 401
+
+
+def test_same_browser_may_retry_a_just_rotated_token(
+    client: TestClient, new_email: Callable[[], str]
+) -> None:
+    """Two tabs or a fast reload send the old cookie once more: no logout for that."""
+    _, first = register_and_login(client, new_email())
+    second = refresh_with(client, first).cookies["refresh_token"]
+
+    retry = refresh_with(client, first)  # same IP and browser, within the grace window
+
+    assert retry.status_code == 200
+    assert retry.cookies["refresh_token"] not in (first, second)
+    assert refresh_with(client, second).status_code == 200  # nobody was logged out
+
+
+def test_reuse_after_the_grace_window_is_theft(
+    client: TestClient, new_email: Callable[[], str]
+) -> None:
+    settings = get_settings()
+    settings.refresh_reuse_grace_seconds = 0  # as if the window had already passed
+    try:
+        _, first = register_and_login(client, new_email())
+        second = refresh_with(client, first).cookies["refresh_token"]
+        reuse = refresh_with(client, first)
+    finally:
+        settings.refresh_reuse_grace_seconds = 10
+
+    assert reuse.status_code == 401
     assert refresh_with(client, second).status_code == 401
 
 

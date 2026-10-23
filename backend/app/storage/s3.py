@@ -36,7 +36,8 @@ def get_s3_client() -> Any:
         aws_secret_access_key=settings.s3_secret_access_key.get_secret_value() or None,
         config=Config(
             signature_version="s3v4",
-            s3={"addressing_style": "path"},  # works for RustFS and AWS
+            # RustFS (custom endpoint) needs path-style URLs; real AWS prefers virtual-hosted ones.
+            s3={"addressing_style": "path" if settings.s3_endpoint_url else "virtual"},
             retries={"max_attempts": 3, "mode": "standard"},
         ),
     )

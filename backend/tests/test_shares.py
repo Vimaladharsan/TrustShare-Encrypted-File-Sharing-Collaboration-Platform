@@ -360,3 +360,21 @@ def test_shared_by_me_lists_status(client: TestClient, new_email: Callable[[], s
     assert items[active["id"]]["status"] == "active"
     assert items[revoked["id"]]["status"] == "revoked"
     assert items[active["id"]]["file_name"] == "report.pdf"
+
+
+def test_recipient_is_emailed_about_a_direct_share(
+    client: TestClient, new_email: Callable[[], str], outbox
+) -> None:
+    _, owner, file_id = owner_with_file(client, new_email)
+    recipient_email = new_email()
+    new_user(client, recipient_email)
+
+    share(client, owner, file_id, share_type="user", recipient_email=recipient_email,
+          permission="download", expires_at=in_days(3))  # fmt: skip
+    share(client, owner, file_id)  # a link share: nobody to email
+
+    mails = [m for m in outbox.sent if m.to == recipient_email and "shared" in m.subject]
+    assert len(mails) == 1
+    assert '"report.pdf"' in mails[0].subject
+    assert "/shared-with-me" in mails[0].text and "view and download" in mails[0].text
+    assert "%PDF" not in mails[0].text  # never the file itself

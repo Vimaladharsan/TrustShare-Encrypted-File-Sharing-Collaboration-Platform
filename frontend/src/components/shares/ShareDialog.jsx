@@ -66,7 +66,7 @@ export default function ShareDialog({ file, onClose }) {
         setCreatedUrl(created.url);
         setCopied(false);
       } else {
-        toast.success(`Shared with ${created.recipient_name}`);
+        toast.success(`Shared with ${created.recipient_name} – we emailed them a notice`);
         setEmail('');
       }
       loadShares();

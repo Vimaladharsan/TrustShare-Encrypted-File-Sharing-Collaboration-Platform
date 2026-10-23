@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 7
+    # Seconds a just-rotated refresh token may be retried by the same browser (two tabs, fast
+    # reloads) without counting as token theft. 0 = no grace at all.
+    refresh_reuse_grace_seconds: int = 10
     cookie_secure: bool = False  # True in production (HTTPS only); False for http://localhost
 
     # Multi-factor authentication

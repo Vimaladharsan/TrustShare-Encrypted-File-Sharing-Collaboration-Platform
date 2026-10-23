@@ -42,6 +42,7 @@ from app.schemas.share import (
     ShareStatus,
 )
 from app.services.activity_service import ActivityService
+from app.services.email_service import Email, file_shared_email
 from app.services.file_validation import PREVIEWABLE
 from app.services.security_events import record_security_event
 from app.storage.secure_store import SecureFileStore
@@ -463,4 +464,19 @@ def _owner_can_share(owner: User | None) -> bool:
 def _file_usable(file: dict[str, Any] | None, share: Share) -> bool:
     return (
         file is not None and file["status"] == "active" and file["owner_id"] == str(share.owner_id)
+    )
+
+
+def direct_share_email(owner: User, share: ShareCreated) -> Email:
+    """The "shared with you" notification for a direct share."""
+    expires = share.expires_at.strftime("%d %b %Y, %H:%M UTC") if share.expires_at else None
+    return file_shared_email(
+        to=share.recipient_email or "",
+        name=share.recipient_name or "",
+        owner_name=owner.full_name,
+        owner_email=owner.email,
+        file_name=share.file_name or "a file",
+        can_download=share.permission == "download",
+        expires=expires,
+        link=f"{get_settings().frontend_url}/shared-with-me",
     )

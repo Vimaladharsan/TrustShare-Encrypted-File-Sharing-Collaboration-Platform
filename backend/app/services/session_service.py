@@ -3,6 +3,7 @@
 Redis keys (all expire automatically):
     refresh:{hash}            -> session data (user_id, family, ip, user_agent, created_at)
     refresh_used:{hash}       -> user_id of an already-rotated token (for reuse detection)
+    refresh_grace:{hash}      -> who rotated it (user, family, ip, user agent), a few seconds
     user_sessions:{user_id}   -> set of the user's active refresh-token hashes
     access_denylist:{jti}     -> access token revoked by logout (until it would expire anyway)
     revoked_before:{user_id}  -> access tokens issued before this time (ms) are invalid (logout-all)
@@ -38,6 +39,7 @@ class SessionService:
         settings = get_settings()
         self.refresh_ttl = settings.refresh_token_ttl_days * 24 * 3600
         self.access_ttl = settings.access_token_ttl_minutes * 60
+        self.grace = settings.refresh_reuse_grace_seconds
 
     async def create(
         self, user_id: uuid.UUID, ip: str, user_agent: str, family: str | None = None
@@ -73,6 +75,9 @@ class SessionService:
             session, _ = await pipe.execute()
 
         if not session:
+            retry = await self._grace_retry(token_hash, ip, user_agent)
+            if retry is not None:
+                return retry
             reused_by = await self.redis.get(f"refresh_used:{token_hash}")
             if reused_by:
                 # An old token came back: someone has a copy. Log out every device.
@@ -83,9 +88,35 @@ class SessionService:
 
         user_id = uuid.UUID(session["user_id"])
         await self.redis.set(f"refresh_used:{token_hash}", str(user_id), ex=self.refresh_ttl)
+        if self.grace > 0:
+            grace_key = f"refresh_grace:{token_hash}"
+            await self.redis.hset(
+                grace_key,
+                mapping={
+                    "user_id": str(user_id),
+                    "family": session["family"],
+                    "ip": ip,
+                    "user_agent": user_agent[:200],
+                },
+            )
+            await self.redis.expire(grace_key, self.grace)
         await self.redis.srem(f"user_sessions:{user_id}", token_hash)
         new_token = await self.create(user_id, ip, user_agent, family=session["family"])
         return new_token, user_id
+
+    async def _grace_retry(
+        self, token_hash: str, ip: str, user_agent: str
+    ) -> tuple[str, uuid.UUID] | None:
+        """A token rotated a moment ago comes back from the SAME browser (same IP and user
+        agent) – e.g. two tabs, or a page reloaded before the new cookie was saved. That is not
+        theft, so the browser simply gets a fresh token instead of being logged out everywhere.
+        Anything else – another IP or browser, or after the few-second window – stays reuse."""
+        grace = await self.redis.hgetall(f"refresh_grace:{token_hash}")
+        if not grace or grace["ip"] != ip or grace["user_agent"] != user_agent[:200]:
+            return None
+        user_id = uuid.UUID(grace["user_id"])
+        logger.info("Refresh token retried within the grace window for user %s", user_id)
+        return await self.create(user_id, ip, user_agent, family=grace["family"]), user_id
 
     async def revoke(self, token: str) -> None:
         """Logout of this device."""
