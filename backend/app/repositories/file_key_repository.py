@@ -1,7 +1,7 @@
 """Database access for wrapped file keys (PostgreSQL file_keys). No business rules here."""
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import UTC, datetime
 
 from sqlalchemy import delete, func, select
@@ -36,10 +36,20 @@ class FileKeyRepository:
 
     # ---------- key rotation ----------
 
-    async def older_than(self, version: int, limit: int) -> Sequence[FileKey]:
-        result = await self.session.execute(
-            select(FileKey).where(FileKey.key_version != version).limit(limit)
-        )
+    async def older_than(
+        self,
+        version: int,
+        limit: int,
+        owner_id: uuid.UUID | None = None,
+        skip: Collection[str] = (),
+    ) -> Sequence[FileKey]:
+        """Keys not yet wrapped with master key `version` (optionally one owner's only)."""
+        query = select(FileKey).where(FileKey.key_version != version)
+        if owner_id is not None:
+            query = query.where(FileKey.owner_id == owner_id)
+        if skip:
+            query = query.where(FileKey.file_id.not_in(skip))
+        result = await self.session.execute(query.order_by(FileKey.file_id).limit(limit))
         return result.scalars().all()
 
     async def replace(self, row: FileKey, key: EncryptedKey) -> None:

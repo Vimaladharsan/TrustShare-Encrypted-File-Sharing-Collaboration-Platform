@@ -83,11 +83,16 @@ an error and **no unverified plaintext is returned**; the event is logged as a s
 
 ### 4.4 Rotation
 - **Master key rotation (planned or after suspected exposure):**
-  1. Generate a new KEK and add it to `MASTER_KEYS` as the next version (e.g. `v2`).
-  2. Set `ACTIVE_MASTER_KEY_VERSION=2` and restart the backend – new uploads use `v2`.
+  1. `python -m app.scripts.rotate_keys --new-key` prints the next version with a fresh random KEK
+     (the only time a key is ever printed). Append it to `MASTER_KEYS` (`1:<old>,2:<new>`) and store a
+     separate backup.
+  2. Set `ACTIVE_MASTER_KEY_VERSION=2` and restart the backend – new uploads use `v2`, old files still
+     open with `v1`.
   3. Run `python -m app.scripts.rotate_keys` – it unwraps every DEK still on an old version and re-wraps it
-     with `v2` (one transaction per batch; progress logged; safe to re-run).
-  4. When no row uses `v1` any more, remove `v1` from `MASTER_KEYS`.
+     with `v2` (batches of 100, one transaction each; safe to stop and re-run). A key whose KEK is
+     missing is reported and left unchanged. The run is recorded in the activity log (`key.rotate`).
+  4. `python -m app.scripts.rotate_keys --status` shows how many keys use each version; when no key uses
+     `v1` any more, remove `v1` from `MASTER_KEYS` and restart.
 - Files stay decryptable throughout: every row records which KEK version wrapped it, and old versions
   remain available until re-wrapping is finished.
 - **DEK rotation** (re-encrypting a file with a new DEK) is not needed routinely; it is done by

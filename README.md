@@ -101,7 +101,7 @@ TrustShare/
 │   │   ├── models/         # SQLAlchemy models
 │   │   ├── repositories/   # Data access
 │   │   ├── schemas/        # Pydantic request/response models
-│   │   ├── scripts/        # create_admin, seed_demo
+│   │   ├── scripts/        # create_admin, seed_demo, encrypt_existing_files, rotate_keys
 │   │   ├── services/       # Business logic (auth, MFA, upload validation, folders, trash)
 │   │   └── storage/        # StorageBackend implementations (local; S3 in M2)
 │   ├── alembic/            # Database migrations
