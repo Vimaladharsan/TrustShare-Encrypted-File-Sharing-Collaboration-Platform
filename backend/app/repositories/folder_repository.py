@@ -73,3 +73,6 @@ class FolderRepository:
 
     async def delete_many(self, ids: list[ObjectId]) -> None:
         await self.folders.delete_many({"_id": {"$in": ids}})
+
+    async def delete_all_owned(self, owner_id: str) -> None:
+        await self.folders.delete_many({"owner_id": owner_id})

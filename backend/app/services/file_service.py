@@ -22,7 +22,6 @@ from pymongo.asynchronous.database import AsyncDatabase
 
 from app.core.config import get_settings
 from app.core.errors import AppError
-from app.core.permissions import Perm
 from app.models import User
 from app.repositories.file_repository import FileRepository
 from app.repositories.folder_repository import FolderRepository
@@ -178,11 +177,10 @@ class FileService:
     # ---------- reading ----------
 
     async def get_for_read(self, user: User, file_id: str) -> dict[str, Any]:
-        """Owner can read; Admins (file:read_all) can read anyone's file. Others get 404."""
+        """Only the owner can read a file – Admins included: their role manages accounts, never
+        other people's files (privacy). Everyone else gets 404."""
         doc = await self.files.get(file_id)
-        if doc is None:
-            raise _not_found()
-        if doc["owner_id"] != str(user.id) and Perm.FILE_READ_ALL not in user.permission_codes:
+        if doc is None or doc["owner_id"] != str(user.id):
             raise _not_found()
         return doc
 

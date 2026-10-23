@@ -55,6 +55,15 @@ class FileRepository:
     async def delete(self, file_id: ObjectId) -> None:
         await self.files.delete_one({"_id": file_id})
 
+    # ---------- whole account (admin deletes an inactive account) ----------
+
+    async def all_owned(self, owner_id: str) -> list[dict[str, Any]]:
+        """Every file of a user – active and trashed."""
+        return await self.files.find({"owner_id": owner_id}).to_list(length=None)
+
+    async def delete_all_owned(self, owner_id: str) -> None:
+        await self.files.delete_many({"owner_id": owner_id})
+
     async def list_owned(
         self,
         owner_id: str,

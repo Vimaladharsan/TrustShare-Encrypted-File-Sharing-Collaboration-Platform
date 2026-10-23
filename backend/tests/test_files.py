@@ -282,14 +282,18 @@ def test_other_users_files_are_invisible(client: TestClient, new_email: Callable
     assert all(item["id"] != file_id for item in listing["items"])
 
 
-def test_admin_can_view_any_users_file(client: TestClient, new_email: Callable[[], str]) -> None:
+def test_admin_cannot_open_other_users_files(
+    client: TestClient, new_email: Callable[[], str]
+) -> None:
+    """Privacy: an Admin manages accounts, not other people's files."""
     owner = new_user(client, new_email())
     admin = new_user(client, new_email(), role="admin")
-    file_id = upload(client, owner, "audit-me.pdf", PDF).json()["id"]
+    file_id = upload(client, owner, "private.pdf", PDF).json()["id"]
 
-    response = client.get(f"/api/files/{file_id}", headers=auth(admin))
-
-    assert response.status_code == 200
+    for path in ("", "/download", "/preview"):
+        response = client.get(f"/api/files/{file_id}{path}", headers=auth(admin))
+        assert response.status_code == 404
+        assert PDF not in response.content
 
 
 def test_invalid_file_id_returns_404(client: TestClient, new_email: Callable[[], str]) -> None:

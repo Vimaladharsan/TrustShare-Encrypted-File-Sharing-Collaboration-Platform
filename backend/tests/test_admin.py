@@ -8,8 +8,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.scripts.create_admin import make_admin
-from tests.conftest import TEST_PASSWORD
+from tests.conftest import TEST_PASSWORD, file_key_row, set_last_login, stored_object
 from tests.test_auth import auth, login_token, register, user_id
+from tests.test_files import PDF, mongo_db, upload
 
 
 @pytest.fixture
@@ -155,3 +156,76 @@ def test_admin_sees_and_clears_a_lockout(
     assert response.status_code == 200
     assert response.json()["is_locked"] is False
     assert login_token(client, email)  # can log in again straight away
+
+
+# ---------- deleting inactive accounts ----------
+
+
+def test_recently_active_account_cannot_be_deleted(
+    client: TestClient, new_email: Callable[[], str], admin_token: str
+) -> None:
+    email = new_email()
+    target = make_user(client, email)
+    login_token(client, email)
+
+    response = client.delete(f"/api/admin/users/{target}", headers=auth(admin_token))
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "ACCOUNT_STILL_ACTIVE"
+    assert find_user(client, admin_token, email)["can_delete"] is False
+
+
+def test_inactive_account_is_deleted_with_all_its_files(
+    client: TestClient, new_email: Callable[[], str], admin_token: str
+) -> None:
+    email = new_email()
+    target = make_user(client, email)
+    token = login_token(client, email)
+    file_id = upload(client, token, "old.pdf", PDF).json()["id"]
+    storage_key = mongo_db()["files"].find_one({"owner_id": target})["storage_key"]
+    set_last_login(email, 31)
+    listed = find_user(client, admin_token, email)
+    assert listed["can_delete"] is True and listed["inactive_days"] == 31
+
+    response = client.delete(f"/api/admin/users/{target}", headers=auth(admin_token))
+
+    assert response.status_code == 204
+    assert mongo_db()["files"].count_documents({"owner_id": target}) == 0
+    assert stored_object(storage_key) is None  # encrypted object removed from the bucket
+    assert file_key_row(file_id) is None  # and its key
+    login = client.post("/api/auth/login", json={"email": email, "password": TEST_PASSWORD})
+    assert login.status_code == 401
+    log = mongo_db()["activity_logs"].find_one(
+        {"action": "admin.user_delete", "resource_id": target}
+    )
+    assert log["details"]["files_deleted"] == 1
+
+
+def test_admins_cannot_be_deleted(
+    client: TestClient, new_email: Callable[[], str], admin_token: str
+) -> None:
+    email = new_email()
+    asyncio.run(make_admin(email, "Other Admin", TEST_PASSWORD))
+    other = user_id(client, email)  # (logs in, so set the old login time afterwards)
+    set_last_login(email, 60)
+
+    response = client.delete(f"/api/admin/users/{other}", headers=auth(admin_token))
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "CANNOT_DELETE_ADMIN"
+
+
+def test_normal_user_cannot_delete_accounts(
+    client: TestClient, new_email: Callable[[], str]
+) -> None:
+    email = new_email()
+    target = make_user(client, email)
+    set_last_login(email, 60)
+    caller = new_email()
+    make_user(client, caller)
+
+    token = login_token(client, caller)
+
+    response = client.delete(f"/api/admin/users/{target}", headers=auth(token))
+
+    assert response.status_code == 403

@@ -65,6 +65,10 @@ class UserRepository:
             )
         )
 
+    async def delete(self, user_id: uuid.UUID) -> None:
+        """Remove the account; OAuth links, MFA codes and file keys go with it (FK cascade)."""
+        await self.session.execute(delete(User).where(User.id == user_id))
+
     async def count_active_with_role(self, role_name: str) -> int:
         count = await self.session.scalar(
             select(func.count())

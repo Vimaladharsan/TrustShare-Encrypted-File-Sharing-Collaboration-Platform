@@ -79,6 +79,9 @@ class Settings(BaseSettings):
     def google_enabled(self) -> bool:
         return bool(self.google_client_id and self.google_client_secret.get_secret_value())
 
+    # Admins may delete an account (and all its files) only after this many days without a login.
+    inactive_account_days: int = 30
+
     # Files
     default_quota_mb: int = 1024
     max_upload_mb: int = 25

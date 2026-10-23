@@ -1,27 +1,36 @@
-"""User management by admins: change roles, enable/disable accounts, unlock lockouts.
+"""User management by admins: change roles, enable/disable accounts, unlock lockouts, and delete
+accounts that have been inactive for a long time.
 
 Safety rules:
   - admins can't change their own role or disable themselves (no accidental self-lockout)
   - the last active admin can never be removed, so the system always has someone in charge
   - disabling an account logs it out of every device immediately
-Every change is written to the activity log.
+  - admins never get access to other users' files (privacy); the only thing they can do with
+    them is delete them together with an account that hasn't logged in for
+    INACTIVE_ACCOUNT_DAYS (default 30) - admin accounts themselves can't be deleted this way
+Every change is written to the activity log (which is kept even after an account is deleted).
 """
 
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import Request
 from pymongo.asynchronous.database import AsyncDatabase
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.permissions import RoleName
 from app.models import User
+from app.repositories.file_repository import FileRepository
+from app.repositories.folder_repository import FolderRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import AdminUserResponse, AdminUserUpdate, UserResponse
 from app.services.activity_service import ActivityService
 from app.services.login_guard import LoginGuard
 from app.services.session_service import SessionService
+from app.storage.secure_store import SecureFileStore
 
 
 def _not_found() -> AppError:
@@ -30,9 +39,16 @@ def _not_found() -> AppError:
 
 class AdminService:
     def __init__(
-        self, session: AsyncSession, redis: Redis, db: AsyncDatabase, request: Request
+        self,
+        session: AsyncSession,
+        redis: Redis,
+        db: AsyncDatabase,
+        request: Request,
+        storage: SecureFileStore | None = None,
     ) -> None:
         self.session = session
+        self.db = db
+        self.storage = storage
         self.users = UserRepository(session)
         self.redis = redis
         self.guard = LoginGuard(redis)
@@ -104,10 +120,74 @@ class AdminService:
         )
         return await self._response(user)
 
+    async def delete_inactive(self, admin: User, user_id: uuid.UUID) -> None:
+        """Delete an account that hasn't logged in for INACTIVE_ACCOUNT_DAYS, with all its files:
+        encrypted objects, keys, metadata, folders and sessions. Cannot be undone."""
+        user = await self.users.get_by_id(user_id)
+        if user is None:
+            raise _not_found()
+        if user.id == admin.id:
+            raise AppError("CANNOT_DELETE_SELF", "You can't delete your own account.", 400)
+        if user.role.name == RoleName.ADMIN:
+            raise AppError(
+                "CANNOT_DELETE_ADMIN",
+                "Admin accounts can't be deleted. Change the role to User first.",
+                400,
+            )
+        days, limit = inactive_days(user), get_settings().inactive_account_days
+        if days < limit:
+            raise AppError(
+                "ACCOUNT_STILL_ACTIVE",
+                f"This account was last active {days} day(s) ago. Accounts can only be deleted "
+                f"after {limit} days without a login.",
+                409,
+            )
+        if self.storage is None:
+            raise RuntimeError("AdminService needs a SecureFileStore to delete accounts")
+
+        owner_id, email = str(user.id), user.email
+        files = await FileRepository(self.db).all_owned(owner_id)
+        for doc in files:  # safe to repeat if interrupted: deleting a missing object is a no-op
+            await self.storage.delete(doc)  # encrypted object + its key (crypto-shredding)
+        await FileRepository(self.db).delete_all_owned(owner_id)
+        await FolderRepository(self.db).delete_all_owned(owner_id)
+
+        await self.users.delete(user_id)
+        await self.session.commit()
+        await SessionService(self.redis).revoke_all(user_id)
+        await self.guard.unlock(user_id)
+        await self.activity.log(
+            self.request,
+            admin,
+            "admin.user_delete",
+            resource_type="user",
+            resource_id=owner_id,
+            details={
+                "email": email,
+                "inactive_days": days,
+                "files_deleted": len(files),
+                "bytes_freed": sum(doc["size_bytes"] for doc in files),
+            },
+        )
+
     async def _response(self, user: User) -> AdminUserResponse:
         locked = await self.guard.locked_ids([user.id])
         return _to_response(user, user.id in locked)
 
 
+def inactive_days(user: User) -> int:
+    """Whole days since the last login (or since sign-up, if the user never logged in)."""
+    last_seen = user.last_login_at or user.created_at
+    return max((datetime.now(UTC) - last_seen).days, 0)
+
+
 def _to_response(user: User, is_locked: bool) -> AdminUserResponse:
-    return AdminUserResponse(**UserResponse.from_user(user).model_dump(), is_locked=is_locked)
+    days = inactive_days(user)
+    return AdminUserResponse(
+        **UserResponse.from_user(user).model_dump(),
+        is_locked=is_locked,
+        inactive_days=days,
+        can_delete=(
+            user.role.name != RoleName.ADMIN and days >= get_settings().inactive_account_days
+        ),
+    )

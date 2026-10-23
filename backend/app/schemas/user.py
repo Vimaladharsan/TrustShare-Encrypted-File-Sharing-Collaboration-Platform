@@ -43,9 +43,11 @@ class UserResponse(BaseModel):
 
 
 class AdminUserResponse(UserResponse):
-    """A user as seen on the admin page: also shows whether the account is locked out."""
+    """A user as seen on the admin page: also shows lockout and inactivity."""
 
     is_locked: bool = False
+    inactive_days: int = 0  # days since the last login (or sign-up)
+    can_delete: bool = False  # inactive long enough (and not an admin) to be deleted
 
 
 class AdminUserListResponse(BaseModel):

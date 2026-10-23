@@ -7,6 +7,7 @@ import re
 import shutil
 import uuid
 from collections.abc import Callable, Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -62,6 +63,8 @@ def _delete_test_files(user_ids: list[str]) -> None:
         # Failed logins for made-up test emails have no user id – match them by email.
         test_email = {"$regex": f"{re.escape(TEST_EMAIL_DOMAIN)}$"}
         db["activity_logs"].delete_many({"details.email": test_email})
+        # Logs of test accounts that a test deleted (their ids are gone from PostgreSQL).
+        db["activity_logs"].delete_many({"actor_email": test_email})
     finally:
         mongo.close()
     for user_id in user_ids:
@@ -138,6 +141,24 @@ async def _set_role(email: str, role_name: str) -> None:
 def set_role(email: str, role_name: str) -> None:
     """Change a test user's role directly in the database (e.g. make a Guest)."""
     asyncio.run(_set_role(email, role_name))
+
+
+async def _set_last_login(email: str, days_ago: int) -> None:
+    engine = create_async_engine(get_settings().postgres_url)
+    try:
+        async with async_sessionmaker(engine)() as session:
+            when = datetime.now(UTC) - timedelta(days=days_ago)
+            await session.execute(
+                update(User).where(User.email == email).values(last_login_at=when)
+            )
+            await session.commit()
+    finally:
+        await engine.dispose()
+
+
+def set_last_login(email: str, days_ago: int) -> None:
+    """Pretend a test user last logged in `days_ago` days ago (for the inactivity rule)."""
+    asyncio.run(_set_last_login(email, days_ago))
 
 
 def clear_rate_limits() -> None:

@@ -91,7 +91,7 @@ erDiagram
 | 2 | user | Standard member, manages own files |
 | 3 | guest | Read-only access |
 
-**`permissions`** – seeded by migration: `file:read`, `file:upload`, `file:update`, `file:delete`, `folder:manage`, `file:read_all`, `user:read`, `user:manage`, `audit:read`, `share:create` (M2).
+**`permissions`** – seeded by migration: `file:read`, `file:upload`, `file:update`, `file:delete`, `folder:manage`, `user:read`, `user:manage`, `audit:read`, `share:create` (M2), `user:delete_inactive` (M2). The M1 permission `file:read_all` was removed in M2 – admins can't read users' files.
 
 **`role_permissions`** – mapping from the permission matrix in [requirements.md](requirements.md#3-permission-matrix).
 

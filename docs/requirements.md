@@ -12,7 +12,7 @@ Organisations exchange sensitive documents through email attachments and public 
 
 | Role | Who | Summary |
 |---|---|---|
-| **Admin** | Platform operator | Manages users and roles, can view every user's files and the activity log. |
+| **Admin** | Platform operator | Manages users and roles and sees the activity log. **Cannot open other users' files** (privacy, changed in M2); can delete accounts that haven't logged in for 30+ days, together with their files. |
 | **User** | Standard registered member (default on sign-up) | Uploads and manages **own** files and folders. |
 | **Guest** | Known external person with an account (role assigned by an Admin) | Logs in, read-only: can view/download files available to them, cannot upload, create folders or modify anything. Every action is traceable to their account. |
 | **Link visitor** **(M2)** | Anyone holding a public share link – no account, not logged in | Can open only that one file, within the link's limits (expiry, download count, optional password). Not a role; identified only by IP in the logs. |
@@ -30,13 +30,13 @@ Every request is authorised by **permission**, not by role name. Roles are bundl
 | `file:update` | Rename, move, trash/restore own files | ✅ | ✅ | ❌ |
 | `file:delete` | Permanently delete own files | ✅ | ✅ | ❌ |
 | `folder:manage` | Create, rename, move, delete folders | ✅ | ✅ | ❌ |
-| `file:read_all` | See any user's files | ✅ | ❌ | ❌ |
 | `user:read` | List users | ✅ | ❌ | ❌ |
 | `user:manage` | Change role, activate/deactivate, unlock users | ✅ | ❌ | ❌ |
 | `audit:read` | View activity logs of all users | ✅ | ❌ | ❌ |
 | `share:create` **(M2)** | Create secure share links | ✅ | ✅ | ❌ |
+| `user:delete_inactive` **(M2)** | Delete an account inactive for 30+ days, with all its files | ✅ | ❌ | ❌ |
 
-Ownership rule: even with `file:update`, a user can only act on files where `owner_id == current_user.id`, unless they hold `file:read_all` (read) – admins do not silently modify other people's files.
+Ownership rule: every file action requires `owner_id == current_user.id` (or, from M2, a valid share). **There is no admin bypass** – the M1 permission `file:read_all` was removed in M2 (migration `c4d8e2a6b9f0`) so that not even an Admin can read users' files. An Admin's only power over files is deleting them together with an account that has been inactive for `INACTIVE_ACCOUNT_DAYS` (default 30); admin accounts can't be deleted this way and the activity log is kept.
 
 ## 4. Functional requirements
 

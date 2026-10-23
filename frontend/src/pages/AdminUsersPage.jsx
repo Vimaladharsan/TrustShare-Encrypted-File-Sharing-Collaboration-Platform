@@ -1,8 +1,8 @@
-import { Lock, Search, ShieldCheck, ShieldOff, UsersRound } from 'lucide-react';
+import { Clock, Lock, Search, ShieldCheck, ShieldOff, UsersRound } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { listUsers, unlockUser, updateUser } from '../api/admin';
+import { deleteInactiveUser, listUsers, unlockUser, updateUser } from '../api/admin';
 import { getErrorMessage } from '../api/client';
 import { useAuth } from '../auth/useAuth';
 import Button from '../components/Button';
@@ -13,7 +13,8 @@ import { formatDate } from '../utils/format';
 const PAGE_SIZE = 20;
 const ROLES = ['admin', 'user', 'guest'];
 
-/** Admins only: every account with its role, status, MFA and lockout state. */
+/** Admins only: every account with its role, status, MFA and lockout state.
+ * Admins never see users' files; they can only delete accounts inactive for 30+ days. */
 export default function AdminUsersPage() {
   const { user: me, can } = useAuth();
   const allowed = can('user:read');
@@ -90,6 +91,23 @@ export default function AdminUsersPage() {
     });
   }
 
+  function remove(target) {
+    setConfirm({
+      title: 'Delete this inactive account?',
+      message: `${target.full_name} (${target.email}) hasn't logged in for ${target.inactive_days} days. The account and ALL of its files will be permanently deleted. This can't be undone.`,
+      label: 'Delete account',
+      action: async () => {
+        try {
+          await deleteInactiveUser(target.id);
+          toast.success(`${target.full_name}'s account was deleted.`);
+          load();
+        } catch (err) {
+          toast.error(getErrorMessage(err));
+        }
+      },
+    });
+  }
+
   function unlock(target) {
     apply(target, () => unlockUser(target.id), `${target.full_name} is unlocked.`);
   }
@@ -103,7 +121,8 @@ export default function AdminUsersPage() {
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Users</h1>
           <p className="text-sm text-slate-500">
-            Manage roles and access. {data && `${total} account${total === 1 ? '' : 's'}`}
+            Manage roles and access. Accounts inactive for 30+ days can be deleted.{' '}
+            {data && `${total} account${total === 1 ? '' : 's'}`}
           </p>
         </div>
         <label className="relative block sm:w-72">
@@ -183,6 +202,12 @@ export default function AdminUsersPage() {
                             <Lock className="size-3" aria-hidden="true" /> Locked
                           </Badge>
                         )}
+                        {u.can_delete && (
+                          <Badge tone="slate">
+                            <Clock className="size-3" aria-hidden="true" /> Inactive{' '}
+                            {u.inactive_days} days
+                          </Badge>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-500">
@@ -204,6 +229,11 @@ export default function AdminUsersPage() {
                           >
                             {u.is_active ? 'Disable' : 'Enable'}
                           </Button>
+                          {can('user:delete_inactive') && u.can_delete && (
+                            <Button variant="danger" disabled={busy} onClick={() => remove(u)}>
+                              Delete
+                            </Button>
+                          )}
                         </div>
                       )}
                     </td>

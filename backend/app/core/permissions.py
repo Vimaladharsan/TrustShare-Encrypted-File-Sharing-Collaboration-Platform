@@ -12,11 +12,13 @@ class Perm(StrEnum):
     FILE_UPDATE = "file:update"
     FILE_DELETE = "file:delete"
     FOLDER_MANAGE = "folder:manage"
-    FILE_READ_ALL = "file:read_all"
     USER_READ = "user:read"
     USER_MANAGE = "user:manage"
     AUDIT_READ = "audit:read"
     SHARE_CREATE = "share:create"
+    # Delete accounts that haven't logged in for INACTIVE_ACCOUNT_DAYS, with all their files.
+    # (Admins deliberately have NO permission to open other users' files.)
+    USER_DELETE_INACTIVE = "user:delete_inactive"
 
 
 class RoleName(StrEnum):

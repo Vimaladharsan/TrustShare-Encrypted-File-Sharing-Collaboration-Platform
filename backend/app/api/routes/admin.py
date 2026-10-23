@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, status
 from pymongo.asynchronous.database import AsyncDatabase
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,11 +13,13 @@ from app.db.redis import get_redis
 from app.models import User
 from app.schemas.user import AdminUserListResponse, AdminUserResponse, AdminUserUpdate
 from app.services.admin_service import AdminService
+from app.storage.secure_store import SecureFileStore, get_file_store
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 can_read_users = require_permission(Perm.USER_READ)
 can_manage_users = require_permission(Perm.USER_MANAGE)
+can_delete_inactive = require_permission(Perm.USER_DELETE_INACTIVE)
 
 
 def admin_service(
@@ -25,8 +27,9 @@ def admin_service(
     session: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),
     db: AsyncDatabase = Depends(get_mongo),
+    storage: SecureFileStore = Depends(get_file_store),
 ) -> AdminService:
-    return AdminService(session, redis, db, request)
+    return AdminService(session, redis, db, request, storage)
 
 
 @router.get(
@@ -70,3 +73,16 @@ async def unlock_user(
     service: AdminService = Depends(admin_service),
 ) -> AdminUserResponse:
     return await service.unlock(admin, user_id)
+
+
+@router.delete(
+    "/users/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete an account inactive for 30+ days, with all its files (user:delete_inactive)",
+)
+async def delete_inactive_user(
+    user_id: uuid.UUID,
+    admin: User = Depends(can_delete_inactive),
+    service: AdminService = Depends(admin_service),
+) -> None:
+    await service.delete_inactive(admin, user_id)

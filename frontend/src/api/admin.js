@@ -19,3 +19,8 @@ export async function unlockUser(userId) {
   const { data } = await api.post(`/admin/users/${userId}/unlock`);
   return data;
 }
+
+/** Only for accounts with no login for 30+ days (can_delete). Deletes the account and all its files. */
+export async function deleteInactiveUser(userId) {
+  await api.delete(`/admin/users/${userId}`);
+}
