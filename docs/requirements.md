@@ -15,17 +15,17 @@ Organisations exchange sensitive documents through email attachments and public 
 | **Admin** | Platform operator | Manages users and roles and sees the activity log. **Cannot open other users' files** (privacy, changed in M2); can delete accounts that haven't logged in for 30+ days, together with their files. |
 | **User** | Standard registered member (default on sign-up) | Uploads and manages **own** files and folders. |
 | **Guest** | Known external person with an account (role assigned by an Admin) | Logs in, read-only: can view/download files available to them, cannot upload, create folders or modify anything. Every action is traceable to their account. |
-| **Link visitor** **(M2)** | Anyone holding a public share link – no account, not logged in | Can open only that one file, within the link's limits (expiry, download count, optional password). Not a role; identified only by IP in the logs. |
+| **Link visitor** **(M2)** | Anyone holding a public share link – no account, not logged in | Can open only that one file, within the link's limits (permission view/download, expiry, download count, revocation). Password-protected links are future work. Not a role; identified only by IP in the logs. |
 
 Every request is authorised by **permission**, not by role name. Roles are bundles of permissions, so adding a role later (e.g. "Auditor") needs no code change.
 
-**Guest vs Link visitor:** a Guest is a logged-in role used for "Restricted" sharing (specific known people, fully traceable). A Link visitor uses "Anyone with the link" sharing (convenient, no account). In M2 the file owner chooses the access mode for each share link.
+**Guest vs Link visitor:** a Guest is a logged-in role used for "Restricted" sharing (specific known people, fully traceable). A Link visitor uses "Anyone with the link" sharing (convenient, no account). In M2 the owner chooses per share: a link, or a direct share with a registered user ("Specific people" – Users and Guests), plus view or download permission.
 
 ## 3. Permission matrix
 
 | Permission | Meaning | Admin | User | Guest |
 |---|---|:-:|:-:|:-:|
-| `file:read` | List, preview, download own (and later shared) files | ✅ | ✅ | ✅ |
+| `file:read` | List, preview, download own files and files shared with you | ✅ | ✅ | ✅ |
 | `file:upload` | Upload new files | ✅ | ✅ | ❌ |
 | `file:update` | Rename, move, trash/restore own files | ✅ | ✅ | ❌ |
 | `file:delete` | Permanently delete own files | ✅ | ✅ | ❌ |

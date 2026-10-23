@@ -1,17 +1,17 @@
 # TrustShare: Secure File-Sharing System
 
-A secure file-sharing and document management platform – a private alternative to Google Drive. Users upload files that are validated and stored safely, organise them in folders, and (from Milestone 2) share them through permission-controlled, expiring links, with every file encrypted server-side using a unique **AES-256-GCM** key.
+A secure file-sharing and document management platform – a private alternative to Google Drive. Every file is validated, **encrypted server-side with its own AES-256-GCM key** (envelope encryption with rotatable master keys) and stored in S3-compatible object storage. Users organise files in folders and share them through **permission-controlled, expiring, revocable links** or directly with other users – with analytics for users and a security dashboard for admins.
 
 ![CI](https://github.com/Vimaladharsan/TrustShare-Encrypted-File-Sharing-Collaboration-Platform/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.12+-blue)
 ![FastAPI](https://img.shields.io/badge/backend-FastAPI-009688)
 ![React](https://img.shields.io/badge/frontend-React_%2B_Vite-61DAFB)
-![Status](https://img.shields.io/badge/milestone_1-complete-2ea44f)
+![Status](https://img.shields.io/badge/milestone_2-complete-2ea44f)
 
 ## Status
 
-TrustShare is built milestone by milestone. **Milestone 1 (foundation) is complete**; Milestone 2 (encryption and sharing) is next.
+TrustShare is built milestone by milestone. **Milestone 1** (foundation: auth, RBAC, MFA, upload, dashboard) and **Milestone 2** (encryption, cloud storage, secure sharing, key management, dashboards, HTTPS) are complete.
 
 ## Features
 
@@ -46,48 +46,68 @@ TrustShare is built milestone by milestone. **Milestone 1 (foundation) is comple
 - Loading, empty and error states; responsive layout
 - Buttons adapt to the user's permissions (enforced by the backend regardless)
 
+### Encryption and storage (Milestone 2)
+- **AES-256-GCM** with a fresh random 256-bit key per file, in 1 MiB authenticated chunks (format "TSE1"): any changed, missing, reordered or swapped chunk is detected and the download is refused
+- **Envelope encryption:** each file key is stored only wrapped by a versioned **master key** (`MASTER_KEYS`); keys never appear in responses, logs or the browser (tests check this)
+- Encrypted bytes in **S3-compatible object storage** (RustFS locally, AWS S3 by configuration), metadata in MongoDB, wrapped keys in PostgreSQL – no single store reveals a file
+- **Key rotation** without re-encrypting files (`python -m app.scripts.rotate_keys`), crypto-shredding on permanent delete, migration of Milestone 1 plaintext files
+- Decryption only in memory, after authorization; integrity failures return a safe error – details: [docs/key-management.md](docs/key-management.md)
+
+### Secure sharing (Milestone 2)
+- **Share links** for anyone (no account): view-only or view & download, expiry (max 30 days), optional download limit, instant revoke; 256-bit tokens stored only as SHA-256 hashes and hidden in logs
+- **Direct sharing** with registered users ("Shared with me" / "Shared by me")
+- Every access re-checks revocation, expiry, limit, file status and the owner's account and permissions – trashing a file or disabling its owner stops all links at once
+
+### Dashboards (Milestone 2)
+- **User:** Dashboard, Recent, Favorites, Storage breakdown, **File Analytics** (storage by type, uploads, downloads incl. unique users and shared downloads, sharing trends, date range, change vs previous period), own Activity Logs, and a Security page
+- **Admin panel:** **Security Dashboard** (logins, failed logins, unauthorized and blocked attempts, security events by severity, recent logins with IP and location), audit log viewer, storage per account (sizes only – admins can't open users' files), sharing reports, system monitoring
+- **Security events** recorded automatically: repeated failed logins, lockouts, suspicious IPs, new-IP sign-ins, token reuse, 403s and forged tokens, rate-limit blocks, disguised or tampered files, download anomalies, admin actions
+
 ### Platform
+- **HTTPS** through a Caddy reverse proxy (TLS 1.3) at https://localhost:8443; real client IPs via trusted proxy headers
 - **Activity log** in MongoDB for every important action, including **login history** (successful logins with method, failed logins with reason, lockouts) and rejected uploads (who, what, IP, user agent, request ID)
-- Health endpoint that checks PostgreSQL, MongoDB and Redis
+- Health endpoint that checks PostgreSQL, MongoDB, Redis and object storage
 - Standard JSON error format with request IDs, security headers, structured logging
 - Everything runs with Docker Compose; database migrations run automatically on start
 
 ## Architecture
 
 ```
-React + Vite ──HTTPS──> FastAPI backend ──> StorageBackend (local now → AES-256-GCM on S3 in M2)
-                              │
-              ┌───────────────┼───────────────┐
-              ▼               ▼               ▼
-         PostgreSQL        MongoDB          Redis
-       (users, roles,   (file metadata,  (sessions, refresh
-        permissions)     folders, logs)   tokens, rate limits)
+Browser ──HTTPS──> Caddy ──> React + Vite (UI)
+                     └─/api─> FastAPI backend ──encrypt / decrypt (AES-256-GCM)──> Object storage
+                                    │                                           (RustFS / AWS S3,
+              ┌─────────────────────┼─────────────────────┐                     ciphertext only)
+              ▼                     ▼                     ▼
+         PostgreSQL              MongoDB                Redis
+   (users, roles, wrapped     (file metadata,      (sessions, refresh
+    file keys, shares)       activity logs,         tokens, rate limits)
+                             security events)
 ```
 
 Each database is used for what it is good at: PostgreSQL for consistent relational data, MongoDB for flexible, high-volume documents, Redis for fast data that expires on its own. The backend is layered – **routes → services → repositories** – so HTTP handling, business rules and data access stay separate.
 
 Full design with diagrams: [docs/architecture.md](docs/architecture.md) · data model: [docs/database.md](docs/database.md) · requirements and permission matrix: [docs/requirements.md](docs/requirements.md) · wireframes: [docs/wireframes.html](docs/wireframes.html).
 
-**Planned encryption workflow (Milestone 2)**
+**Encryption workflow (implemented in Milestone 2)**
 
-1. User uploads a file over HTTPS.
-2. Backend validates type, size, content and permissions.
-3. A unique AES-256 key is generated for the file and wrapped by a master key (envelope encryption).
-4. The file is encrypted on the server and stored in S3.
-5. Metadata and activity logs are recorded.
-6. Authorized users access the file through a secure, expiring share link.
-7. The backend decrypts the file in memory only and delivers it.
+1. The user uploads a file over HTTPS.
+2. The backend validates type, size, content and permissions.
+3. A unique AES-256 key is generated for the file and wrapped by the active master key (envelope encryption).
+4. The file is encrypted in authenticated chunks and stored in object storage under a random name.
+5. Metadata (MongoDB), the wrapped key (PostgreSQL) and an activity log entry are recorded.
+6. The owner, a direct-share recipient or a valid share link may access the file – checked on every request.
+7. The backend unwraps the key, verifies and decrypts the file in memory only, and streams it.
 
 ## Tech Stack
 
 | Layer | Technologies |
 |---|---|
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2 (async), Pydantic v2, Alembic, Uvicorn |
-| Frontend | React 19, Vite, React Router, Tailwind CSS, Axios, lucide-react, sonner |
-| Databases | PostgreSQL 16, MongoDB 7, Redis 7 |
-| Security | bcrypt, JWT, TOTP (pyotp), Fernet, permission-based RBAC (AES-256-GCM in M2) |
-| Quality | pytest (69 tests), ruff, ESLint, Prettier, pre-commit, GitHub Actions |
-| Deployment | Docker, Docker Compose |
+| Frontend | React 19, Vite, React Router, Tailwind CSS, Axios, Recharts, lucide-react, sonner |
+| Data & storage | PostgreSQL 16, MongoDB 7, Redis 7, S3 API via boto3 (RustFS locally / AWS S3) |
+| Security | AES-256-GCM (`cryptography`), envelope encryption with versioned master keys, bcrypt, JWT, TOTP (pyotp), Fernet, permission-based RBAC, Caddy (TLS) |
+| Quality | pytest (204 tests), Postman/Newman collection, ruff, ESLint, Prettier, pre-commit, GitHub Actions |
+| Deployment | Docker, Docker Compose (7 services incl. RustFS and Caddy) |
 
 ## Project Structure
 
@@ -95,25 +115,28 @@ Full design with diagrams: [docs/architecture.md](docs/architecture.md) · data 
 TrustShare/
 ├── backend/
 │   ├── app/
-│   │   ├── api/            # Routes (/auth, /users, /admin, /files, /folders, /trash, /health)
+│   │   ├── api/            # Routes (auth, users, admin, files, folders, trash, shares, analytics, health)
 │   │   ├── core/           # Config, security, permissions, errors, logging, middleware
+│   │   ├── crypto/         # Master-key keyring (wraps and unwraps file keys)
 │   │   ├── db/             # PostgreSQL, MongoDB and Redis connections
 │   │   ├── models/         # SQLAlchemy models
 │   │   ├── repositories/   # Data access
 │   │   ├── schemas/        # Pydantic request/response models
-│   │   ├── scripts/        # create_admin, seed_demo, encrypt_existing_files, rotate_keys
-│   │   ├── services/       # Business logic (auth, MFA, upload validation, folders, trash)
-│   │   └── storage/        # StorageBackend implementations (local; S3 in M2)
+│   │   ├── scripts/        # create_admin, seed_demo, encrypt_existing_files, rotate_keys, remove_test_accounts
+│   │   ├── services/       # Business logic (auth, MFA, upload, encryption, sharing, analytics, security events)
+│   │   └── storage/        # S3 object storage + SecureFileStore (encrypt on write, verify + decrypt on read)
 │   ├── alembic/            # Database migrations
 │   └── tests/
 ├── frontend/
 │   └── src/
 │       ├── api/            # Axios client with automatic token refresh
 │       ├── auth/           # Auth context and hooks
-│       ├── components/     # Layout, file table, dialogs, upload modal
-│       ├── pages/          # Login, register, files, trash
+│       ├── components/     # Layouts, file table, dialogs, upload, share dialog, charts
+│       ├── pages/          # Auth, files, sharing, analytics, security, admin panel
 │       └── utils/
-├── docs/                   # Architecture, database design, requirements, wireframes
+├── caddy/                  # Caddyfile for local HTTPS
+├── docs/                   # Architecture, database design, key management, requirements, wireframes
+├── postman/                # Postman collection + environment (Milestone 2 API checks)
 ├── .github/workflows/      # CI pipeline
 ├── docker-compose.yml
 └── .env.example
@@ -181,6 +204,20 @@ docker compose exec backend ruff check .
 docker compose exec frontend npm run lint
 ```
 
+### Postman collection
+
+`postman/TrustShare_M2.postman_collection.json` checks encrypted upload and download, access control,
+share links (view vs download, limit, revoke, expiry), direct sharing, admin RBAC and analytics – 30
+requests, run in order. Import it with `postman/TrustShare_local.postman_environment.json` into
+Postman (Collection Runner), or run it with Newman in Docker:
+
+```bash
+docker run --rm --network trustshare_default -v "$PWD/postman:/etc/newman" postman/newman:6-alpine run TrustShare_M2.postman_collection.json -e TrustShare_local.postman_environment.json --env-var baseUrl=http://backend:8000/api
+```
+
+It creates two throwaway accounts (`@postman.example.com`); remove them afterwards with
+`docker compose exec backend python -m app.scripts.remove_test_accounts postman.example.com`.
+
 ## Environment Variables
 
 See [.env.example](.env.example).
@@ -196,8 +233,11 @@ See [.env.example](.env.example).
 | `FRONTEND_URL` | Base URL used in email links (default `http://localhost:5173`) |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` | Optional Google login (button hidden when not set) |
 | `REQUIRE_EMAIL_VERIFICATION` | `true` blocks login until the email is verified (default `false`: reminder only) |
+| `MASTER_KEYS` / `ACTIVE_MASTER_KEY_VERSION` | Versioned 256-bit master keys (`1:<base64>,2:<base64>`) that wrap every file key, and the one used for new files – back them up separately; see [docs/key-management.md](docs/key-management.md) |
+| `S3_ENDPOINT_URL` / `S3_BUCKET` / `S3_REGION` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Object storage for the encrypted files (empty endpoint = real AWS S3) |
+| `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY` | Credentials of the local RustFS container |
 
-Optional settings with defaults include `MAX_UPLOAD_MB` (25), `DEFAULT_QUOTA_MB` (1024), `ACCESS_TOKEN_TTL_MINUTES` (15), `REFRESH_TOKEN_TTL_DAYS` (7), `MAX_FAILED_LOGINS` (5) and `LOCKOUT_MINUTES` (15).
+Optional settings with defaults include `MAX_UPLOAD_MB` (25), `DEFAULT_QUOTA_MB` (1024), `ACCESS_TOKEN_TTL_MINUTES` (15), `REFRESH_TOKEN_TTL_DAYS` (7), `MAX_FAILED_LOGINS` (5), `LOCKOUT_MINUTES` (15), `SHARE_LINK_MAX_DAYS` (30), `SHARE_LINK_RATE_LIMIT_PER_MINUTE` (60) and `INACTIVE_ACCOUNT_DAYS` (30).
 
 > **Never commit `.env` files or secrets.**
 
@@ -222,8 +262,8 @@ Interactive documentation is available at `/docs` while the backend is running.
 ## Roadmap
 
 - [x] **Milestone 1:** design, Docker setup, authentication, RBAC, MFA, secure upload, file dashboard, CI
-- [ ] **Milestone 2:** AES-256-GCM encryption, cloud storage, secure sharing, expiring links, key management
-- [ ] **Milestone 3:** monitoring, audit logs, notifications, analytics, suspicious-activity detection
+- [x] **Milestone 2:** AES-256-GCM envelope encryption, S3-compatible storage, secure links and direct sharing, key rotation, user analytics, admin security dashboard, HTTPS
+- [ ] **Milestone 3:** notifications, deeper monitoring and suspicious-activity detection (audit logs and analytics started in M2)
 - [ ] **Milestone 4:** security testing, cloud deployment, documentation, demo
 
 ## License

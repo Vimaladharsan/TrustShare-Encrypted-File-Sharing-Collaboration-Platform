@@ -456,7 +456,7 @@ Files are never re-encrypted; downloads keep working during rotation.
   log. Every admin endpoint requires the `audit:read` / `user:read` permissions on the **backend**; the
   hidden menu is only a convenience.
 
-### 8.7 API surface added in Milestone 2 (planned)
+### 8.7 API surface added in Milestone 2
 
 | Method | Endpoint | Permission | Purpose |
 |---|---|---|---|
