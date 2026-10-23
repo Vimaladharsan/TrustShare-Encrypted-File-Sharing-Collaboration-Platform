@@ -2,7 +2,7 @@ from functools import lru_cache
 from urllib.parse import quote_plus
 
 from cryptography.fernet import Fernet
-from pydantic import SecretStr, field_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     mfa_encryption_key: SecretStr  # Fernet key that encrypts TOTP secrets in the database
     mfa_issuer: str = "TrustShare"  # name shown in Google Authenticator
     mfa_challenge_minutes: int = 5  # time allowed between password and code
+
+    # File encryption (Milestone 2): versioned master keys (KEKs) that wrap each file's own key.
+    # Format: "1:<base64 32 bytes>,2:<base64 32 bytes>" – see docs/key-management.md.
+    master_keys: SecretStr
+    active_master_key_version: int = 1
 
     # Brute-force protection
     max_failed_logins: int = 5
@@ -99,6 +104,18 @@ class Settings(BaseSettings):
         except ValueError as exc:
             raise ValueError("MFA_ENCRYPTION_KEY must be a valid Fernet key") from exc
         return value
+
+    @model_validator(mode="after")
+    def master_keys_must_be_valid(self) -> "Settings":
+        # Imported here to avoid a circular import (the keyring reads these settings).
+        from app.crypto.keyring import parse_master_keys
+
+        keys = parse_master_keys(self.master_keys.get_secret_value())  # raises on bad format
+        if self.active_master_key_version not in keys:
+            raise ValueError(
+                f"ACTIVE_MASTER_KEY_VERSION={self.active_master_key_version} is not in MASTER_KEYS"
+            )
+        return self
 
     @property
     def postgres_url(self) -> str:

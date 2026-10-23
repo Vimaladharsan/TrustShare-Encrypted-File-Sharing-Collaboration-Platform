@@ -290,7 +290,7 @@ All routes are under `/api`. Interactive docs: `http://localhost:8000/docs`.
 | Path traversal | Storage keys are server-generated UUIDs; user input never becomes a path. |
 | CSRF (OAuth) | Random `state` stored in Redis, single use. |
 | Secrets in code | `.env` (gitignored) loaded by pydantic-settings; `.env.example` documents keys. |
-| Tampering / snooping on disk **(M2)** | AES-256-GCM per-file keys, envelope encryption, S3. |
+| Tampering / snooping on disk **(M2)** | Chunked AES-256-GCM with a per-file key; keys wrapped by versioned master keys (envelope encryption); the private bucket holds only ciphertext – see [§8](#8-milestone-2--encryption-storage-and-sharing) and [key-management.md](key-management.md). |
 
 ## 6. Deployment view (M1 – local)
 
@@ -322,10 +322,153 @@ All services have health checks; the backend waits for the databases to be healt
 | API Gateway: SSL, Auth, Validation, Rate limiting, Audit logging, Routing | FastAPI middleware + dependencies (NGINX/TLS added in M4) |
 | Auth Service | `AuthService`, `MfaService`, `OAuthService` |
 | File Service | `FileService`, `FolderService`, `StorageBackend` |
-| Encryption Service | **M2** – `EncryptedStorage` (AES-256-GCM, envelope keys, rotation) |
-| Sharing Service | **M2** – share links in PostgreSQL |
+| Encryption Service | **M2** – `EncryptionService` + `Keyring` (chunked AES-256-GCM, envelope keys, rotation), `S3Storage` |
+| Sharing Service | **M2** – `ShareService`: link + direct shares in PostgreSQL (hashed tokens, permission, expiry, revocation, limits) |
 | Notification Service | Email (M1: verification/reset) → **M3** in-app + email alerts |
 | Analytics Service | **M3** – aggregations over MongoDB activity logs |
 | Data layer: PostgreSQL, MongoDB, Redis, encrypted storage, audit logs | As in §1 (audit logs = MongoDB `activity_logs`) |
 | Infrastructure: Docker, CI/CD (GitHub Actions), AWS | Docker Compose + GitHub Actions now; cloud in M4 |
 | Message queue, Kubernetes, SIEM/IDS, ML anomaly detection, mobile/desktop clients, FCM, Captcha | **Future scope** (see requirements §8) |
+
+---
+
+## 8. Milestone 2 – Encryption, storage and sharing
+
+Requirements: Milestone 2 brief (AES-256 encryption, cloud storage, encrypted retrieval, secure sharing,
+access permissions, link expiry, key management, secure decryption) plus the mentor's dashboards
+(user File Analytics, admin Security Dashboard, user Security page). Key details:
+[key-management.md](key-management.md).
+
+### 8.1 Components added
+
+| Component | Responsibility |
+|---|---|
+| `EncryptionService` | Chunked AES-256-GCM encrypt/decrypt of file streams; generates one DEK per file. |
+| `Keyring` | Versioned master keys (KEKs) from the environment; wraps/unwraps DEKs. The only code that sees KEKs. |
+| `S3Storage` (`StorageBackend`) | Upload/download/delete objects in a **private** bucket via the S3 API (boto3). MinIO locally, AWS S3 in the cloud. |
+| `ShareService` | Link shares (hashed token) and direct shares (registered recipient); permission, expiry, revocation, download limit. |
+| `AnalyticsService` | Date-range aggregations over activity logs and file metadata (user File Analytics, admin dashboards). |
+| `SecurityEventService` | Records security events with severity (failed/locked logins, unauthorized and blocked requests, tampering, suspicious downloads). |
+
+### 8.2 Encrypted upload
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant API as FastAPI
+    participant ENC as EncryptionService + Keyring
+    participant S3 as Object storage (MinIO / S3)
+    participant PG as PostgreSQL
+    participant MO as MongoDB
+
+    U->>API: POST /api/files (multipart, JWT)
+    API->>API: Permission file:upload, type allow-list, size, quota, magic bytes, SHA-256 (as in M1)
+    API->>ENC: new random DEK (256-bit)
+    ENC->>ENC: encrypt 1 MiB chunks with AES-256-GCM (nonce = prefix + counter + last flag, AAD = file id + index)
+    API->>S3: PUT encrypted object (private bucket, random key)
+    ENC->>ENC: wrap DEK with active KEK (version n)
+    API->>PG: INSERT file_keys(file_id, wrapped_key, key_version)
+    API->>MO: files: metadata + encryption {algorithm, format, chunk_size, key_version}
+    API->>MO: activity_logs: file.upload
+    API-->>U: 201 file info (no key material)
+```
+
+The plaintext never reaches object storage; the raw DEK never leaves backend memory.
+
+### 8.3 Encrypted download / preview
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as User or link visitor
+    participant API as FastAPI
+    participant PG as PostgreSQL
+    participant S3 as Object storage
+    participant ENC as EncryptionService + Keyring
+    participant MO as MongoDB
+
+    U->>API: GET /api/files/{id}/download (or /api/s/{token}/download)
+    API->>API: Authenticate and authorize: owner, direct share or valid link (permission, expiry, revoked, limit)
+    API->>PG: SELECT file_keys WHERE file_id
+    ENC->>ENC: unwrap DEK with the KEK of the stored version
+    API->>S3: GET encrypted object (streamed)
+    loop each chunk
+        ENC->>ENC: decrypt and verify GCM tag (fail: stop, security event)
+        API-->>U: verified plaintext chunk
+    end
+    API->>MO: activity_logs: file.download {via: owner | direct_share | link}
+```
+
+### 8.4 Share links and direct sharing
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor O as Owner
+    actor R as Recipient
+    participant API as FastAPI
+    participant PG as PostgreSQL
+
+    O->>API: POST /api/files/{id}/shares {type, permission, expires_at, max_downloads, recipient_email}
+    API->>API: owner + share:create, file active, expiry in the future
+    alt link share
+        API->>API: token = 256-bit random (URL-safe)
+        API->>PG: INSERT shares(token_hash = sha256(token), ...)
+        API-->>O: link https://.../s/{token} (token shown once)
+    else direct share
+        API->>PG: INSERT shares(recipient_id, ...)
+        API-->>O: 201 (recipient sees it under "Shared with Me")
+    end
+    R->>API: GET /api/s/{token} (or the file in "Shared with Me")
+    API->>PG: find share by sha256(token) / recipient
+    API->>API: deny if revoked, expired, limit reached, file trashed/deleted, owner disabled, owner lost share:create, action not permitted
+    API-->>R: file info / preview (view) / download (download) - decrypted as in 8.3
+```
+
+| Situation | Result |
+|---|---|
+| Owner requests own file | Allowed (account active, file active) |
+| Valid share, permitted action | Allowed – only that action (`view` = preview, `download` = preview + download) |
+| No permission / wrong action | 404 (link) or 403 (direct) – nothing revealed |
+| Link expired or revoked | 410 Gone ("This link has expired" / "This link was revoked") |
+| Download limit reached | 410 Gone |
+| File trashed or deleted, owner disabled | 404 – the link stops working automatically |
+
+### 8.5 Key rotation
+
+Admin adds master key `v(n+1)` → sets it active → runs `rotate_keys` → every `file_keys` row on an older
+version is unwrapped and re-wrapped with the new key (batches, idempotent) → old KEK removed when unused.
+Files are never re-encrypted; downloads keep working during rotation.
+
+### 8.6 Dashboards (mentor's additions)
+
+- **User:** new sidebar (Dashboard, My Files, Shared with Me, Shared by Me, Recent, Favorites, Trash,
+  Storage, File Analytics, Activity Logs, Security, Settings); File Analytics with summary cards, storage by
+  type, uploads/downloads/sharing over time, recent uploads/downloads and a date range; a Security page
+  describing the active protections.
+- **Admin:** separate admin panel with a **Security Dashboard** – login metrics and charts, unauthorized
+  and blocked attempts, security events by severity and type, recent logins with IP and location, audit
+  log. Every admin endpoint requires the `audit:read` / `user:read` permissions on the **backend**; the
+  hidden menu is only a convenience.
+
+### 8.7 API surface added in Milestone 2 (planned)
+
+| Method | Endpoint | Permission | Purpose |
+|---|---|---|---|
+| POST | `/files/{id}/shares` | `share:create` + owner | Create a link or direct share |
+| GET | `/files/{id}/shares` | owner | List a file's shares with status |
+| GET | `/shares/sent` · `/shares/received` | logged in | "Shared by Me" / "Shared with Me" |
+| DELETE | `/shares/{share_id}` | owner | Revoke |
+| GET | `/s/{token}` · `/s/{token}/preview` · `/s/{token}/download` | public (token) | Link visitor access |
+| POST/DELETE | `/files/{id}/favorite` | owner / recipient | Favorites |
+| GET | `/analytics/me?from&to` | logged in | User File Analytics |
+| GET | `/admin/security/overview?from&to` | `audit:read` | Security Dashboard metrics and charts |
+| GET | `/admin/security/logins` · `/events` · `/audit` | `audit:read` | Recent logins, security events, audit log |
+
+### 8.8 Deployment view (Milestone 2 – local)
+
+`docker compose` gains a **`minio`** service (S3-compatible object storage, private bucket created on
+start, console on :9001). Leaving `S3_ENDPOINT_URL` empty and putting real AWS credentials in `.env`
+switches the same code to **AWS S3**. HTTPS locally is provided by a Caddy reverse proxy with a trusted
+local certificate (Phase 9).

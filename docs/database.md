@@ -118,7 +118,41 @@ Indexes: `UNIQUE(email)`, `INDEX(role_id)`.
 
 **`mfa_backup_codes`** – 10 rows per user when MFA is enabled; regenerating deletes old rows. `INDEX(user_id)`, `ON DELETE CASCADE`.
 
-**Planned (M2):** `shares` (id, file_id, owner_id, token_hash, permission view/download, expires_at, max_downloads, download_count, password_hash, revoked_at), `file_permissions` (file_id, user_id, access level).
+**`file_keys`** *(Milestone 2)* – one row per stored file; holds the file's data key **only in wrapped
+(encrypted) form**. See [key-management.md](key-management.md).
+
+| Column | Type | Constraints / notes |
+|---|---|---|
+| file_id | `varchar(24)` | PK – the MongoDB `files._id` (ObjectId as hex). |
+| owner_id | `uuid` | FK → users, `ON DELETE CASCADE`. |
+| wrapped_key | `bytea` | nonce (12 bytes) + AES-256-GCM(KEK, DEK) + tag. Never the raw key. |
+| key_version | `smallint` | Which master key (KEK) wrapped it – needed for rotation. `INDEX`. |
+| algorithm | `varchar(32)` | `AES-256-GCM` (file cipher). |
+| created_at, rotated_at | `timestamptz` | `rotated_at` set when re-wrapped by key rotation. |
+
+**`shares`** *(Milestone 2)* – both **link shares** (anyone with the secret link) and **direct shares**
+(a registered recipient – "Shared with Me").
+
+| Column | Type | Constraints / notes |
+|---|---|---|
+| id | `uuid` | PK |
+| file_id | `varchar(24)` | MongoDB file id. `INDEX`. |
+| owner_id | `uuid` | FK → users (who created the share), `ON DELETE CASCADE`. `INDEX`. |
+| share_type | `varchar(10)` | `link` or `user` (CHECK). |
+| recipient_id | `uuid` | FK → users; required for `user`, `NULL` for `link`. `INDEX`. |
+| token_hash | `char(64)` | SHA-256 of the link token, `UNIQUE`; `NULL` for direct shares. The raw token is shown once and never stored. |
+| permission | `varchar(10)` | `view` (preview only) or `download` (CHECK). |
+| expires_at | `timestamptz` | Required for links; optional for direct shares. |
+| max_downloads | `integer` | Optional download limit; `download_count` counts uses. |
+| download_count | `integer` | default 0. |
+| revoked_at | `timestamptz` | Set when the owner revokes. |
+| last_accessed_at, created_at | `timestamptz` | |
+
+Constraint: `UNIQUE(file_id, recipient_id)` for active direct shares (one direct share per person and file).
+A share is **usable** only if not revoked, not expired, under its limit, the file is active and the owner is
+active and still holds `share:create` – checked on every access.
+
+**Not stored:** a separate `file_permissions` table – direct shares cover per-user access.
 
 Migrations are managed with **Alembic** (`backend/alembic/versions`).
 
@@ -126,7 +160,7 @@ Migrations are managed with **Alembic** (`backend/alembic/versions`).
 
 ## 2. MongoDB (documents)
 
-Database: `trustshare`. Collections: `files`, `folders`, `activity_logs`.
+Database: `trustshare`. Collections: `files`, `folders`, `activity_logs`, and in Milestone 2 `security_events` and `favorites`.
 
 ### 2.1 `files`
 
@@ -142,12 +176,18 @@ Database: `trustshare`. Collections: `files`, `folders`, `activity_logs`.
   "category": "document",
   "size_bytes": 482133,
   "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
-  "storage_backend": "local",
+  "storage_backend": "s3",
   "storage_key": "6f1c2a3e-.../a8c4e9f2-3b1d-4c7e-9f00-1e2d3c4b5a69",
   "version": 1,
   "status": "active",
   "trashed_at": null,
-  "encryption": null,
+  "encryption": {
+    "algorithm": "AES-256-GCM",
+    "format": "TSE1-chunked",
+    "chunk_size": 1048576,
+    "key_version": 1,
+    "encrypted_size": 482281
+  },
   "created_at": ISODate("2026-10-12T09:15:22Z"),
   "updated_at": ISODate("2026-10-12T09:15:22Z")
 }
@@ -163,7 +203,7 @@ Database: `trustshare`. Collections: `files`, `folders`, `activity_logs`.
 | sha256 | Integrity + duplicate detection. In M2 also proves the decrypted file matches the original. |
 | storage_key | Random server-generated path inside the storage backend. |
 | status | `active` or `trashed`. Permanent delete removes the document and the stored file. |
-| encryption | `null` in M1. **(M2)** `{ "algorithm": "AES-256-GCM", "wrapped_key": "...", "nonce": "...", "key_version": 1 }` – added without any migration. |
+| encryption | `null` in M1 (plaintext on local disk). **(M2)** describes how the object is encrypted: algorithm, object format, chunk size, master-key version, ciphertext size. **No key material** – the wrapped key is in PostgreSQL `file_keys`. Added without any migration (schema-flexible). |
 
 Indexes:
 
@@ -225,6 +265,38 @@ Indexes: `{ user_id: 1, created_at: -1 }`, `{ action: 1, created_at: -1 }`, `{ i
 
 ---
 
+### 2.4 `security_events` *(Milestone 2 – admin Security Dashboard)*
+
+```json
+{
+  "_id": ObjectId("…"),
+  "type": "multiple_failed_logins",
+  "severity": "high",
+  "user_id": "6f1c2a3e-…",
+  "actor_email": "priya@example.com",
+  "ip_address": "192.168.1.45",
+  "details": { "attempts": 5 },
+  "request_id": "b1f2c3d4e5f6",
+  "created_at": ISODate("2026-10-22T10:24:00Z")
+}
+```
+
+| Field | Notes |
+|---|---|
+| type | `multiple_failed_logins`, `account_locked`, `unauthorized_access` (401/403), `blocked_request` (429 / lockout), `suspicious_ip`, `policy_violation` (e.g. rejected upload type), `file_threat` (fake file type, tampered ciphertext), `download_anomaly`, `admin_action`. |
+| severity | `high`, `medium`, `low`, `info`. |
+
+Indexes: `{ created_at: -1 }`, `{ type: 1, created_at: -1 }`, `{ severity: 1, created_at: -1 }`.
+Login history itself stays in `activity_logs` (`auth.login.success` / `auth.login.failed`); downloads are
+logged there too (`file.download` with `via: owner | direct_share | link`) for the analytics dashboards.
+
+### 2.5 `favorites` *(Milestone 2)*
+
+`{ user_id, file_id, created_at }` – `UNIQUE(user_id, file_id)`. A user can star their own files or files
+shared with them.
+
+---
+
 ## 3. Redis (key-value, auto-expiring)
 
 All one-time tokens are stored **hashed** (`sha256(token)`) – if Redis is dumped, the tokens in emails still can't be reconstructed.
@@ -258,4 +330,4 @@ class StorageBackend(Protocol):
 ```
 
 - **M1 – `LocalStorage`:** `storage/{user_id}/{uuid}` inside a Docker volume, not inside the web root.
-- **M2 – `EncryptedStorage(S3Storage)`:** wraps any backend; encrypts each file with its own AES-256-GCM key, wraps that key with the master key (envelope encryption), uploads ciphertext to S3. `FileService` code does not change.
+- **M2 – `S3Storage`:** private bucket on MinIO (local) or AWS S3 via boto3. `FileService` encrypts each file with its own AES-256-GCM key (`EncryptionService`) before calling `save`, and decrypts while streaming from `open`; the wrapped key goes to PostgreSQL `file_keys`. The object store only ever holds ciphertext. Details: [key-management.md](key-management.md).
