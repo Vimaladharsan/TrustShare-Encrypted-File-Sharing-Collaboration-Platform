@@ -7,9 +7,15 @@ from fastapi import APIRouter, Response, status
 from app.db.mongo import ping_mongo
 from app.db.postgres import ping_postgres
 from app.db.redis import ping_redis
+from app.storage.s3 import get_s3_storage
 
 router = APIRouter(tags=["health"])
 logger = logging.getLogger(__name__)
+
+
+async def ping_storage() -> None:
+    storage = get_s3_storage()
+    await asyncio.to_thread(storage.client.head_bucket, Bucket=storage.bucket)
 
 
 async def check(name: str, ping: Callable[[], Awaitable[None]]) -> str:
@@ -21,15 +27,16 @@ async def check(name: str, ping: Callable[[], Awaitable[None]]) -> str:
         return "error"
 
 
-@router.get("/health", summary="Status of PostgreSQL, MongoDB and Redis")
+@router.get("/health", summary="Status of PostgreSQL, MongoDB, Redis and object storage")
 async def health(response: Response) -> dict:
-    """Checks the three databases in parallel. Returns 503 if any is down."""
-    postgres, mongodb, redis = await asyncio.gather(
+    """Checks the three databases and the object storage in parallel. 503 if any is down."""
+    postgres, mongodb, redis, storage = await asyncio.gather(
         check("postgres", ping_postgres),
         check("mongodb", ping_mongo),
         check("redis", ping_redis),
+        check("storage", ping_storage),
     )
-    services = {"postgres": postgres, "mongodb": mongodb, "redis": redis}
+    services = {"postgres": postgres, "mongodb": mongodb, "redis": redis, "storage": storage}
     healthy = all(result == "ok" for result in services.values())
     if not healthy:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE

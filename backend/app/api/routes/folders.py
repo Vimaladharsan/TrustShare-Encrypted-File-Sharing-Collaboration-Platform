@@ -12,7 +12,7 @@ from app.schemas.folder import (
     FolderUpdate,
 )
 from app.services.folder_service import FolderService
-from app.storage.local import LocalStorage, get_storage
+from app.storage.secure_store import SecureFileStore, get_file_store
 
 router = APIRouter(prefix="/folders", tags=["folders"])
 
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/folders", tags=["folders"])
 def folder_service(
     request: Request,
     db: AsyncDatabase = Depends(get_mongo),
-    storage: LocalStorage = Depends(get_storage),
+    storage: SecureFileStore = Depends(get_file_store),
 ) -> FolderService:
     return FolderService(db, request, storage)
 

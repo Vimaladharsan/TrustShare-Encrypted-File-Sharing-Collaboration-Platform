@@ -13,7 +13,7 @@ from app.repositories.file_repository import ALL_FOLDERS, FileRepository
 from app.repositories.folder_repository import FolderRepository
 from app.schemas.file import FileInfo, FileListResponse, FileUpdate, StorageUsageResponse
 from app.services.file_service import FileService
-from app.storage.local import LocalStorage, get_storage
+from app.storage.secure_store import SecureFileStore, get_file_store
 
 router = APIRouter(prefix="/files", tags=["files"])
 
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/files", tags=["files"])
 def file_service(
     request: Request,
     db: AsyncDatabase = Depends(get_mongo),
-    storage: LocalStorage = Depends(get_storage),
+    storage: SecureFileStore = Depends(get_file_store),
 ) -> FileService:
     return FileService(db, storage, request)
 

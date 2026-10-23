@@ -345,7 +345,7 @@ access permissions, link expiry, key management, secure decryption) plus the men
 |---|---|
 | `EncryptionService` | Chunked AES-256-GCM encrypt/decrypt of file streams; generates one DEK per file. |
 | `Keyring` | Versioned master keys (KEKs) from the environment; wraps/unwraps DEKs. The only code that sees KEKs. |
-| `S3Storage` (`StorageBackend`) | Upload/download/delete objects in a **private** bucket via the S3 API (boto3). MinIO locally, AWS S3 in the cloud. |
+| `S3Storage` (`StorageBackend`) | Upload/download/delete objects in a **private** bucket via the S3 API (boto3). RustFS locally, AWS S3 in the cloud. |
 | `ShareService` | Link shares (hashed token) and direct shares (registered recipient); permission, expiry, revocation, download limit. |
 | `AnalyticsService` | Date-range aggregations over activity logs and file metadata (user File Analytics, admin dashboards). |
 | `SecurityEventService` | Records security events with severity (failed/locked logins, unauthorized and blocked requests, tampering, suspicious downloads). |
@@ -358,7 +358,7 @@ sequenceDiagram
     actor U as User
     participant API as FastAPI
     participant ENC as EncryptionService + Keyring
-    participant S3 as Object storage (MinIO / S3)
+    participant S3 as Object storage (RustFS / S3)
     participant PG as PostgreSQL
     participant MO as MongoDB
 
@@ -369,7 +369,7 @@ sequenceDiagram
     API->>S3: PUT encrypted object (private bucket, random key)
     ENC->>ENC: wrap DEK with active KEK (version n)
     API->>PG: INSERT file_keys(file_id, wrapped_key, key_version)
-    API->>MO: files: metadata + encryption {algorithm, format, chunk_size, key_version}
+    API->>MO: files: metadata + encryption {algorithm, format, chunk_size, encrypted_size}
     API->>MO: activity_logs: file.upload
     API-->>U: 201 file info (no key material)
 ```
@@ -468,7 +468,7 @@ Files are never re-encrypted; downloads keep working during rotation.
 
 ### 8.8 Deployment view (Milestone 2 – local)
 
-`docker compose` gains a **`minio`** service (S3-compatible object storage, private bucket created on
-start, console on :9001). Leaving `S3_ENDPOINT_URL` empty and putting real AWS credentials in `.env`
+`docker compose` gains a **`rustfs`** service (RustFS – open-source S3-compatible object storage, private bucket
+created on start, console on :9001/rustfs/console/). Leaving `S3_ENDPOINT_URL` empty and putting real AWS credentials in `.env`
 switches the same code to **AWS S3**. HTTPS locally is provided by a Caddy reverse proxy with a trusted
 local certificate (Phase 9).

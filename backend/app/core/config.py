@@ -84,6 +84,14 @@ class Settings(BaseSettings):
     max_upload_mb: int = 25
     storage_dir: str = "/app/storage"  # inside the container; backend/storage on the laptop
 
+    # Object storage for encrypted files (Milestone 2): RustFS locally, AWS S3 in the cloud.
+    # Empty endpoint = real AWS S3; credentials come from .env and are never committed.
+    s3_endpoint_url: str = ""
+    s3_region: str = "us-east-1"
+    s3_bucket: str = "trustshare-files"
+    s3_access_key_id: str = ""
+    s3_secret_access_key: SecretStr = SecretStr("")
+
     @property
     def max_upload_bytes(self) -> int:
         return self.max_upload_mb * 1024 * 1024

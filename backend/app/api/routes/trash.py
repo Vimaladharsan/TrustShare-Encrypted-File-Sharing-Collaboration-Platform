@@ -6,7 +6,7 @@ from app.db.mongo import get_mongo
 from app.models import User
 from app.schemas.trash import BulkResult, TrashSelection
 from app.services.trash_service import TrashService
-from app.storage.local import LocalStorage, get_storage
+from app.storage.secure_store import SecureFileStore, get_file_store
 
 router = APIRouter(prefix="/trash", tags=["trash"])
 
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/trash", tags=["trash"])
 def trash_service(
     request: Request,
     db: AsyncDatabase = Depends(get_mongo),
-    storage: LocalStorage = Depends(get_storage),
+    storage: SecureFileStore = Depends(get_file_store),
 ) -> TrashService:
     return TrashService(db, storage, request)
 

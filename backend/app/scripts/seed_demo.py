@@ -32,6 +32,8 @@ from app.schemas.auth import RegisterRequest
 from app.services.file_service import FileService
 from app.services.folder_service import FolderService
 from app.storage.local import get_storage
+from app.storage.s3 import get_s3_storage
+from app.storage.secure_store import SecureFileStore
 
 DEMO_USERS = [
     ("user@example.com", "Demo User", RoleName.USER),
@@ -170,8 +172,20 @@ async def add_demo_content(user: User) -> None:
 
     request = script_request()
     folders = FolderService(db, request)
-    files = FileService(db, get_storage(), request)
+    await asyncio.to_thread(get_s3_storage().ensure_bucket)
+    engine = create_async_engine(get_settings().postgres_url)
+    try:
+        async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+            # Files are encrypted and stored exactly like a browser upload.
+            store = SecureFileStore(session, get_s3_storage(), get_storage())
+            files = FileService(db, store, request)
+            await _add_folders_and_files(user, folders, files)
+    finally:
+        await engine.dispose()
+    print(f"Added {len(DEMO_CONTENT) - 1} folders and sample files for {user.email}")
 
+
+async def _add_folders_and_files(user: User, folders: FolderService, files: FileService) -> None:
     async def upload(name: str, content: bytes, folder_id: str | None) -> dict:
         upload_file = UploadFile(io.BytesIO(content), filename=name)
         return await files.upload(user, upload_file, folder_id, allow_duplicate=False)
@@ -188,7 +202,6 @@ async def add_demo_content(user: User) -> None:
 
     draft = await upload(*TRASHED_FILE, folder_id=None)
     await files.trash(user, str(draft["_id"]))
-    print(f"Added {len(DEMO_CONTENT) - 1} folders and sample files for {user.email}")
 
 
 # ---------- entry point ----------

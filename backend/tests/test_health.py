@@ -7,7 +7,7 @@ def test_health_reports_all_databases_ok(client: TestClient) -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
-    assert body["services"] == {"postgres": "ok", "mongodb": "ok", "redis": "ok"}
+    assert body["services"] == {"postgres": "ok", "mongodb": "ok", "redis": "ok", "storage": "ok"}
 
 
 def test_every_response_has_request_id_and_security_headers(client: TestClient) -> None:

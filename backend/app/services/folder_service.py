@@ -17,7 +17,7 @@ from app.models import User
 from app.repositories.folder_repository import FolderRepository
 from app.schemas.folder import Breadcrumb
 from app.services.activity_service import ActivityService
-from app.storage.local import LocalStorage
+from app.storage.secure_store import SecureFileStore
 
 
 def _not_found() -> AppError:
@@ -39,7 +39,7 @@ def clean_folder_name(raw: str) -> str:
 
 class FolderService:
     def __init__(
-        self, db: AsyncDatabase, request: Request, storage: LocalStorage | None = None
+        self, db: AsyncDatabase, request: Request, storage: SecureFileStore | None = None
     ) -> None:
         self.folders = FolderRepository(db)
         self.files = db["files"]
@@ -217,11 +217,11 @@ class FolderService:
         folder_ids = [doc["_id"], *[f["_id"] for f in await self.folders.descendants(doc["_id"])]]
         inside = await self.files.find(
             {"owner_id": str(user.id), "folder_id": {"$in": folder_ids}},
-            {"storage_key": 1, "size_bytes": 1},
+            {"storage_key": 1, "size_bytes": 1, "encryption": 1},
         ).to_list(length=None)
 
-        for file in inside:  # bytes first: if this fails, the metadata still points to them
-            await self.storage.delete(file["storage_key"])
+        for file in inside:  # bytes + keys first: if this fails, the metadata still points to them
+            await self.storage.delete(file)
         await self.files.delete_many({"_id": {"$in": [f["_id"] for f in inside]}})
         await self.folders.delete_many(folder_ids)
 

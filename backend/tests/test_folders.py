@@ -1,12 +1,11 @@
 """Folders, rename/move, trash/restore and delete forever (Phase 4B – demo item 4)."""
 
 from collections.abc import Callable
-from pathlib import Path
 
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from app.core.config import get_settings
+from tests.conftest import file_key_row, stored_object
 from tests.test_files import PDF, auth, mongo_db, new_user, upload
 
 
@@ -181,7 +180,8 @@ def test_delete_forever_removes_bytes_and_metadata(
 
     assert response.status_code == 204
     assert client.get(f"/api/files/{file_id}", headers=auth(token)).status_code == 404
-    assert not (Path(get_settings().storage_dir) / storage_key).exists()
+    assert stored_object(storage_key) is None  # encrypted object gone
+    assert file_key_row(file_id) is None  # and its key – unreadable forever
     assert client.get("/api/files/usage", headers=auth(token)).json()["used_bytes"] == 0
 
 

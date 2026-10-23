@@ -31,6 +31,21 @@ services:
     ports:
       - "127.0.0.1:6379:6379"
 
+  # S3-compatible object storage for the ENCRYPTED file objects (Milestone 2).
+  # RustFS: open-source (Apache-2.0), same API as AWS S3; buckets are private.
+  # Console: http://localhost:9001/rustfs/console/
+  rustfs:
+    image: rustfs/rustfs:1.0.3
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY}
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - objectdata:/data
+
   backend:
     build: ./backend
     restart: unless-stopped
@@ -49,6 +64,7 @@ services:
       - postgres
       - mongo
       - redis
+      - rustfs
 
   frontend:
     build: ./frontend
@@ -67,3 +83,4 @@ services:
 volumes:
   pgdata:
   mongodata:
+  objectdata:

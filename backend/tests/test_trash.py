@@ -1,19 +1,17 @@
 """Delete folders forever, bulk restore/delete, restore all and empty trash."""
 
 from collections.abc import Callable
-from pathlib import Path
 
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from app.core.config import get_settings
+from tests.conftest import file_key_row, stored_object
 from tests.test_files import PDF, auth, mongo_db, new_user, upload
 from tests.test_folders import create_folder, list_files, list_folders
 
 
-def storage_path(file_id: str) -> Path:
-    doc = mongo_db()["files"].find_one({"_id": ObjectId(file_id)})
-    return Path(get_settings().storage_dir) / doc["storage_key"]
+def storage_key(file_id: str) -> str:
+    return mongo_db()["files"].find_one({"_id": ObjectId(file_id)})["storage_key"]
 
 
 def usage(client: TestClient, token: str) -> int:
@@ -39,13 +37,14 @@ def test_deleting_folder_forever_removes_everything_inside(
     sub = create_folder(client, token, "Drafts", top["id"]).json()
     file_a = upload(client, token, "a.pdf", PDF, folder_id=top["id"]).json()["id"]
     file_b = upload(client, token, "b.txt", b"notes", folder_id=sub["id"]).json()["id"]
-    disk = [storage_path(file_a), storage_path(file_b)]
+    keys = [storage_key(file_a), storage_key(file_b)]
     trash_folder(client, token, top["id"])
 
     response = client.delete(f"/api/folders/{top['id']}", headers=auth(token))
 
     assert response.status_code == 204
-    assert all(not path.exists() for path in disk)  # bytes gone
+    assert all(stored_object(key) is None for key in keys)  # encrypted objects gone
+    assert file_key_row(file_a) is None and file_key_row(file_b) is None  # keys gone
     assert (
         mongo_db()["files"].count_documents({"_id": {"$in": [ObjectId(file_a), ObjectId(file_b)]}})
         == 0

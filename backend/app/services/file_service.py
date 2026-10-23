@@ -1,9 +1,10 @@
 """File upload, listing and access rules. All file decisions live here.
 
-Upload pipeline (docs/architecture.md §3.4):
+Upload pipeline (docs/architecture.md §3.4 and §8.2):
   permission (route) → clean name → extension allow-list → quota → stream to a temp file in
   1 MB chunks while counting size and computing SHA-256 → magic bytes / Office structure →
-  duplicate check → move to storage under a random key → metadata in MongoDB → activity log
+  duplicate check → encrypt with a new AES-256 key and store in the private bucket (SecureFileStore)
+  → metadata in MongoDB → activity log
 """
 
 import asyncio
@@ -35,7 +36,8 @@ from app.services.file_validation import (
     extension_of,
     office_structure_ok,
 )
-from app.storage.local import CHUNK_SIZE, LocalStorage
+from app.storage.local import CHUNK_SIZE
+from app.storage.secure_store import SecureFileStore
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +48,7 @@ def _not_found() -> AppError:
 
 
 class FileService:
-    def __init__(self, db: AsyncDatabase, storage: LocalStorage, request: Request) -> None:
+    def __init__(self, db: AsyncDatabase, storage: SecureFileStore, request: Request) -> None:
         self.files = FileRepository(db)
         self.folders = FolderRepository(db)
         self.activity = ActivityService(db)
@@ -86,9 +88,9 @@ class FileService:
                         "DUPLICATE_FILE", "You already have an identical file here.", 409
                     )
 
-                # Random storage name: the user's filename never becomes a path on disk.
-                storage_key = f"{user.id}/{uuid.uuid4()}"
-                await self.storage.save(storage_key, temp)
+                # Encrypt with a fresh key and store under a random name (never the filename).
+                file_oid = ObjectId()
+                stored = await self.storage.store(str(file_oid), user.id, temp)
             finally:
                 await asyncio.to_thread(temp.unlink, missing_ok=True)
         except AppError as exc:
@@ -104,27 +106,29 @@ class FileService:
 
         now = datetime.now(UTC)
         file_type = ALLOWED_TYPES[extension]
-        doc = await self.files.insert(
-            {
-                "owner_id": str(user.id),
-                "folder_id": folder_oid,
-                "original_name": name,
-                "name_lower": name.lower(),
-                "extension": extension,
-                "mime_type": file_type.mime_type,
-                "category": file_type.category,
-                "size_bytes": size,
-                "sha256": sha256,
-                "storage_backend": "local",
-                "storage_key": storage_key,
-                "version": 1,
-                "status": "active",
-                "trashed_at": None,
-                "encryption": None,  # filled in from Milestone 2 (AES-256-GCM)
-                "created_at": now,
-                "updated_at": now,
-            }
-        )
+        doc = {
+            "_id": file_oid,
+            "owner_id": str(user.id),
+            "folder_id": folder_oid,
+            "original_name": name,
+            "name_lower": name.lower(),
+            "extension": extension,
+            "mime_type": file_type.mime_type,
+            "category": file_type.category,
+            "size_bytes": size,
+            "sha256": sha256,
+            **stored,  # storage_backend, storage_key, encryption info (no key material)
+            "version": 1,
+            "status": "active",
+            "trashed_at": None,
+            "created_at": now,
+            "updated_at": now,
+        }
+        try:
+            await self.files.insert(doc)
+        except Exception:
+            await self.storage.delete(doc)  # don't leave an encrypted object without metadata
+            raise
         await self.activity.log(
             self.request,
             user,
@@ -192,7 +196,7 @@ class FileService:
             resource_id=file_id,
             details={"file_name": doc["original_name"]},
         )
-        return doc, self.storage.open(doc["storage_key"])
+        return doc, await self.storage.open(doc)
 
     async def preview(self, user: User, file_id: str) -> tuple[dict[str, Any], AsyncIterator]:
         """Same access rules as download, but only for types the browser can display."""
@@ -209,7 +213,7 @@ class FileService:
             resource_id=file_id,
             details={"file_name": doc["original_name"]},
         )
-        return doc, self.storage.open(doc["storage_key"])
+        return doc, await self.storage.open(doc)
 
     # ---------- organising: rename, move, trash, restore, delete ----------
 
@@ -302,7 +306,7 @@ class FileService:
     async def delete_forever(self, user: User, file_id: str) -> None:
         """Remove the bytes from storage and the metadata from MongoDB. Cannot be undone."""
         doc = await self.owned(user, file_id, status=None)
-        await self.storage.delete(doc["storage_key"])
+        await self.storage.delete(doc)  # encrypted object + its key
         await self.files.delete(doc["_id"])
         await self._log(
             user,

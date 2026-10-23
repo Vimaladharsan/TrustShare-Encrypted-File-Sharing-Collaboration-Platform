@@ -39,3 +39,7 @@ extend-immutable-calls = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+filterwarnings = [
+    # botocore (boto3) still calls datetime.utcnow() internally – not our code.
+    "ignore:datetime.datetime.utcnow:DeprecationWarning:botocore.*",
+]

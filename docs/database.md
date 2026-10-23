@@ -185,7 +185,6 @@ Database: `trustshare`. Collections: `files`, `folders`, `activity_logs`, and in
     "algorithm": "AES-256-GCM",
     "format": "TSE1-chunked",
     "chunk_size": 1048576,
-    "key_version": 1,
     "encrypted_size": 482281
   },
   "created_at": ISODate("2026-10-12T09:15:22Z"),
@@ -203,7 +202,7 @@ Database: `trustshare`. Collections: `files`, `folders`, `activity_logs`, and in
 | sha256 | Integrity + duplicate detection. In M2 also proves the decrypted file matches the original. |
 | storage_key | Random server-generated path inside the storage backend. |
 | status | `active` or `trashed`. Permanent delete removes the document and the stored file. |
-| encryption | `null` in M1 (plaintext on local disk). **(M2)** describes how the object is encrypted: algorithm, object format, chunk size, master-key version, ciphertext size. **No key material** – the wrapped key is in PostgreSQL `file_keys`. Added without any migration (schema-flexible). |
+| encryption | `null` in M1 (plaintext on local disk). **(M2)** describes how the object is encrypted: algorithm, object format, chunk size, ciphertext size (the master-key version lives with the wrapped key in PostgreSQL, so rotation never has to touch MongoDB). **No key material** – the wrapped key is in PostgreSQL `file_keys`. Added without any migration (schema-flexible). |
 
 Indexes:
 
@@ -330,4 +329,4 @@ class StorageBackend(Protocol):
 ```
 
 - **M1 – `LocalStorage`:** `storage/{user_id}/{uuid}` inside a Docker volume, not inside the web root.
-- **M2 – `S3Storage`:** private bucket on MinIO (local) or AWS S3 via boto3. `FileService` encrypts each file with its own AES-256-GCM key (`EncryptionService`) before calling `save`, and decrypts while streaming from `open`; the wrapped key goes to PostgreSQL `file_keys`. The object store only ever holds ciphertext. Details: [key-management.md](key-management.md).
+- **M2 – `S3Storage`:** private bucket on RustFS (local) or AWS S3 via boto3. `FileService` encrypts each file with its own AES-256-GCM key (`EncryptionService`) before calling `save`, and decrypts while streaming from `open`; the wrapped key goes to PostgreSQL `file_keys`. The object store only ever holds ciphertext. Details: [key-management.md](key-management.md).

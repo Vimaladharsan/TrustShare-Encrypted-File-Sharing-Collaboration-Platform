@@ -16,11 +16,11 @@ from app.repositories.file_repository import FileRepository
 from app.repositories.folder_repository import FolderRepository
 from app.services.file_service import FileService
 from app.services.folder_service import FolderService
-from app.storage.local import LocalStorage
+from app.storage.secure_store import SecureFileStore
 
 
 class TrashService:
-    def __init__(self, db: AsyncDatabase, storage: LocalStorage, request: Request) -> None:
+    def __init__(self, db: AsyncDatabase, storage: SecureFileStore, request: Request) -> None:
         self.files = FileService(db, storage, request)
         self.folders = FolderService(db, request, storage)
         self.file_repo = FileRepository(db)

@@ -36,7 +36,7 @@ Master keys (KEKs)  – versioned, 256-bit, in the server's environment (.env / 
 **Why envelope encryption?** One key per file limits damage (a leaked DEK exposes one file, not all), and
 rotating the master key only means re-wrapping small 32-byte DEKs instead of re-encrypting gigabytes.
 
-**Separation of storage:** ciphertext → object storage (MinIO / AWS S3) · file metadata → MongoDB ·
+**Separation of storage:** ciphertext → object storage (RustFS / AWS S3) · file metadata → MongoDB ·
 wrapped DEKs → PostgreSQL · KEKs → environment. An attacker needs **all four** to read a file.
 
 ---
@@ -115,7 +115,7 @@ ciphertext is permanently unreadable even if a storage backup still contains it 
 | Routes, other services | No – they call the encryption service | No |
 | API responses, logs, activity logs | **Never** (tests verify this) | **Never** |
 | Browser / users / admins | **Never** | **Never** |
-| Object storage (MinIO / S3) | No – only ciphertext | No |
+| Object storage (RustFS / S3) | No – only ciphertext | No |
 | PostgreSQL / MongoDB | No – only wrapped keys / metadata | No |
 
 In production the KEK would live in a key-management service (e.g. **AWS KMS**) so that even the backend

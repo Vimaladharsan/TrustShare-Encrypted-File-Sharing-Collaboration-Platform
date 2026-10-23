@@ -4,7 +4,6 @@ import hashlib
 import io
 import zipfile
 from collections.abc import Callable
-from pathlib import Path
 
 import pytest
 from bson import ObjectId
@@ -12,7 +11,7 @@ from fastapi.testclient import TestClient
 from pymongo import MongoClient
 
 from app.core.config import get_settings
-from tests.conftest import TEST_PASSWORD, set_role
+from tests.conftest import TEST_PASSWORD, file_key_row, set_role, stored_object
 
 PDF = b"%PDF-1.4\n% TrustShare test file\n1 0 obj << >> endobj\ntrailer << >>\n%%EOF\n"
 
@@ -80,10 +79,14 @@ def test_upload_pdf_saves_file_and_metadata(
     doc = mongo_db()["files"].find_one({"_id": ObjectId(body["id"])})
     assert doc["original_name"] == "Q3 Report.pdf"
     assert doc["status"] == "active"
-    # ...and the bytes are on disk under a random name, not the user's filename.
-    stored = Path(get_settings().storage_dir) / doc["storage_key"]
-    assert stored.read_bytes() == PDF
-    assert "Q3 Report" not in str(stored)
+    # ...and the bytes are ENCRYPTED in the private bucket under a random name.
+    stored = stored_object(doc["storage_key"])
+    assert stored is not None and stored.startswith(b"TSE1")  # TrustShare encrypted format
+    assert PDF not in stored and b"%PDF" not in stored  # nothing readable
+    assert "Q3 Report" not in doc["storage_key"]
+    assert doc["encryption"]["algorithm"] == "AES-256-GCM"
+    # ...and the file's key exists only in wrapped form in PostgreSQL.
+    assert file_key_row(body["id"]) is not None
 
 
 def test_download_returns_the_same_bytes_as_attachment(

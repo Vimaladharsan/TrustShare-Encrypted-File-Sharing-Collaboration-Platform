@@ -18,8 +18,9 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.config import get_settings
 from app.main import app
-from app.models import Role, User
+from app.models import FileKey, Role, User
 from app.services.email_service import Email, get_email_sender
+from app.storage.s3 import get_s3_client
 
 TEST_EMAIL_DOMAIN = "@pytest.example.com"
 TEST_PASSWORD = "Str0ng!Passw0rd"
@@ -65,6 +66,62 @@ def _delete_test_files(user_ids: list[str]) -> None:
         mongo.close()
     for user_id in user_ids:
         shutil.rmtree(Path(settings.storage_dir) / user_id, ignore_errors=True)
+        _delete_objects(f"{user_id}/")
+
+
+def _delete_objects(prefix: str) -> None:
+    """Remove a test user's encrypted objects from the bucket (RustFS)."""
+    s3, bucket = get_s3_client(), get_settings().s3_bucket
+    listed = s3.list_objects_v2(Bucket=bucket, Prefix=prefix).get("Contents", [])
+    if listed:
+        s3.delete_objects(
+            Bucket=bucket, Delete={"Objects": [{"Key": obj["Key"]} for obj in listed]}
+        )
+
+
+# ---------- helpers for storage / key tests ----------
+
+
+def stored_object(storage_key: str) -> bytes | None:
+    """The raw object exactly as stored in the bucket (None if it doesn't exist)."""
+    s3 = get_s3_client()
+    try:
+        return s3.get_object(Bucket=get_settings().s3_bucket, Key=storage_key)["Body"].read()
+    except s3.exceptions.NoSuchKey:
+        return None
+
+
+def put_object(storage_key: str, data: bytes) -> None:
+    """Overwrite a stored object – used to simulate tampering."""
+    get_s3_client().put_object(Bucket=get_settings().s3_bucket, Key=storage_key, Body=data)
+
+
+async def _file_key(file_id: str) -> FileKey | None:
+    engine = create_async_engine(get_settings().postgres_url)
+    try:
+        async with async_sessionmaker(engine)() as session:
+            return await session.get(FileKey, file_id)
+    finally:
+        await engine.dispose()
+
+
+def file_key_row(file_id: str) -> FileKey | None:
+    """The PostgreSQL file_keys row for a file (wrapped key), or None."""
+    return asyncio.run(_file_key(file_id))
+
+
+async def _drop_file_key(file_id: str) -> None:
+    engine = create_async_engine(get_settings().postgres_url)
+    try:
+        async with async_sessionmaker(engine)() as session:
+            await session.execute(delete(FileKey).where(FileKey.file_id == file_id))
+            await session.commit()
+    finally:
+        await engine.dispose()
+
+
+def drop_file_key(file_id: str) -> None:
+    asyncio.run(_drop_file_key(file_id))
 
 
 async def _set_role(email: str, role_name: str) -> None:
