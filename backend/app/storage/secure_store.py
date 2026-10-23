@@ -6,7 +6,7 @@ Encrypted on the way in, decrypted on the way out:
                                              wrapped key → PostgreSQL file_keys
     open(file metadata)                    → wrapped key → unwrap → stream object → verify + decrypt
     delete(file metadata)                  → remove object AND key (without the key the bytes are
-                                             unreadable forever – "crypto-shredding")
+                                             unreadable forever – "crypto-shredding") and shares
 
 Services (FileService, FolderService, TrashService) only ever call these three methods; they never
 see keys. Files uploaded before Milestone 2 (plaintext on local disk, `encryption: null`) are still
@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import AppError
 from app.db.postgres import get_db
 from app.repositories.file_key_repository import FileKeyRepository
+from app.repositories.share_repository import ShareRepository
 from app.services.encryption_service import (
     ALGORITHM,
     CHUNK_SIZE,
@@ -128,11 +129,14 @@ class SecureFileStore:
     # ---------- delete ----------
 
     async def delete(self, doc: dict[str, Any]) -> None:
-        if not doc.get("encryption"):
+        """Permanent delete: the bytes, the key and every share of the file."""
+        file_id = str(doc["_id"])
+        if doc.get("encryption"):
+            await self.objects.delete(doc["storage_key"])
+            await self.keys.delete(file_id)
+        else:
             await self.legacy.delete(doc["storage_key"])
-            return
-        await self.objects.delete(doc["storage_key"])
-        await self.keys.delete(str(doc["_id"]))
+        await ShareRepository(self.session).delete_for_file(file_id)
         await self.session.commit()
 
 

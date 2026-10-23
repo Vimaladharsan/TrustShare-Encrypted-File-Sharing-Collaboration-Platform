@@ -13,12 +13,17 @@ const MAX_TEXT_PREVIEW = 2 * 1024 * 1024; // bigger text files are faster to dow
 /**
  * Shows a PDF, image or text file inside the app. The file is fetched with the login token and
  * displayed from memory (a blob: URL) – it is never saved to disk unless the user clicks Download.
+ *
+ * file: { id, name, extension, size_bytes }. `load(signal)` fetches the Blob – by default the
+ * user's own file; shared files and public links pass their own loader. Without `onDownload`
+ * (view-only shares) no Download button is shown.
  */
-export default function FilePreviewDialog({ file, onDownload, onClose }) {
+export default function FilePreviewDialog({ file, load, onDownload, onClose }) {
   const kind = previewKind(file);
   const [content, setContent] = useState(null); // { url } for PDF/images, { text } for text
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const [loader] = useState(() => load || ((signal) => previewFile(file.id, signal)));
 
   useEffect(() => {
     if (!kind) return undefined;
@@ -26,7 +31,7 @@ export default function FilePreviewDialog({ file, onDownload, onClose }) {
     let url = null;
     setContent(null);
     setError('');
-    previewFile(file.id, controller.signal)
+    loader(controller.signal)
       .then(async (blob) => {
         if (kind === 'text') {
           setContent({ text: await blob.text() });
@@ -42,7 +47,7 @@ export default function FilePreviewDialog({ file, onDownload, onClose }) {
       controller.abort();
       if (url) URL.revokeObjectURL(url); // free the memory
     };
-  }, [file.id, kind, attempt]);
+  }, [loader, kind, attempt]);
 
   return (
     <Modal title={file.name} onClose={onClose} width="max-w-5xl">
@@ -76,9 +81,13 @@ export default function FilePreviewDialog({ file, onDownload, onClose }) {
         <span className="text-sm text-slate-500">
           {file.extension.toUpperCase()} · {formatBytes(file.size_bytes)}
         </span>
-        <Button onClick={onDownload}>
-          <Download className="size-4" aria-hidden="true" /> Download
-        </Button>
+        {onDownload ? (
+          <Button onClick={onDownload}>
+            <Download className="size-4" aria-hidden="true" /> Download
+          </Button>
+        ) : (
+          <span className="text-sm text-slate-500">View only – downloading is not allowed</span>
+        )}
       </div>
     </Modal>
   );

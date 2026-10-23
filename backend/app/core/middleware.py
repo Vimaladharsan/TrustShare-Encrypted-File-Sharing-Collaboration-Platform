@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 import uuid
 
@@ -11,6 +12,8 @@ from app.core.errors import error_body
 from app.core.logging import request_id_ctx
 
 logger = logging.getLogger("app.request")
+
+SHARE_TOKEN = re.compile(r"^(/api/s/)[^/]+")
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",  # browser must not guess file types
@@ -35,13 +38,18 @@ def register_middleware(app: FastAPI) -> None:
             logger.info(
                 "%s %s -> %s (%.1f ms)",
                 request.method,
-                request.url.path,
+                safe_path(request.url.path),
                 response.status_code,
                 elapsed_ms,
             )
             return response
         finally:
             request_id_ctx.reset(token)
+
+
+def safe_path(path: str) -> str:
+    """The request path for logs, with share-link tokens hidden (a token is a password)."""
+    return SHARE_TOKEN.sub(r"\g<1>***", path)
 
 
 def _reject_oversized_upload(request: Request) -> Response | None:

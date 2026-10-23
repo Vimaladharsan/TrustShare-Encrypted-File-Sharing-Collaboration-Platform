@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.config import get_settings
 from app.main import app
-from app.models import FileKey, Role, User
+from app.models import FileKey, Role, Share, User
 from app.services.email_service import Email, get_email_sender
 from app.storage.s3 import get_s3_client
 
@@ -161,6 +161,37 @@ def set_last_login(email: str, days_ago: int) -> None:
     asyncio.run(_set_last_login(email, days_ago))
 
 
+async def _share_row(share_id: str) -> Share | None:
+    engine = create_async_engine(get_settings().postgres_url)
+    try:
+        async with async_sessionmaker(engine)() as session:
+            return await session.get(Share, uuid.UUID(share_id))
+    finally:
+        await engine.dispose()
+
+
+def share_row(share_id: str) -> Share | None:
+    """The PostgreSQL shares row, or None."""
+    return asyncio.run(_share_row(share_id))
+
+
+async def _update_share(share_id: str, values: dict) -> None:
+    engine = create_async_engine(get_settings().postgres_url)
+    try:
+        async with async_sessionmaker(engine)() as session:
+            await session.execute(
+                update(Share).where(Share.id == uuid.UUID(share_id)).values(**values)
+            )
+            await session.commit()
+    finally:
+        await engine.dispose()
+
+
+def update_share(share_id: str, **values: object) -> None:
+    """Change a share directly in the database (e.g. make it expired)."""
+    asyncio.run(_update_share(share_id, values))
+
+
 def clear_rate_limits() -> None:
     redis = Redis.from_url(get_settings().redis_url)
     for key in redis.scan_iter("rl:*"):
@@ -179,6 +210,7 @@ def client() -> Iterator[TestClient]:
     settings.login_rate_limit_per_minute = 1000
     settings.register_rate_limit_per_minute = 1000
     settings.forgot_password_rate_limit_per_minute = 1000
+    settings.share_link_rate_limit_per_minute = 1000
     clear_rate_limits()
 
     # Using TestClient as a context manager runs the app's startup/shutdown (DB connections).

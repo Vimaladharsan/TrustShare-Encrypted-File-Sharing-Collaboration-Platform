@@ -79,6 +79,11 @@ class Settings(BaseSettings):
     def google_enabled(self) -> bool:
         return bool(self.google_client_id and self.google_client_secret.get_secret_value())
 
+    # Sharing (Milestone 2): links must expire within this many days; public link requests per
+    # minute per IP (slows down anyone trying to guess links).
+    share_link_max_days: int = 30
+    share_link_rate_limit_per_minute: int = 60
+
     # Admins may delete an account (and all its files) only after this many days without a login.
     inactive_account_days: int = 30
 

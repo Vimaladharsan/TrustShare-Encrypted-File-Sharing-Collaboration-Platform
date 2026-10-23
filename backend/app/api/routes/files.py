@@ -1,4 +1,5 @@
-from typing import Literal
+from collections.abc import AsyncIterator
+from typing import Any, Literal
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile, status
@@ -104,13 +105,8 @@ def _disposition(kind: str, name: str) -> str:
     return f"{kind}; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(name)}"
 
 
-@router.get("/{file_id}/download", summary="Download the file")
-async def download_file(
-    file_id: str,
-    user: User = Depends(can_read_files),
-    service: FileService = Depends(file_service),
-) -> StreamingResponse:
-    doc, chunks = await service.download(user, file_id)
+def download_response(doc: dict[str, Any], chunks: AsyncIterator[bytes]) -> StreamingResponse:
+    """Decrypted file as a download (also used by share links)."""
     return StreamingResponse(
         chunks,
         media_type=doc["mime_type"],
@@ -118,20 +114,13 @@ async def download_file(
             # "attachment" = always save as a file, never open/execute inside the page.
             "Content-Disposition": _disposition("attachment", doc["original_name"]),
             "Content-Length": str(doc["size_bytes"]),
+            "Cache-Control": "private, no-store",
         },
     )
 
 
-@router.get(
-    "/{file_id}/preview",
-    summary="Show the file in the browser (PDF, images, TXT, CSV only)",
-)
-async def preview_file(
-    file_id: str,
-    user: User = Depends(can_read_files),
-    service: FileService = Depends(file_service),
-) -> StreamingResponse:
-    doc, chunks = await service.preview(user, file_id)
+def preview_response(doc: dict[str, Any], chunks: AsyncIterator[bytes]) -> StreamingResponse:
+    """Decrypted file shown in the browser (also used by share links)."""
     # Text is always sent as plain text, so it can never be interpreted as HTML.
     is_text = doc["extension"] in {"txt", "csv"}
     media_type = "text/plain; charset=utf-8" if is_text else doc["mime_type"]
@@ -147,6 +136,29 @@ async def preview_file(
             "Cache-Control": "private, no-store",
         },
     )
+
+
+@router.get("/{file_id}/download", summary="Download the file")
+async def download_file(
+    file_id: str,
+    user: User = Depends(can_read_files),
+    service: FileService = Depends(file_service),
+) -> StreamingResponse:
+    doc, chunks = await service.download(user, file_id)
+    return download_response(doc, chunks)
+
+
+@router.get(
+    "/{file_id}/preview",
+    summary="Show the file in the browser (PDF, images, TXT, CSV only)",
+)
+async def preview_file(
+    file_id: str,
+    user: User = Depends(can_read_files),
+    service: FileService = Depends(file_service),
+) -> StreamingResponse:
+    doc, chunks = await service.preview(user, file_id)
+    return preview_response(doc, chunks)
 
 
 @router.patch("/{file_id}", response_model=FileInfo, summary="Rename and/or move a file")

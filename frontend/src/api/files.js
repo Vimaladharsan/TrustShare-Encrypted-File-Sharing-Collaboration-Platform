@@ -50,15 +50,20 @@ export const trashFile = (fileId) => api.post(`/files/${fileId}/trash`);
 export const restoreFile = (fileId) => api.post(`/files/${fileId}/restore`);
 export const deleteFile = (fileId) => api.delete(`/files/${fileId}`);
 
+/** Saves a downloaded Blob as a file in the browser. */
+export function saveBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 /** Downloads through the API (so the login token is sent), then saves it in the browser. */
 export async function downloadFile(file) {
   const response = await api.get(`/files/${file.id}/download`, { responseType: 'blob' });
-  const url = URL.createObjectURL(response.data);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = file.name;
-  link.click();
-  URL.revokeObjectURL(url);
+  saveBlob(response.data, file.name);
 }
 
 /** Types the browser can display (same list as the backend's PREVIEWABLE). */

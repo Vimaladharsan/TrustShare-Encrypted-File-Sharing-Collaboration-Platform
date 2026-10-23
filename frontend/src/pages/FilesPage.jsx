@@ -6,6 +6,7 @@ import {
   Inbox,
   Pencil,
   SearchX,
+  Share2,
   Trash2,
   Upload,
 } from 'lucide-react';
@@ -34,6 +35,7 @@ import FolderGrid from '../components/files/FolderGrid';
 import UploadModal from '../components/files/UploadModal';
 import MoveDialog from '../components/MoveDialog';
 import NameDialog from '../components/NameDialog';
+import ShareDialog from '../components/shares/ShareDialog';
 import { Empty, ErrorState, Loading } from '../components/StateMessage';
 import { CATEGORIES } from '../utils/format';
 
@@ -114,6 +116,11 @@ export default function FilesPage({ mode = 'folder' }) {
   const fileActions = (file) => [
     { label: 'Preview', icon: Eye, onClick: () => setDialog({ type: 'preview', item: file }) },
     { label: 'Download', icon: Download, onClick: () => run(() => downloadFile(file)) },
+    can('share:create') && {
+      label: 'Share',
+      icon: Share2,
+      onClick: () => setDialog({ type: 'share', item: file }),
+    },
     canEditFiles && {
       label: 'Rename',
       icon: Pencil,
@@ -262,6 +269,9 @@ export default function FilesPage({ mode = 'folder' }) {
           onDownload={() => run(() => downloadFile(dialog.item))}
           onClose={() => setDialog(null)}
         />
+      )}
+      {dialog?.type === 'share' && (
+        <ShareDialog file={dialog.item} onClose={() => setDialog(null)} />
       )}
       {dialog?.type === 'upload' && (
         <UploadModal

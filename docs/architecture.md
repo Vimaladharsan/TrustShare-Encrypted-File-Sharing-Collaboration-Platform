@@ -430,10 +430,14 @@ sequenceDiagram
 |---|---|
 | Owner requests own file | Allowed (account active, file active) |
 | Valid share, permitted action | Allowed – only that action (`view` = preview, `download` = preview + download) |
-| No permission / wrong action | 404 (link) or 403 (direct) – nothing revealed |
+| Action not allowed by the permission (e.g. download on a view-only share) | 403 `SHARE_DOWNLOAD_NOT_ALLOWED` |
+| Not the recipient of a direct share (incl. Admins) | 404 – nothing revealed |
 | Link expired or revoked | 410 Gone ("This link has expired" / "This link was revoked") |
 | Download limit reached | 410 Gone |
-| File trashed or deleted, owner disabled | 404 – the link stops working automatically |
+| File trashed, owner disabled or owner lost `share:create` | 404 – the link stops working automatically (works again if the file is restored and the link is still valid) |
+| File deleted forever | 404 – its shares are deleted together with the object and key |
+
+Link tokens: 256-bit random (`secrets.token_urlsafe(32)`), only the SHA-256 is stored, the full link is shown once; request logs print `/api/s/***`; the share page sets `Referrer-Policy: no-referrer`; public endpoints are rate-limited per IP (`SHARE_LINK_RATE_LIMIT_PER_MINUTE`). Download limits are counted with one atomic `UPDATE … WHERE download_count < max_downloads`, so two visitors can't both take the last download. Links must expire within `SHARE_LINK_MAX_DAYS` (30); direct shares may have no expiry.
 
 ### 8.5 Key rotation
 
@@ -460,6 +464,7 @@ Files are never re-encrypted; downloads keep working during rotation.
 | GET | `/files/{id}/shares` | owner | List a file's shares with status |
 | GET | `/shares/sent` · `/shares/received` | logged in | "Shared by Me" / "Shared with Me" |
 | DELETE | `/shares/{share_id}` | owner | Revoke |
+| GET | `/shares/{share_id}/preview` · `/shares/{share_id}/download` | recipient | Open a file shared with me |
 | GET | `/s/{token}` · `/s/{token}/preview` · `/s/{token}/download` | public (token) | Link visitor access |
 | POST/DELETE | `/files/{id}/favorite` | owner / recipient | Favorites |
 | GET | `/analytics/me?from&to` | logged in | User File Analytics |

@@ -8,9 +8,12 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import GoogleCallbackPage from './pages/GoogleCallbackPage';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
+import PublicSharePage from './pages/PublicSharePage';
 import RegisterPage from './pages/RegisterPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import SettingsPage from './pages/SettingsPage';
+import SharedByMePage from './pages/SharedByMePage';
+import SharedWithMePage from './pages/SharedWithMePage';
 import StatusPage from './pages/StatusPage';
 import TrashPage from './pages/TrashPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
@@ -28,6 +31,8 @@ export default function App() {
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/auth/google" element={<GoogleCallbackPage />} />
       <Route path="/status" element={<StatusPage />} />
+      {/* Share links work without an account. */}
+      <Route path="/s/:token" element={<PublicSharePage />} />
       <Route
         element={
           <ProtectedRoute>
@@ -38,6 +43,8 @@ export default function App() {
         <Route path="/files" element={<FilesPage />} />
         <Route path="/folders/:folderId" element={<FilesPage />} />
         <Route path="/search" element={<FilesPage mode="search" />} />
+        <Route path="/shared-with-me" element={<SharedWithMePage />} />
+        <Route path="/shared-by-me" element={<SharedByMePage />} />
         <Route path="/trash" element={<TrashPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/admin/users" element={<AdminUsersPage />} />

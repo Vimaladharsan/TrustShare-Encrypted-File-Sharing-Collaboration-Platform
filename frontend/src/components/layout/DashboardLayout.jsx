@@ -1,4 +1,4 @@
-import { FolderOpen, Search, Settings, Trash2, UsersRound } from 'lucide-react';
+import { FolderOpen, Inbox, Search, Settings, Share2, Trash2, UsersRound } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useSearchParams } from 'react-router';
 
@@ -11,6 +11,8 @@ import VerifyEmailBanner from './VerifyEmailBanner';
 
 const NAV = [
   { to: '/files', label: 'My Files', icon: FolderOpen },
+  { to: '/shared-with-me', label: 'Shared with me', icon: Inbox },
+  { to: '/shared-by-me', label: 'Shared by me', icon: Share2, permission: 'share:create' },
   { to: '/trash', label: 'Trash', icon: Trash2 },
   { to: '/settings', label: 'Settings', icon: Settings },
   // Shown only to roles with this permission (the API checks it again).
