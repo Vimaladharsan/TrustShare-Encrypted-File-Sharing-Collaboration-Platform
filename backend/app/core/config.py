@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 from urllib.parse import quote_plus
 
 from cryptography.fernet import Fernet
@@ -94,6 +95,11 @@ class Settings(BaseSettings):
     default_quota_mb: int = 1024
     max_upload_mb: int = 25
     storage_dir: str = "/app/storage"  # inside the container; backend/storage on the laptop
+
+    # Where the encrypted files live: "s3" (RustFS locally / AWS S3) or "azure" (Azure Blob).
+    storage_provider: Literal["s3", "azure"] = "s3"
+    azure_storage_connection_string: SecretStr = SecretStr("")
+    azure_container: str = "trustshare-files"
 
     # Object storage for encrypted files (Milestone 2): RustFS locally, AWS S3 in the cloud.
     # Empty endpoint = real AWS S3; credentials come from .env and are never committed.

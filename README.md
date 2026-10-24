@@ -1,6 +1,6 @@
 # TrustShare: Secure File-Sharing System
 
-A secure file-sharing and document management platform – a private alternative to Google Drive. Every file is validated, **encrypted server-side with its own AES-256-GCM key** (envelope encryption with rotatable master keys) and stored in S3-compatible object storage. Users organise files in folders and share them through **permission-controlled, expiring, revocable links** or directly with other users – with analytics for users and a security dashboard for admins.
+A secure file-sharing and document management platform – a private alternative to Google Drive. Every file is validated, **encrypted server-side with its own AES-256-GCM key** (envelope encryption with rotatable master keys) and stored in private cloud object storage (S3 API or Azure Blob Storage). Users organise files in folders and share them through **permission-controlled, expiring, revocable links** or directly with other users – with analytics for users and a security dashboard for admins.
 
 ![CI](https://github.com/Vimaladharsan/TrustShare-Encrypted-File-Sharing-Collaboration-Platform/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -49,7 +49,7 @@ TrustShare is built milestone by milestone. **Milestone 1** (foundation: auth, R
 ### Encryption and storage (Milestone 2)
 - **AES-256-GCM** with a fresh random 256-bit key per file, in 1 MiB authenticated chunks (format "TSE1"): any changed, missing, reordered or swapped chunk is detected and the download is refused
 - **Envelope encryption:** each file key is stored only wrapped by a versioned **master key** (`MASTER_KEYS`); keys never appear in responses, logs or the browser (tests check this)
-- Encrypted bytes in **S3-compatible object storage** (RustFS locally, AWS S3 by configuration), metadata in MongoDB, wrapped keys in PostgreSQL – no single store reveals a file
+- Encrypted bytes in private **object storage** – RustFS locally, **Azure Blob Storage** or **AWS S3** by configuration (`STORAGE_PROVIDER`) – metadata in MongoDB, wrapped keys in PostgreSQL – no single store reveals a file
 - **Key rotation** without re-encrypting files (`python -m app.scripts.rotate_keys`), crypto-shredding on permanent delete, migration of Milestone 1 plaintext files
 - Decryption only in memory, after authorization; integrity failures return a safe error – details: [docs/key-management.md](docs/key-management.md)
 
@@ -104,7 +104,7 @@ Full design with diagrams: [docs/architecture.md](docs/architecture.md) · data 
 |---|---|
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2 (async), Pydantic v2, Alembic, Uvicorn |
 | Frontend | React 19, Vite, React Router, Tailwind CSS, Axios, Recharts, lucide-react, sonner |
-| Data & storage | PostgreSQL 16, MongoDB 7, Redis 7, S3 API via boto3 (RustFS locally / AWS S3) |
+| Data & storage | PostgreSQL 16, MongoDB 7, Redis 7, object storage: Azure Blob Storage (azure-storage-blob) or S3 API via boto3 (RustFS locally / AWS S3) |
 | Security | AES-256-GCM (`cryptography`), envelope encryption with versioned master keys, bcrypt, JWT, TOTP (pyotp), Fernet, permission-based RBAC, Caddy (TLS) |
 | Quality | pytest (204 tests), Postman/Newman collection, ruff, ESLint, Prettier, pre-commit, GitHub Actions |
 | Deployment | Docker, Docker Compose (7 services incl. RustFS and Caddy) |
@@ -124,7 +124,7 @@ TrustShare/
 │   │   ├── schemas/        # Pydantic request/response models
 │   │   ├── scripts/        # create_admin, seed_demo, encrypt_existing_files, rotate_keys, copy_objects, remove_test_accounts
 │   │   ├── services/       # Business logic (auth, MFA, upload, encryption, sharing, analytics, security events)
-│   │   └── storage/        # S3 object storage + SecureFileStore (encrypt on write, verify + decrypt on read)
+│   │   └── storage/        # S3 + Azure Blob adapters, SecureFileStore (encrypt on write, verify + decrypt on read)
 │   ├── alembic/            # Database migrations
 │   └── tests/
 ├── frontend/
@@ -200,6 +200,25 @@ The code speaks the plain S3 API, so switching is configuration only:
 
 Switching back = restore the RustFS values in `.env` and recreate the backend.
 
+### Using Azure Blob Storage
+
+The brief allows AWS S3 **or** Azure Blob Storage; TrustShare supports both (`STORAGE_PROVIDER`).
+Azure for Students gives free credit without a credit card.
+
+1. Azure portal → **Storage accounts → Create**: Standard performance, **LRS** redundancy (cheapest),
+   region e.g. *Central India*. Under Advanced keep **Require secure transfer** on and
+   **Allow enabling anonymous access on containers** off.
+2. In the account → **Data storage → Containers → + Container** → name `trustshare-files`,
+   access level **Private**.
+3. **Security + networking → Access keys** → copy the **Connection string** (into `secrets.txt`).
+4. In `.env`: `STORAGE_PROVIDER=azure`, `AZURE_STORAGE_CONNECTION_STRING=<connection string>`,
+   `AZURE_CONTAINER=trustshare-files` → `docker compose up -d --force-recreate backend`.
+5. Copy the existing encrypted objects from RustFS (no decryption – file keys stay valid):
+   `docker compose exec backend python -m app.scripts.copy_objects --from-endpoint http://rustfs:9000`
+
+The Azure code is tested against Azurite, Microsoft's Azure Storage emulator, on every CI run.
+Switching back = `STORAGE_PROVIDER=s3` and recreate the backend.
+
 ### Create an admin and demo data
 
 ```bash
@@ -252,6 +271,7 @@ See [.env.example](.env.example).
 | `MASTER_KEYS` / `ACTIVE_MASTER_KEY_VERSION` | Versioned 256-bit master keys (`1:<base64>,2:<base64>`) that wrap every file key, and the one used for new files – back them up separately; see [docs/key-management.md](docs/key-management.md) |
 | `S3_ENDPOINT_URL` / `S3_BUCKET` / `S3_REGION` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Object storage for the encrypted files (empty endpoint = real AWS S3) |
 | `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY` | Credentials of the local RustFS container |
+| `STORAGE_PROVIDER` / `AZURE_STORAGE_CONNECTION_STRING` / `AZURE_CONTAINER` | `s3` (default) or `azure`; the Azure storage account's connection string and private container |
 
 Optional settings with defaults include `MAX_UPLOAD_MB` (25), `DEFAULT_QUOTA_MB` (1024), `ACCESS_TOKEN_TTL_MINUTES` (15), `REFRESH_TOKEN_TTL_DAYS` (7), `MAX_FAILED_LOGINS` (5), `LOCKOUT_MINUTES` (15), `SHARE_LINK_MAX_DAYS` (30), `SHARE_LINK_RATE_LIMIT_PER_MINUTE` (60) and `INACTIVE_ACCOUNT_DAYS` (30).
 

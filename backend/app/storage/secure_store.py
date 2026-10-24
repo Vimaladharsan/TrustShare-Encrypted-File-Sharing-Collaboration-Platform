@@ -23,6 +23,7 @@ from typing import Any
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.errors import AppError
 from app.db.postgres import get_db
 from app.repositories.file_key_repository import FileKeyRepository
@@ -38,7 +39,7 @@ from app.services.encryption_service import (
 )
 from app.services.security_events import record_security_event
 from app.storage.local import LocalStorage, get_storage
-from app.storage.s3 import S3Storage, get_s3_storage
+from app.storage.objects import ObjectStorage, get_object_storage
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ class SecureFileStore:
     def __init__(
         self,
         session: AsyncSession,
-        objects: S3Storage,
+        objects: ObjectStorage,
         legacy: LocalStorage,
         encryption: EncryptionService | None = None,
     ) -> None:
@@ -90,7 +91,7 @@ class SecureFileStore:
             await self.objects.delete(key)  # no orphaned ciphertext without a key
             raise
         return {
-            "storage_backend": "s3",
+            "storage_backend": get_settings().storage_provider,  # s3 | azure
             "storage_key": key,
             "encryption": {
                 "algorithm": ALGORITHM,
@@ -171,4 +172,4 @@ async def _chain(first: bytes, rest: AsyncIterator[bytes], file_id: str) -> Asyn
 
 def get_file_store(session: AsyncSession = Depends(get_db)) -> SecureFileStore:
     """FastAPI dependency."""
-    return SecureFileStore(session, get_s3_storage(), get_storage())
+    return SecureFileStore(session, get_object_storage(), get_storage())

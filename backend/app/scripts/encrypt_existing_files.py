@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.core.config import get_settings
 from app.db.mongo import close_mongo, get_mongo, init_mongo
 from app.storage.local import get_storage
-from app.storage.s3 import get_s3_storage
+from app.storage.objects import get_object_storage
 from app.storage.secure_store import SecureFileStore
 
 PLAINTEXT = {"$or": [{"encryption": None}, {"encryption": {"$exists": False}}]}
@@ -53,9 +53,9 @@ async def main() -> None:
     init_mongo(settings)
     engine = create_async_engine(settings.postgres_url)
     try:
-        await asyncio.to_thread(get_s3_storage().ensure_bucket)
+        await asyncio.to_thread(get_object_storage().ensure_bucket)
         async with async_sessionmaker(engine, expire_on_commit=False)() as session:
-            store = SecureFileStore(session, get_s3_storage(), get_storage())
+            store = SecureFileStore(session, get_object_storage(), get_storage())
             counts = await encrypt_existing(get_mongo(), store)
     finally:
         await engine.dispose()

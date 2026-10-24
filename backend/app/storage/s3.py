@@ -78,6 +78,9 @@ class S3Storage:
             return False
         return True
 
+    def ping(self) -> None:
+        self.client.head_bucket(Bucket=self.bucket)
+
     def ensure_bucket(self) -> None:
         """Create the private bucket if it doesn't exist yet (called once at startup)."""
         try:

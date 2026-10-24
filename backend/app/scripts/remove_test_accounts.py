@@ -21,7 +21,7 @@ from app.models import User
 from app.repositories.user_repository import UserRepository
 from app.services.session_service import SessionService
 from app.storage.local import get_storage
-from app.storage.s3 import get_s3_storage
+from app.storage.objects import get_object_storage
 from app.storage.secure_store import SecureFileStore
 
 
@@ -38,7 +38,7 @@ async def remove(domain: str) -> int:
                 .scalars()
                 .all()
             )
-            store = SecureFileStore(session, get_s3_storage(), get_storage())
+            store = SecureFileStore(session, get_object_storage(), get_storage())
             for user in users:
                 owner, email = str(user.id), user.email
                 for doc in await db["files"].find({"owner_id": owner}).to_list(length=None):

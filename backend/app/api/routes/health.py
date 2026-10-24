@@ -7,15 +7,14 @@ from fastapi import APIRouter, Response, status
 from app.db.mongo import ping_mongo
 from app.db.postgres import ping_postgres
 from app.db.redis import ping_redis
-from app.storage.s3 import get_s3_storage
+from app.storage.objects import get_object_storage
 
 router = APIRouter(tags=["health"])
 logger = logging.getLogger(__name__)
 
 
 async def ping_storage() -> None:
-    storage = get_s3_storage()
-    await asyncio.to_thread(storage.client.head_bucket, Bucket=storage.bucket)
+    await asyncio.to_thread(get_object_storage().ping)
 
 
 async def check(name: str, ping: Callable[[], Awaitable[None]]) -> str:

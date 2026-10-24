@@ -16,7 +16,7 @@ from app.core.middleware import register_middleware
 from app.db.mongo import close_mongo, ensure_indexes, init_mongo
 from app.db.postgres import close_postgres, init_postgres
 from app.db.redis import close_redis, init_redis
-from app.storage.s3 import get_s3_storage
+from app.storage.objects import get_object_storage
 
 setup_logging(get_settings().log_level)
 logger = logging.getLogger("app")
@@ -43,7 +43,7 @@ async def _ensure_bucket() -> None:
     """Create the private storage bucket if needed. RustFS may still be starting, so retry."""
     for attempt in range(1, 11):
         try:
-            await asyncio.to_thread(get_s3_storage().ensure_bucket)
+            await asyncio.to_thread(get_object_storage().ensure_bucket)
             return
         except Exception as exc:  # connection refused while RustFS boots
             logger.warning("Object storage not ready (attempt %d/10): %s", attempt, exc)

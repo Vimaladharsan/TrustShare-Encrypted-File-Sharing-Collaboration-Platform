@@ -32,7 +32,7 @@ from app.schemas.auth import RegisterRequest
 from app.services.file_service import FileService
 from app.services.folder_service import FolderService
 from app.storage.local import get_storage
-from app.storage.s3 import get_s3_storage
+from app.storage.objects import get_object_storage
 from app.storage.secure_store import SecureFileStore
 
 DEMO_USERS = [
@@ -172,12 +172,12 @@ async def add_demo_content(user: User) -> None:
 
     request = script_request()
     folders = FolderService(db, request)
-    await asyncio.to_thread(get_s3_storage().ensure_bucket)
+    await asyncio.to_thread(get_object_storage().ensure_bucket)
     engine = create_async_engine(get_settings().postgres_url)
     try:
         async with async_sessionmaker(engine, expire_on_commit=False)() as session:
             # Files are encrypted and stored exactly like a browser upload.
-            store = SecureFileStore(session, get_s3_storage(), get_storage())
+            store = SecureFileStore(session, get_object_storage(), get_storage())
             files = FileService(db, store, request)
             await _add_folders_and_files(user, folders, files)
     finally:

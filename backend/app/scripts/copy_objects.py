@@ -1,13 +1,14 @@
-"""Copy the encrypted file objects from one S3-compatible storage to another – e.g. from the local
-RustFS container to a real AWS S3 bucket – without decrypting anything.
+"""Copy the encrypted file objects from the local RustFS container (S3 API) to the storage the
+backend is configured for now – an AWS S3 bucket or an Azure Blob container – without decrypting.
 
     docker compose exec backend python -m app.scripts.copy_objects \\
         --from-endpoint http://rustfs:9000 --from-bucket trustshare-files
 
 The source credentials are read from RUSTFS_ACCESS_KEY / RUSTFS_SECRET_KEY; the destination is the
-storage the backend is configured for right now (S3_* settings). Only objects that belong to a
-stored file are copied, and objects already present at the destination are skipped, so the script
-can be run again safely. File keys don't change: they are bound to the file, not to its location.
+storage the backend is configured for right now (STORAGE_PROVIDER + S3_* / AZURE_* settings).
+Only objects that belong to a stored file are copied, and objects already present at the
+destination are skipped, so the script can be run again safely. File keys don't change: they
+are bound to the file, not to its location.
 """
 
 import argparse
@@ -22,7 +23,7 @@ from botocore.exceptions import ClientError
 
 from app.core.config import get_settings
 from app.db.mongo import close_mongo, get_mongo, init_mongo
-from app.storage.s3 import get_s3_storage
+from app.storage.objects import get_object_storage
 
 
 def source_client(endpoint: str) -> object:
@@ -40,17 +41,19 @@ async def copy(endpoint: str, bucket: str) -> dict[str, int]:
     settings = get_settings()
     init_mongo(settings)
     source = source_client(endpoint)
-    target = get_s3_storage()
+    target = get_object_storage()
+    provider = settings.storage_provider
     await asyncio.to_thread(target.ensure_bucket)
     counts = {"copied": 0, "already_there": 0, "missing_at_source": 0}
     try:
         files = get_mongo()["files"].find(
-            {"storage_backend": "s3"}, {"storage_key": 1, "original_name": 1}
+            {"encryption": {"$ne": None}}, {"storage_key": 1, "storage_backend": 1}
         )
         async for doc in files:
             key = doc["storage_key"]
             if await target.exists(key):
                 counts["already_there"] += 1
+                await _mark(doc, provider)
                 continue
             with tempfile.TemporaryDirectory() as tmp:
                 local = Path(tmp) / "object.enc"
@@ -62,10 +65,19 @@ async def copy(endpoint: str, bucket: str) -> dict[str, int]:
                     continue
                 await target.save(key, local)  # still ciphertext – nothing is decrypted
             counts["copied"] += 1
+            await _mark(doc, provider)
             print(f"  ✓ {doc['_id']} copied")
     finally:
         await close_mongo()
     return counts
+
+
+async def _mark(doc: dict, provider: str) -> None:
+    """Record in the metadata where the object lives now."""
+    if doc.get("storage_backend") != provider:
+        await get_mongo()["files"].update_one(
+            {"_id": doc["_id"]}, {"$set": {"storage_backend": provider}}
+        )
 
 
 def main() -> None:
@@ -73,8 +85,11 @@ def main() -> None:
     parser.add_argument("--from-endpoint", default="http://rustfs:9000")
     parser.add_argument("--from-bucket", default="trustshare-files")
     args = parser.parse_args()
-    if not get_settings().s3_endpoint_url:
-        print(f"Destination: AWS S3 bucket {get_settings().s3_bucket} ({get_settings().s3_region})")
+    settings = get_settings()
+    if settings.storage_provider == "azure":
+        print(f"Destination: Azure Blob container {settings.azure_container}")
+    elif not settings.s3_endpoint_url:
+        print(f"Destination: AWS S3 bucket {settings.s3_bucket} ({settings.s3_region})")
     counts = asyncio.run(copy(args.from_endpoint, args.from_bucket))
     print(
         f"Done: {counts['copied']} copied, {counts['already_there']} already there, "

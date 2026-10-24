@@ -15,3 +15,4 @@ qrcode==8.2
 cryptography==50.0.2
 boto3==1.35.36
 tzdata==2026.4
+azure-storage-blob==12.31.0
