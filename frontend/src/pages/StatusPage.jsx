@@ -39,7 +39,7 @@ export default function StatusPage() {
       <h1 className="text-3xl font-bold text-blue-700">TrustShare</h1>
       <p className="mt-1 text-slate-500">Secure file sharing</p>
 
-      <section className="mt-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="card mt-8 p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">System status</h2>
           <button

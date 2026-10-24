@@ -2,9 +2,10 @@ import { Eye, EyeOff } from 'lucide-react';
 import { useId, useState } from 'react';
 
 const INPUT =
-  'block w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 ' +
-  'placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ' +
-  'focus:outline-none disabled:bg-slate-50';
+  'block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 ' +
+  'shadow-xs transition placeholder:text-slate-400 hover:border-slate-400 ' +
+  'focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 focus:outline-none ' +
+  'disabled:bg-slate-50';
 
 /** Labelled input. type="password" gets a show/hide button; `icon` shows an icon on the left. */
 export default function FormField({ label, type = 'text', hint, icon: Icon, ...inputProps }) {
@@ -14,7 +15,7 @@ export default function FormField({ label, type = 'text', hint, icon: Icon, ...i
 
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-sm font-medium text-slate-700">
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-slate-700">
         {label}
       </label>
       <div className="relative">

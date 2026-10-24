@@ -1,7 +1,7 @@
 import { MoreVertical } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-const MENU_WIDTH = 176; // px (w-44)
+const MENU_WIDTH = 224; // px
 const ITEM_HEIGHT = 36; // px per menu row (approximate, for flipping upwards)
 
 /**
@@ -61,7 +61,11 @@ export default function ActionMenu({ items, label = 'Actions' }) {
         ref={buttonRef}
         type="button"
         onClick={toggle}
-        className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+        className={`rounded-lg p-1.5 transition ${
+          position
+            ? 'bg-slate-100 text-slate-700'
+            : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
+        }`}
         aria-label={label}
         aria-expanded={Boolean(position)}
       >
@@ -71,10 +75,15 @@ export default function ActionMenu({ items, label = 'Actions' }) {
         <ul
           ref={menuRef}
           style={{ top: position.top, left: position.left, width: MENU_WIDTH }}
-          className="fixed z-50 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+          className="animate-pop-in shadow-pop fixed z-50 overflow-hidden rounded-xl bg-white p-1.5 ring-1 ring-slate-900/10"
+          role="menu"
         >
-          {visible.map(({ label: itemLabel, icon: Icon, onClick, danger }) => (
+          {visible.map(({ label: itemLabel, icon: Icon, onClick, danger }, index) => (
             <li key={itemLabel}>
+              {/* A thin divider separates destructive actions from the rest. */}
+              {danger && index > 0 && !visible[index - 1].danger && (
+                <div className="mx-1 my-1 h-px bg-slate-100" />
+              )}
               <button
                 type="button"
                 onClick={(e) => {
@@ -82,11 +91,19 @@ export default function ActionMenu({ items, label = 'Actions' }) {
                   setPosition(null);
                   onClick();
                 }}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 ${
-                  danger ? 'text-red-600' : 'text-slate-700'
+                role="menuitem"
+                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm whitespace-nowrap transition ${
+                  danger
+                    ? 'text-red-600 hover:bg-red-50'
+                    : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'
                 }`}
               >
-                {Icon && <Icon className="size-4" aria-hidden="true" />}
+                {Icon && (
+                  <Icon
+                    className={`size-4 ${danger ? 'text-red-500' : 'text-slate-400'}`}
+                    aria-hidden="true"
+                  />
+                )}
                 {itemLabel}
               </button>
             </li>

@@ -3,10 +3,11 @@ import { useRef, useState } from 'react';
 
 import { getErrorCode, getErrorMessage } from '../../api/client';
 import { uploadFile } from '../../api/files';
-import { fileIcon, formatBytes } from '../../utils/format';
+import { formatBytes } from '../../utils/format';
 import { ALLOWED_TEXT, MAX_UPLOAD_MB, precheck } from '../../utils/uploadRules';
 import Button from '../Button';
 import Modal from '../Modal';
+import FileIcon from './FileIcon';
 
 const CATEGORY_BY_EXTENSION = {
   pdf: 'document',
@@ -154,12 +155,11 @@ export default function UploadModal({ folderId, folderName, onUploaded, onClose 
 
 function UploadRow({ item, onCancel, onKeepBoth, onRetry }) {
   const extension = item.file.name.split('.').pop().toLowerCase();
-  const { Icon, color } = fileIcon(CATEGORY_BY_EXTENSION[extension]);
 
   return (
     <li className="rounded-lg border border-slate-200 px-3 py-2">
       <div className="flex items-center gap-3">
-        <Icon className={`size-5 shrink-0 ${color}`} aria-hidden="true" />
+        <FileIcon category={CATEGORY_BY_EXTENSION[extension]} size="sm" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-slate-800" title={item.file.name}>
             {item.file.name}

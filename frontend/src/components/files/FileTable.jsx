@@ -1,12 +1,13 @@
-import { ArrowDown, ArrowUp, Star } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Star } from 'lucide-react';
 
-import { fileIcon, formatBytes, formatDate } from '../../utils/format';
+import { formatBytes, formatDate } from '../../utils/format';
 import ActionMenu from '../ActionMenu';
+import FileIcon from './FileIcon';
 
 const COLUMNS = [
   { key: 'name', label: 'Name', className: '' },
   { key: null, label: 'Type', className: 'hidden sm:table-cell' },
-  { key: 'size', label: 'Size', className: 'text-right' },
+  { key: 'size', label: 'Size', className: 'hidden text-right sm:table-cell' },
   { key: 'date', label: 'Uploaded', className: 'hidden md:table-cell' },
 ];
 
@@ -20,9 +21,9 @@ export default function FileTable({ files, sort, onSort, actionsFor, selected, o
   const selectable = Boolean(selected && onToggle);
   const allSelected = selectable && files.length > 0 && files.every((f) => selected.has(f.id));
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <div className="card overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-slate-50 text-left text-xs font-semibold text-slate-500">
+        <thead className="eyebrow border-b border-slate-200 bg-slate-50/80 text-left !text-slate-500">
           <tr>
             {selectable && (
               <th className="w-10 px-4 py-3">
@@ -38,20 +39,29 @@ export default function FileTable({ files, sort, onSort, actionsFor, selected, o
               </th>
             )}
             {COLUMNS.map((col) => (
-              <th key={col.label} className={`px-4 py-3 ${col.className}`} scope="col">
+              <th
+                key={col.label}
+                className={`px-4 py-3 font-semibold ${col.className}`}
+                scope="col"
+              >
                 {col.key && onSort ? (
                   <button
                     type="button"
                     onClick={() => onSort(col.key)}
-                    className="inline-flex items-center gap-1 hover:text-slate-800"
+                    className={`group inline-flex items-center gap-1 uppercase transition hover:text-slate-900 ${
+                      sort?.by === col.key ? 'text-slate-900' : ''
+                    }`}
                   >
                     {col.label}
-                    {sort?.by === col.key &&
-                      (sort.order === 'asc' ? (
+                    {sort?.by === col.key ? (
+                      sort.order === 'asc' ? (
                         <ArrowUp className="size-3" />
                       ) : (
                         <ArrowDown className="size-3" />
-                      ))}
+                      )
+                    ) : (
+                      <ArrowUpDown className="size-3 opacity-0 transition group-hover:opacity-60" />
+                    )}
                   </button>
                 ) : (
                   col.label
@@ -64,66 +74,70 @@ export default function FileTable({ files, sort, onSort, actionsFor, selected, o
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {files.map((file) => {
-            const { Icon, color } = fileIcon(file.category);
-            return (
-              <tr
-                key={file.id}
-                className={
-                  selectable && selected.has(file.id) ? 'bg-blue-50/60' : 'hover:bg-slate-50'
-                }
-              >
-                {selectable && (
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(file.id)}
-                      onChange={() => onToggle(file.id)}
-                      aria-label={`Select ${file.name}`}
-                      className="size-4 rounded border-slate-300 accent-blue-600"
-                    />
-                  </td>
-                )}
-                <td className="max-w-0 px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <Icon className={`size-5 shrink-0 ${color}`} aria-hidden="true" />
+          {files.map((file) => (
+            <tr
+              key={file.id}
+              className={`group transition-colors ${
+                selectable && selected.has(file.id) ? 'bg-blue-50/60' : 'hover:bg-slate-50/80'
+              }`}
+            >
+              {selectable && (
+                <td className="px-4 py-2.5">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(file.id)}
+                    onChange={() => onToggle(file.id)}
+                    aria-label={`Select ${file.name}`}
+                    className="size-4 rounded border-slate-300 accent-blue-600"
+                  />
+                </td>
+              )}
+              <td className="max-w-0 px-4 py-2.5">
+                <div className="flex items-center gap-3">
+                  <FileIcon category={file.category} size="sm" />
+                  <span className="min-w-0">
                     {onOpen ? (
                       <button
                         type="button"
                         onClick={() => onOpen(file)}
-                        className="truncate text-left font-medium text-slate-800 hover:text-blue-600 hover:underline"
+                        className="block max-w-full truncate text-left font-medium text-slate-800 transition hover:text-blue-600"
                         title={`Preview ${file.name}`}
                       >
                         {file.name}
                       </button>
                     ) : (
-                      <span className="truncate font-medium text-slate-800" title={file.name}>
+                      <span className="block truncate font-medium text-slate-800" title={file.name}>
                         {file.name}
                       </span>
                     )}
-                    {file.is_favorite && (
-                      <Star
-                        className="size-3.5 shrink-0 fill-amber-400 text-amber-400"
-                        aria-label="Favorite"
-                      />
-                    )}
-                  </div>
-                </td>
-                <td className="hidden px-4 py-3 text-slate-500 uppercase sm:table-cell">
+                    <span className="block text-xs text-slate-400 sm:hidden">
+                      {file.extension.toUpperCase()} · {formatBytes(file.size_bytes)}
+                    </span>
+                  </span>
+                  {file.is_favorite && (
+                    <Star
+                      className="size-3.5 shrink-0 fill-amber-400 text-amber-400"
+                      aria-label="Favorite"
+                    />
+                  )}
+                </div>
+              </td>
+              <td className="hidden px-4 py-2.5 sm:table-cell">
+                <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-500 uppercase">
                   {file.extension}
-                </td>
-                <td className="px-4 py-3 text-right whitespace-nowrap text-slate-500">
-                  {formatBytes(file.size_bytes)}
-                </td>
-                <td className="hidden px-4 py-3 whitespace-nowrap text-slate-500 md:table-cell">
-                  {formatDate(file.created_at)}
-                </td>
-                <td className="px-4 py-3">
-                  <ActionMenu items={actionsFor(file)} label={`Actions for ${file.name}`} />
-                </td>
-              </tr>
-            );
-          })}
+                </span>
+              </td>
+              <td className="hidden px-4 py-2.5 text-right whitespace-nowrap text-slate-500 sm:table-cell">
+                {formatBytes(file.size_bytes)}
+              </td>
+              <td className="hidden px-4 py-2.5 whitespace-nowrap text-slate-500 md:table-cell">
+                {formatDate(file.created_at)}
+              </td>
+              <td className="px-4 py-2.5 text-right">
+                <ActionMenu items={actionsFor(file)} label={`Actions for ${file.name}`} />
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>

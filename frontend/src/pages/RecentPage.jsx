@@ -7,7 +7,8 @@ import { getErrorMessage } from '../api/client';
 import { downloadFile } from '../api/files';
 import FilePreviewDialog from '../components/files/FilePreviewDialog';
 import { Empty, ErrorState, Loading } from '../components/StateMessage';
-import { fileIcon, formatBytes } from '../utils/format';
+import { formatBytes } from '../utils/format';
+import FileIcon from '../components/files/FileIcon';
 
 const ACTION_LABEL = {
   'file.upload': 'You uploaded',
@@ -43,8 +44,8 @@ export default function RecentPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">Recent</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Recent</h1>
+        <p className="mt-1 text-sm text-slate-500">
           Files you recently uploaded, opened, downloaded, renamed or moved.
         </p>
       </div>
@@ -54,12 +55,11 @@ export default function RecentPage() {
         <Empty icon={Clock} title="Nothing recent" text="Files you work with will show up here." />
       )}
       {!error && items?.length > 0 && (
-        <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+        <ul className="card divide-y divide-slate-100">
           {items.map(({ file, last_action: action, last_activity_at: at }) => {
-            const { Icon, color } = fileIcon(file.category);
             return (
               <li key={file.id} className="flex items-center gap-3 px-4 py-3 text-sm">
-                <Icon className={`size-5 shrink-0 ${color}`} aria-hidden="true" />
+                <FileIcon category={file.category} size="sm" />
                 <div className="min-w-0 flex-1">
                   <button
                     type="button"

@@ -1,10 +1,13 @@
 import {
+  ArrowRight,
   BarChart3,
   CloudUpload,
   Database,
   Download,
   FolderOpen,
   Inbox,
+  KeyRound,
+  Lock,
   Share2,
   ShieldCheck,
 } from 'lucide-react';
@@ -14,13 +17,21 @@ import { Link } from 'react-router';
 import { getAnalytics, getRecentFiles } from '../api/analytics';
 import { getErrorMessage } from '../api/client';
 import { listReceivedShares } from '../api/shares';
-import { SummaryCard } from '../components/analytics/AnalyticsParts';
-import { ErrorState, Loading } from '../components/StateMessage';
 import { useAuth } from '../auth/useAuth';
+import { SummaryCard } from '../components/analytics/AnalyticsParts';
+import FileIcon from '../components/files/FileIcon';
+import { Empty, ErrorState, Loading } from '../components/StateMessage';
 import { presetRange } from '../utils/charts';
-import { fileIcon, formatBytes } from '../utils/format';
+import { formatBytes } from '../utils/format';
 
-/** Home after login: the last 30 days at a glance, recent files and shortcuts. */
+function greeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+/** Home after login: a welcome banner, the last 30 days at a glance, recent files, shortcuts. */
 export default function DashboardPage() {
   const { user, can } = useAuth();
   const [state, setState] = useState({ status: 'loading' });
@@ -42,13 +53,52 @@ export default function DashboardPage() {
 
   const firstName = user.full_name.split(' ')[0];
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900">Welcome back, {firstName}</h1>
-        <p className="text-sm text-slate-500">Here is what happened in the last 30 days.</p>
-      </div>
+    <div className="space-y-6">
+      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700 p-6 text-white shadow-lg shadow-blue-600/20 sm:p-8">
+        {/* Decorative light blobs and a subtle grid – purely visual. */}
+        <div className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-white/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-32 left-1/3 size-72 rounded-full bg-indigo-400/30 blur-3xl" />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage:
+              'linear-gradient(white 1px, transparent 1px), linear-gradient(90deg, white 1px, transparent 1px)',
+            backgroundSize: '32px 32px',
+          }}
+        />
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-xs font-medium ring-1 ring-white/20 backdrop-blur">
+              <Lock className="size-3" aria-hidden="true" /> AES-256 encryption active
+            </p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight">
+              {greeting()}, {firstName}
+            </h1>
+            <p className="mt-1.5 max-w-xl text-sm text-blue-100">
+              Every file you store is encrypted with its own AES-256 key, and every share is checked
+              on each access. Here is your last 30 days.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {can('file:upload') && (
+              <Link
+                to="/files"
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-white px-4 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50"
+              >
+                <CloudUpload className="size-4" aria-hidden="true" /> Upload files
+              </Link>
+            )}
+            <Link
+              to="/analytics"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-white/10 px-4 text-sm font-semibold text-white ring-1 ring-white/25 transition hover:bg-white/20"
+            >
+              <BarChart3 className="size-4" aria-hidden="true" /> View analytics
+            </Link>
+          </div>
+        </div>
+      </section>
 
-      {state.status === 'loading' && <Loading />}
+      {state.status === 'loading' && <Loading rows={3} />}
       {state.status === 'error' && (
         <ErrorState message={state.error} onRetry={() => setAttempt((n) => n + 1)} />
       )}
@@ -62,21 +112,34 @@ export default function DashboardPage() {
 function Overview({ analytics, recent, received, canUpload, canShare }) {
   const s = analytics.summary;
   const shortcuts = [
-    canUpload && { to: '/files', icon: FolderOpen, label: 'My Files', text: 'Upload and organise' },
+    canUpload && {
+      to: '/files',
+      icon: FolderOpen,
+      tone: 'bg-blue-50 text-blue-600',
+      label: 'My Files',
+      text: 'Upload and organise',
+    },
     {
       to: '/shared-with-me',
       icon: Inbox,
+      tone: 'bg-emerald-50 text-emerald-600',
       label: 'Shared with me',
-      text: `${received.length} file(s)`,
+      text: `${received.length} file${received.length === 1 ? '' : 's'} waiting`,
     },
     canShare && {
       to: '/shared-by-me',
       icon: Share2,
+      tone: 'bg-violet-50 text-violet-600',
       label: 'Shared by me',
       text: 'Links and people',
     },
-    { to: '/analytics', icon: BarChart3, label: 'File Analytics', text: 'Charts and reports' },
-    { to: '/security', icon: ShieldCheck, label: 'Security', text: 'How your files are protected' },
+    {
+      to: '/security',
+      icon: ShieldCheck,
+      tone: 'bg-amber-50 text-amber-600',
+      label: 'Security',
+      text: 'How your files are protected',
+    },
   ].filter(Boolean);
 
   return (
@@ -91,7 +154,7 @@ function Overview({ analytics, recent, received, canUpload, canShare }) {
         />
         <SummaryCard
           icon={CloudUpload}
-          tone="bg-green-50 text-green-600"
+          tone="bg-emerald-50 text-emerald-600"
           label="Uploads"
           value={s.uploads.value}
           sub="last 30 days"
@@ -116,51 +179,89 @@ function Overview({ analytics, recent, received, canUpload, canShare }) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 lg:col-span-2">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold text-slate-900">Recent files</h2>
-            <Link to="/recent" className="text-sm font-medium text-blue-600 hover:underline">
-              View all
+        <section className="card min-w-0 lg:col-span-2">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+            <div>
+              <h2 className="font-semibold text-slate-950">Recent files</h2>
+              <p className="text-xs text-slate-500">What you worked on lately</p>
+            </div>
+            <Link
+              to="/recent"
+              className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700"
+            >
+              View all <ArrowRight className="size-3.5" aria-hidden="true" />
             </Link>
           </div>
           {recent.length === 0 ? (
-            <p className="py-8 text-center text-sm text-slate-500">No recent files yet.</p>
+            <Empty
+              icon={FolderOpen}
+              title="No recent files yet"
+              text="Upload or open a file and it shows up here."
+            />
           ) : (
-            <ul className="divide-y divide-slate-100">
-              {recent.slice(0, 6).map(({ file, last_activity_at: at }) => {
-                const { Icon, color } = fileIcon(file.category);
-                return (
-                  <li key={file.id} className="flex items-center gap-3 py-2 text-sm">
-                    <Icon className={`size-4 shrink-0 ${color}`} aria-hidden="true" />
-                    <span className="min-w-0 flex-1 truncate text-slate-800">{file.name}</span>
-                    <span className="text-xs text-slate-500">{formatBytes(file.size_bytes)}</span>
-                    <span className="hidden w-28 text-right text-xs text-slate-500 sm:block">
-                      {new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+            <ul className="divide-y divide-slate-100 px-2 py-1">
+              {recent.slice(0, 6).map(({ file, last_activity_at: at }) => (
+                <li
+                  key={file.id}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 transition hover:bg-slate-50"
+                >
+                  <FileIcon category={file.category} size="sm" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-slate-800">
+                      {file.name}
                     </span>
-                  </li>
-                );
-              })}
+                    <span className="block text-xs text-slate-400">
+                      {file.extension.toUpperCase()} · {formatBytes(file.size_bytes)}
+                    </span>
+                  </span>
+                  <span className="hidden text-xs text-slate-500 sm:block">
+                    {new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                  </span>
+                </li>
+              ))}
             </ul>
           )}
         </section>
 
-        <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="mb-3 font-semibold text-slate-900">Shortcuts</h2>
-          <ul className="space-y-1">
-            {shortcuts.map(({ to, icon: Icon, label, text }) => (
-              <li key={to}>
-                <Link
-                  to={to}
-                  className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-slate-50"
-                >
-                  <Icon className="size-4 text-blue-600" aria-hidden="true" />
-                  <span className="text-sm font-medium text-slate-800">{label}</span>
-                  <span className="ml-auto text-xs text-slate-500">{text}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <div className="space-y-4">
+          <section className="card p-2">
+            <h2 className="px-3 pt-3 pb-2 font-semibold text-slate-950">Shortcuts</h2>
+            <ul>
+              {shortcuts.map(({ to, icon: Icon, tone, label, text }) => (
+                <li key={to}>
+                  <Link
+                    to={to}
+                    className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition hover:bg-slate-50"
+                  >
+                    <span className={`grid size-9 place-items-center rounded-lg ${tone}`}>
+                      <Icon className="size-[18px]" aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium text-slate-800">{label}</span>
+                      <span className="block text-xs text-slate-500">{text}</span>
+                    </span>
+                    <ArrowRight
+                      className="size-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-500"
+                      aria-hidden="true"
+                    />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section className="shadow-card flex items-start gap-3 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 p-5 text-white">
+            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white/10 ring-1 ring-white/15">
+              <KeyRound className="size-[18px]" aria-hidden="true" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold">Your keys never leave the server</p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-300">
+                File keys are stored only in wrapped form and rotated without re-uploading. Not even
+                admins can open your files.
+              </p>
+            </div>
+          </section>
+        </div>
       </div>
     </>
   );

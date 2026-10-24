@@ -11,27 +11,33 @@ export function SummaryCard({ icon: Icon, tone, label, value, sub, metric, upIsB
   const up = metric && metric.value >= metric.previous;
   const good = metric && (metric.value === metric.previous || up !== upIsBad);
   return (
-    <div className="flex min-w-0 gap-4 rounded-xl border border-slate-200 bg-white p-4">
-      <span className={`flex size-11 shrink-0 items-center justify-center rounded-lg ${tone}`}>
-        <Icon className="size-5" aria-hidden="true" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-slate-500">{label}</p>
-        <p className="mt-0.5 text-2xl font-semibold text-slate-900">{value}</p>
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-slate-500">
-          <span>{sub}</span>
-          {change && (
-            <span
-              className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-medium ${
-                good ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-              }`}
-              title="Compared with the previous period of the same length"
-            >
-              {up ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
-              {change} vs previous
-            </span>
-          )}
-        </div>
+    <div className="card hover:shadow-card-hover flex min-w-0 flex-col p-5 transition">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-medium text-slate-500">{label}</p>
+        <span
+          className={`grid size-10 shrink-0 place-items-center rounded-xl ring-1 ring-black/5 ring-inset ${tone}`}
+        >
+          <Icon className="size-5" aria-hidden="true" />
+        </span>
+      </div>
+      <p className="mt-1 text-[28px] leading-tight font-semibold tracking-tight text-slate-950">
+        {value}
+      </p>
+      <div className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-2 text-xs text-slate-500">
+        <span>{sub}</span>
+        {change && (
+          <span
+            className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold ring-1 ring-inset ${
+              good
+                ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/15'
+                : 'bg-red-50 text-red-700 ring-red-600/15'
+            }`}
+            title="Compared with the previous period of the same length"
+          >
+            {up ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
+            {change} vs previous
+          </span>
+        )}
       </div>
     </div>
   );
@@ -45,7 +51,7 @@ export function SummaryCard({ icon: Icon, tone, label, value, sub, metric, upIsB
 export function ChartCard({ title, legend, table, empty, emptyText, children }) {
   const [showTable, setShowTable] = useState(false);
   return (
-    <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4">
+    <section className="card min-w-0 p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <h2 className="font-semibold text-slate-900">{title}</h2>
         {table && !empty && (

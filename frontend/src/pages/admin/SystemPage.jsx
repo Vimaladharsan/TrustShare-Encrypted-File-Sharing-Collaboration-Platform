@@ -54,10 +54,7 @@ export default function SystemPage() {
         {Object.entries(SERVICES).map(([key, [name, role]]) => {
           const ok = health.services?.[key] === 'ok';
           return (
-            <div
-              key={key}
-              className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4"
-            >
+            <div key={key} className="card flex items-start gap-3 p-4">
               {ok ? (
                 <CheckCircle2 className="size-6 shrink-0 text-green-600" aria-hidden="true" />
               ) : (

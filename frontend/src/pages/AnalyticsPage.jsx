@@ -12,7 +12,8 @@ import {
 import { DateRangeFilter, SummaryCard } from '../components/analytics/AnalyticsParts';
 import { ErrorState, Loading } from '../components/StateMessage';
 import { presetRange } from '../utils/charts';
-import { fileIcon, formatBytes } from '../utils/format';
+import { formatBytes } from '../utils/format';
+import FileIcon from '../components/files/FileIcon';
 
 const VIA = { owner: 'Direct', direct_share: 'Shared with person', link: 'Share link' };
 
@@ -45,8 +46,8 @@ export default function AnalyticsPage() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">File Analytics</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">File Analytics</h1>
+          <p className="mt-1 text-sm text-slate-500">
             Insights about your storage, uploads, downloads and sharing activity.
           </p>
         </div>
@@ -140,14 +141,14 @@ export default function AnalyticsPage() {
 
 function RecentTable({ title, columns, rows, empty }) {
   return (
-    <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4">
+    <section className="card min-w-0 p-4">
       <h2 className="mb-3 font-semibold text-slate-900">{title}</h2>
       {rows.length === 0 ? (
         <p className="py-8 text-center text-sm text-slate-500">{empty}</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[480px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs text-slate-500">
+            <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
               <tr>
                 {columns.map((c) => (
                   <th key={c} className="px-3 py-2 font-medium">
@@ -158,12 +159,11 @@ function RecentTable({ title, columns, rows, empty }) {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {rows.map((row) => {
-                const { Icon, color } = fileIcon(row.category);
                 return (
                   <tr key={row.key}>
                     <td className="max-w-[14rem] px-3 py-2">
                       <span className="flex items-center gap-2">
-                        <Icon className={`size-4 shrink-0 ${color}`} aria-hidden="true" />
+                        <FileIcon category={row.category} size="sm" />
                         <span className="truncate text-slate-800" title={row.name}>
                           {row.name}
                         </span>

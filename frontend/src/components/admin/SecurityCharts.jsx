@@ -119,7 +119,7 @@ export function EventsByTypeChart({ types }) {
         rows: types,
       }}
     >
-      <div className="flex flex-col items-center gap-4 sm:flex-row lg:flex-col 2xl:flex-row">
+      <div className="flex flex-col items-center gap-4 sm:flex-row lg:flex-col">
         <div className="relative size-40 shrink-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>

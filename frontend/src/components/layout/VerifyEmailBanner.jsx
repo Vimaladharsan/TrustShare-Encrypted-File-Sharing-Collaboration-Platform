@@ -25,7 +25,7 @@ export default function VerifyEmailBanner() {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-amber-200/70 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-2.5 text-sm text-amber-900 sm:px-6 lg:px-8">
       <MailWarning className="size-4 shrink-0" aria-hidden="true" />
       <span>
         Please verify your email – we sent a link to <strong>{user.email}</strong>.

@@ -1,9 +1,103 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/inter';
 
-html {
-  scroll-behavior: smooth; /* landing page section links */
+/* ---------- design tokens (used as Tailwind classes, e.g. shadow-card, animate-pop-in) ---------- */
+@theme {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Soft, layered shadows: depth without heavy borders. */
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.05);
+  --shadow-card-hover: 0 8px 24px -6px rgb(15 23 42 / 0.12), 0 2px 6px -2px rgb(15 23 42 / 0.06);
+  --shadow-pop: 0 20px 48px -12px rgb(15 23 42 / 0.25), 0 6px 14px -4px rgb(15 23 42 / 0.08);
+
+  --animate-fade-in: fade-in 160ms ease-out;
+  --animate-pop-in: pop-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-slide-in: slide-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-shimmer: shimmer 1.6s infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes slide-in {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: none;
+    }
+  }
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
 }
 
-body {
-  @apply bg-slate-50 text-slate-800 antialiased;
+/* The surface every panel sits on – one definition, so every page looks the same. */
+@utility card {
+  @apply shadow-card rounded-2xl border border-slate-200/80 bg-white;
+}
+
+/* Small uppercase label above a group (sidebar sections, table headers). */
+@utility eyebrow {
+  @apply text-[11px] font-semibold tracking-[0.08em] text-slate-400 uppercase;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth; /* landing page section links */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased;
+    /* Inter's clearer digits and letter shapes (single-storey a, open digits). */
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+  }
+
+  ::selection {
+    @apply bg-blue-100 text-blue-900;
+  }
+
+  /* Keyboard users always see where they are; mouse clicks don't leave rings behind. */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-blue-500;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-slate-300) transparent;
+  }
+
+  /* Tabular figures keep numbers in tables and cards aligned. */
+  table,
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Respect the operating system's "reduce motion" setting. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

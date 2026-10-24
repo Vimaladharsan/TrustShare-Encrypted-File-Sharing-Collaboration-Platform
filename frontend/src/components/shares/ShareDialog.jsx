@@ -20,7 +20,7 @@ const LINK_EXPIRY = [
 const PERSON_EXPIRY = [{ value: 0, label: 'Never' }, ...LINK_EXPIRY.slice(1, 3)];
 
 const inputClass =
-  'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none';
+  'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 shadow-xs focus:ring-4 focus:ring-blue-500/15 focus:outline-none';
 
 /**
  * Share one file: a secret link (anyone who has it) or a registered person ("Shared with me"),

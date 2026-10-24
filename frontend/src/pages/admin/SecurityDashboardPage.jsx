@@ -98,7 +98,7 @@ export default function SecurityDashboardPage() {
             />
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
             <LoginActivityChart days={data.logins_by_day} />
             <AccessAttemptsChart days={data.access_by_day} />
             <EventsByTypeChart types={data.events_by_type} />

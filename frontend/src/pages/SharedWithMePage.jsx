@@ -7,8 +7,9 @@ import { downloadReceived, listReceivedShares, previewReceived } from '../api/sh
 import Button from '../components/Button';
 import FilePreviewDialog from '../components/files/FilePreviewDialog';
 import { Empty, ErrorState, Loading } from '../components/StateMessage';
-import { fileIcon, formatBytes, formatDate } from '../utils/format';
+import { formatBytes, formatDate } from '../utils/format';
 import { expiryLabel, permissionLabel } from '../utils/shares';
+import FileIcon from '../components/files/FileIcon';
 
 /** Files other TrustShare users shared with me directly (only shares that still work). */
 export default function SharedWithMePage() {
@@ -37,8 +38,8 @@ export default function SharedWithMePage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">Shared with me</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Shared with me</h1>
+        <p className="mt-1 text-sm text-slate-500">
           Files other people shared with you. They stay encrypted and you can only do what the owner
           allowed.
         </p>
@@ -55,9 +56,9 @@ export default function SharedWithMePage() {
       )}
 
       {!error && items?.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <div className="card overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500 uppercase">
+            <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
               <tr>
                 <th className="px-4 py-3 font-medium">File</th>
                 <th className="px-4 py-3 font-medium">Shared by</th>
@@ -68,12 +69,11 @@ export default function SharedWithMePage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {items.map((share) => {
-                const { Icon, color } = fileIcon(share.category);
                 return (
                   <tr key={share.id}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <Icon className={`size-5 shrink-0 ${color}`} aria-hidden="true" />
+                        <FileIcon category={share.category} size="sm" />
                         <div className="min-w-0">
                           <p className="truncate font-medium text-slate-900">{share.file_name}</p>
                           <p className="text-xs text-slate-500">

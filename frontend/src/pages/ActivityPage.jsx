@@ -82,8 +82,8 @@ export default function ActivityPage() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Activity logs</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Activity logs</h1>
+          <p className="mt-1 text-sm text-slate-500">
             Everything done with your account. Records can&apos;t be edited or deleted.
           </p>
         </div>
@@ -96,11 +96,7 @@ export default function ActivityPage() {
                 setGroup(value);
                 setPage(0);
               }}
-              className={`rounded-full px-3 py-1 text-sm ${
-                group === value
-                  ? 'bg-blue-600 text-white'
-                  : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-              }`}
+              className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${group === value ? 'bg-slate-900 text-white shadow-sm' : 'bg-white text-slate-600 ring-1 ring-slate-200 ring-inset hover:bg-slate-50 hover:text-slate-900'}`}
             >
               {label}
             </button>
@@ -114,9 +110,9 @@ export default function ActivityPage() {
         <Empty icon={History} title="No activity yet" text="Your actions will be listed here." />
       )}
       {!error && data?.items.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <div className="card overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500 uppercase">
+            <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
               <tr>
                 <th className="px-4 py-3 font-medium">Activity</th>
                 <th className="px-4 py-3 font-medium">Details</th>

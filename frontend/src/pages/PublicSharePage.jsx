@@ -7,9 +7,10 @@ import { getErrorMessage } from '../api/client';
 import { downloadPublic, getPublicShare, previewPublic } from '../api/shares';
 import Button from '../components/Button';
 import FilePreviewDialog from '../components/files/FilePreviewDialog';
+import FileIcon from '../components/files/FileIcon';
 import Logo from '../components/Logo';
 import { Loading } from '../components/StateMessage';
-import { fileIcon, formatBytes } from '../utils/format';
+import { formatBytes } from '../utils/format';
 import { expiryLabel } from '../utils/shares';
 
 const ENDED = {
@@ -63,15 +64,20 @@ export default function PublicSharePage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
-      <header className="border-b border-slate-200 bg-white px-6 py-4">
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-slate-50">
+      {/* Soft brand glow behind the card – decoration only. */}
+      <div className="pointer-events-none absolute -top-40 left-1/2 size-[640px] -translate-x-1/2 rounded-full bg-gradient-to-br from-blue-200/50 to-indigo-200/40 blur-3xl" />
+      <header className="relative flex items-center justify-between px-6 py-5">
         <Link to="/" aria-label="TrustShare home">
           <Logo />
         </Link>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-slate-600 shadow-xs ring-1 ring-slate-200 backdrop-blur">
+          <ShieldCheck className="size-3.5 text-emerald-600" aria-hidden="true" /> Secure link
+        </span>
       </header>
 
-      <main className="flex flex-1 items-center justify-center p-4">
-        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <main className="relative flex flex-1 items-center justify-center p-4">
+        <div className="animate-pop-in shadow-pop w-full max-w-md rounded-3xl bg-white/90 p-8 ring-1 ring-slate-900/5 backdrop-blur">
           {!info && !failure && <Loading />}
           {failure && <Failure failure={failure} />}
           {info && (
@@ -85,8 +91,8 @@ export default function PublicSharePage() {
         </div>
       </main>
 
-      <footer className="flex items-center justify-center gap-2 p-4 text-xs text-slate-500">
-        <ShieldCheck className="size-4 text-green-600" aria-hidden="true" />
+      <footer className="relative flex items-center justify-center gap-2 p-6 text-xs text-slate-500">
+        <ShieldCheck className="size-4 text-emerald-600" aria-hidden="true" />
         Shared securely with TrustShare – stored encrypted with AES-256-GCM
       </footer>
 
@@ -108,18 +114,21 @@ export default function PublicSharePage() {
 }
 
 function SharedFile({ info, downloading, onPreview, onDownload }) {
-  const { Icon, color } = fileIcon(info.category);
   const canDownload = info.permission === 'download' && info.downloads_left !== 0;
   return (
     <div className="text-center">
-      <Icon className={`mx-auto size-14 ${color}`} aria-hidden="true" />
-      <h1 className="mt-3 text-lg font-semibold break-words text-slate-900">{info.file_name}</h1>
+      <div className="flex justify-center">
+        <FileIcon category={info.category} size="lg" />
+      </div>
+      <p className="eyebrow mt-5">{info.owner_name} shared a file with you</p>
+      <h1 className="mt-1.5 text-xl font-semibold tracking-tight break-words text-slate-950">
+        {info.file_name}
+      </h1>
       <p className="mt-1 text-sm text-slate-500">
-        {info.extension.toUpperCase()} · {formatBytes(info.size_bytes)} · shared by{' '}
-        {info.owner_name}
+        {info.extension.toUpperCase()} · {formatBytes(info.size_bytes)}
       </p>
 
-      <dl className="mt-5 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 text-left text-xs">
+      <dl className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-slate-200/70 text-left text-xs ring-1 ring-slate-200/70 [&>div]:bg-slate-50 [&>div]:p-3">
         <div>
           <dt className="text-slate-500">Access</dt>
           <dd className="font-medium text-slate-800">
@@ -138,14 +147,14 @@ function SharedFile({ info, downloading, onPreview, onDownload }) {
         )}
       </dl>
 
-      <div className="mt-6 flex justify-center gap-2">
+      <div className="mt-6 grid gap-2 sm:auto-cols-fr sm:grid-flow-col">
         {info.can_preview && (
-          <Button variant="secondary" onClick={onPreview}>
+          <Button variant="secondary" size="lg" onClick={onPreview}>
             <Eye className="size-4" aria-hidden="true" /> Preview
           </Button>
         )}
         {canDownload && (
-          <Button onClick={onDownload} loading={downloading}>
+          <Button size="lg" onClick={onDownload} loading={downloading}>
             <Download className="size-4" aria-hidden="true" /> Download
           </Button>
         )}

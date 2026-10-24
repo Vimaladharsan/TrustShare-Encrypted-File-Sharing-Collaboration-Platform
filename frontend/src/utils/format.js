@@ -28,11 +28,23 @@ export const CATEGORIES = [
 ];
 
 const ICONS = {
-  document: { Icon: FileText, color: 'text-red-500' },
-  spreadsheet: { Icon: FileSpreadsheet, color: 'text-green-600' },
-  presentation: { Icon: Presentation, color: 'text-orange-500' },
-  image: { Icon: FileImage, color: 'text-purple-500' },
-  text: { Icon: File, color: 'text-slate-500' },
+  document: { Icon: FileText, color: 'text-red-500', tile: 'bg-red-50 text-red-600 ring-red-100' },
+  spreadsheet: {
+    Icon: FileSpreadsheet,
+    color: 'text-green-600',
+    tile: 'bg-emerald-50 text-emerald-600 ring-emerald-100',
+  },
+  presentation: {
+    Icon: Presentation,
+    color: 'text-orange-500',
+    tile: 'bg-orange-50 text-orange-600 ring-orange-100',
+  },
+  image: {
+    Icon: FileImage,
+    color: 'text-purple-500',
+    tile: 'bg-violet-50 text-violet-600 ring-violet-100',
+  },
+  text: { Icon: File, color: 'text-slate-500', tile: 'bg-slate-100 text-slate-500 ring-slate-200' },
 };
 
 export function fileIcon(category) {

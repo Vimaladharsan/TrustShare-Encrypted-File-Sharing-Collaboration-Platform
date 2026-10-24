@@ -22,7 +22,7 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-xl font-semibold text-slate-900">Settings</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Settings</h1>
 
       <Card title="Profile">
         <dl className="grid gap-4 text-sm sm:grid-cols-2">
@@ -298,7 +298,7 @@ function SessionsSection() {
 
 function Card({ title, children }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5">
+    <section className="card p-5">
       <h2 className="mb-4 font-semibold text-slate-900">{title}</h2>
       {children}
     </section>

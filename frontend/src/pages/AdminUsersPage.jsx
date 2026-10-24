@@ -119,8 +119,8 @@ export default function AdminUsersPage() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Users</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Users</h1>
+          <p className="mt-1 text-sm text-slate-500">
             Manage roles and access. Accounts inactive for 30+ days can be deleted.{' '}
             {data && `${total} account${total === 1 ? '' : 's'}`}
           </p>
@@ -133,7 +133,7 @@ export default function AdminUsersPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search name or email"
-            className="w-full rounded-lg border border-slate-300 py-2 pr-3 pl-9 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+            className="w-full rounded-lg border border-slate-300 py-2 pr-3 pl-9 text-sm shadow-xs focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 focus:outline-none"
           />
         </label>
       </div>
@@ -145,9 +145,9 @@ export default function AdminUsersPage() {
       )}
 
       {!error && data && data.items.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <div className="card overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500 uppercase">
+            <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
               <tr>
                 <th className="px-4 py-3 font-medium">User</th>
                 <th className="px-4 py-3 font-medium">Role</th>

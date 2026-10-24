@@ -174,7 +174,7 @@ export default function TrashPage() {
     <div className="mx-auto max-w-6xl">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Trash</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Trash</h1>
           <p className="mt-1 text-sm text-slate-500">
             Items here still count toward your storage until they are deleted forever.
           </p>
@@ -237,9 +237,7 @@ export default function TrashPage() {
           <div className="space-y-6">
             {folders.length > 0 && (
               <section>
-                <h2 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-                  Folders
-                </h2>
+                <h2 className="eyebrow mb-3">Folders</h2>
                 <FolderGrid
                   folders={folders}
                   onOpen={(folder) => toggle(setSelectedFolders)(folder.id)}
@@ -251,9 +249,7 @@ export default function TrashPage() {
             )}
             {files.length > 0 && (
               <section>
-                <h2 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-                  Files
-                </h2>
+                <h2 className="eyebrow mb-3">Files</h2>
                 <FileTable
                   files={files}
                   actionsFor={fileActions}

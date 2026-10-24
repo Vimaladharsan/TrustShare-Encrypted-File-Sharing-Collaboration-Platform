@@ -178,11 +178,16 @@ export default function FilesPage({ mode = 'folder' }) {
   const isEmpty = folders.length === 0 && files.length === 0;
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div>
       {/* ---------- header: where am I + actions ---------- */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         {mode === 'search' ? (
-          <h1 className="text-lg font-semibold text-slate-900">Search results for “{query}”</h1>
+          <div>
+            <p className="eyebrow mb-1">Search</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+              Results for “{query}”
+            </h1>
+          </div>
         ) : (
           <Breadcrumbs crumbs={crumbs} />
         )}
@@ -205,17 +210,21 @@ export default function FilesPage({ mode = 'folder' }) {
       </div>
 
       {/* ---------- category filter ---------- */}
-      <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Filter by type">
+      <div
+        className="mt-6 inline-flex max-w-full flex-wrap gap-1 rounded-xl bg-slate-200/50 p-1"
+        role="group"
+        aria-label="Filter by type"
+      >
         {CATEGORIES.map(({ value, label }) => (
           <button
             key={label}
             type="button"
             onClick={() => setCategory(value)}
             aria-pressed={category === value}
-            className={`rounded-full border px-3 py-1 text-xs font-medium ${
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
               category === value
-                ? 'border-blue-600 bg-blue-50 text-blue-700'
-                : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-900/5'
+                : 'text-slate-500 hover:text-slate-900'
             }`}
           >
             {label}
@@ -224,7 +233,7 @@ export default function FilesPage({ mode = 'folder' }) {
       </div>
 
       {/* ---------- content ---------- */}
-      <div className="mt-6">
+      <div className="mt-8">
         {status === 'loading' && <Loading />}
         {status === 'error' && <ErrorState message={error} onRetry={load} />}
         {status === 'ready' && isEmpty && mode === 'search' && (
@@ -248,8 +257,11 @@ export default function FilesPage({ mode = 'folder' }) {
           <div className="space-y-6">
             {folders.length > 0 && (
               <section>
-                <h2 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                <h2 className="eyebrow mb-3 flex items-center gap-2">
                   Folders
+                  <span className="rounded-full bg-slate-200/70 px-1.5 py-px text-[10px] text-slate-500">
+                    {folders.length}
+                  </span>
                 </h2>
                 <FolderGrid
                   folders={folders}
@@ -260,8 +272,11 @@ export default function FilesPage({ mode = 'folder' }) {
             )}
             {files.length > 0 && (
               <section>
-                <h2 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                <h2 className="eyebrow mb-3 flex items-center gap-2">
                   Files
+                  <span className="rounded-full bg-slate-200/70 px-1.5 py-px text-[10px] text-slate-500">
+                    {files.length}
+                  </span>
                 </h2>
                 <FileTable
                   files={files}

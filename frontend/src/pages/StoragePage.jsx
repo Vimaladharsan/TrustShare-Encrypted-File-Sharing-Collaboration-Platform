@@ -6,7 +6,8 @@ import { getStorageReport } from '../api/analytics';
 import { getErrorMessage } from '../api/client';
 import { ErrorState, Loading } from '../components/StateMessage';
 import { CATEGORY_SERIES } from '../utils/charts';
-import { fileIcon, formatBytes } from '../utils/format';
+import { formatBytes } from '../utils/format';
+import FileIcon from '../components/files/FileIcon';
 
 /** Storage: how much of my quota is used, by which file types, and what takes the most space. */
 export default function StoragePage() {
@@ -30,13 +31,13 @@ export default function StoragePage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">Storage</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Storage</h1>
+        <p className="mt-1 text-sm text-slate-500">
           Every file is stored encrypted. Files in the trash still count until deleted forever.
         </p>
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
+      <section className="card p-5">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div className="flex items-center gap-3">
             <span className="flex size-11 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
@@ -96,17 +97,16 @@ export default function StoragePage() {
         )}
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
+      <section className="card p-5">
         <h2 className="mb-3 font-semibold text-slate-900">Largest files</h2>
         {report.largest.length === 0 ? (
           <p className="text-sm text-slate-500">No files yet.</p>
         ) : (
           <ul className="divide-y divide-slate-100">
             {report.largest.map((file) => {
-              const { Icon, color } = fileIcon(file.category);
               return (
                 <li key={file.id} className="flex items-center gap-3 py-2 text-sm">
-                  <Icon className={`size-4 shrink-0 ${color}`} aria-hidden="true" />
+                  <FileIcon category={file.category} size="sm" />
                   <span className="min-w-0 flex-1 truncate text-slate-800">{file.name}</span>
                   <span className="text-slate-600">{formatBytes(file.size_bytes)}</span>
                 </li>

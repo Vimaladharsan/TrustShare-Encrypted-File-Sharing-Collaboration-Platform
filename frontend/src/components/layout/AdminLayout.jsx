@@ -4,11 +4,15 @@ import {
   FolderLock,
   LayoutDashboard,
   Link2,
+  Menu,
   ServerCog,
   ShieldAlert,
+  ShieldCheck,
   ShieldOff,
   UsersRound,
+  X,
 } from 'lucide-react';
+import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router';
 
 import { useAuth } from '../../auth/useAuth';
@@ -37,6 +41,7 @@ const NAV = [
 export default function AdminLayout() {
   const { can } = useAuth();
   const nav = NAV.filter((item) => can(item.permission));
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   if (!can('user:read')) {
     // Someone typed /admin… without the role: the API would refuse anyway (403).
@@ -55,67 +60,110 @@ export default function AdminLayout() {
     );
   }
 
-  return (
-    <div className="flex min-h-screen bg-slate-50">
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-slate-900 p-4 text-slate-300 md:flex">
-        <div className="mb-6 rounded-lg bg-white px-2 py-1.5">
-          <Logo />
-        </div>
-        <p className="mb-2 px-3 text-xs font-semibold tracking-wider text-slate-500 uppercase">
+  const sidebar = (
+    <div className="flex h-full flex-col bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-slate-400">
+      <div className="flex h-16 shrink-0 items-center px-5">
+        <Logo variant="light" />
+      </div>
+      <div className="px-3">
+        <p className="mb-1.5 px-3 text-[11px] font-semibold tracking-[0.08em] text-slate-500 uppercase">
           Admin panel
         </p>
-        <nav className="flex flex-col gap-1">
+        <nav className="space-y-0.5" aria-label="Admin">
           {nav.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
               end={end}
+              onClick={() => setDrawerOpen(false)}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${
-                  isActive ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'
+                `group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                  isActive ? 'bg-white/10 text-white' : 'hover:bg-white/5 hover:text-slate-100'
                 }`
               }
             >
-              <Icon className="size-4" aria-hidden="true" />
-              {label}
+              {({ isActive }) => (
+                <>
+                  {isActive && (
+                    <span className="absolute top-1/2 -left-3 h-5 w-1 -translate-y-1/2 rounded-r-full bg-blue-400" />
+                  )}
+                  <Icon
+                    className={`size-[18px] ${isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300'}`}
+                    aria-hidden="true"
+                  />
+                  {label}
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
+      </div>
+      <div className="mt-auto p-3">
+        <div className="mb-3 rounded-xl bg-white/5 p-3 text-xs leading-relaxed text-slate-400 ring-1 ring-white/10">
+          <span className="font-semibold text-slate-200">Privacy by design.</span> Admins see
+          accounts, sizes and security events – never the contents of users&apos; files.
+        </div>
         <NavLink
           to="/dashboard"
-          className="mt-auto flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-slate-800 hover:text-white"
+          className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition hover:bg-white/5 hover:text-white"
         >
           <ArrowLeft className="size-4" aria-hidden="true" /> Back to my workspace
         </NavLink>
-      </aside>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex min-h-screen bg-slate-50">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 lg:block">{sidebar}</aside>
+
+      {drawerOpen && (
+        <div
+          className="fixed inset-0 z-40 lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu"
+        >
+          <div
+            className="animate-fade-in absolute inset-0 bg-slate-950/50 backdrop-blur-[2px]"
+            onClick={() => setDrawerOpen(false)}
+          />
+          <aside className="animate-slide-in shadow-pop absolute inset-y-0 left-0 w-72">
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(false)}
+              className="absolute top-4 right-3 z-10 rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white"
+              aria-label="Close menu"
+            >
+              <X className="size-5" />
+            </button>
+            {sidebar}
+          </aside>
+        </div>
+      )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4">
-          <span className="text-sm font-semibold text-slate-700 md:hidden">Admin panel</span>
-          <span className="hidden text-sm text-slate-500 md:block">
-            Administration – access is checked on the server for every request
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-200/70 bg-white/80 px-4 backdrop-blur-md sm:px-6">
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            className="-ml-1 rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 lg:hidden"
+            aria-label="Open menu"
+          >
+            <Menu className="size-5" />
+          </button>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">
+            <ShieldCheck className="size-3.5 text-blue-300" aria-hidden="true" /> Admin
+          </span>
+          <span className="hidden text-sm text-slate-500 xl:block">
+            Every request is permission-checked on the server
           </span>
           <UserMenu />
         </header>
-        <nav className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-white px-4 py-2 whitespace-nowrap md:hidden">
-          {nav.map(({ to, label, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) =>
-                `rounded-full px-3 py-1 text-sm ${isActive ? 'bg-blue-50 text-blue-700' : 'text-slate-600'}`
-              }
-            >
-              {label}
-            </NavLink>
-          ))}
-          <NavLink to="/dashboard" className="rounded-full px-3 py-1 text-sm text-slate-600">
-            My workspace
-          </NavLink>
-        </nav>
-        <main className="flex-1 p-4 sm:p-6">
-          <Outlet />
+        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <div className="mx-auto w-full max-w-7xl">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>
