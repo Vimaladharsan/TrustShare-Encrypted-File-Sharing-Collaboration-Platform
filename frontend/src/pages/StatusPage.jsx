@@ -6,7 +6,7 @@ const SERVICES = [
   { key: 'postgres', name: 'PostgreSQL', role: 'Users, roles & permissions' },
   { key: 'mongodb', name: 'MongoDB', role: 'File metadata & activity logs' },
   { key: 'redis', name: 'Redis', role: 'Sessions, tokens & rate limits' },
-  { key: 'storage', name: 'Object storage', role: 'Encrypted files (RustFS / AWS S3)' },
+  { key: 'storage', name: 'Object storage', role: 'Encrypted files in cloud storage' },
 ];
 
 // Shows that the frontend can reach the backend, and the backend can reach all 3 databases.

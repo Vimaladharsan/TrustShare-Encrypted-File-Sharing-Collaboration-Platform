@@ -96,6 +96,7 @@ class SessionService:
             raise _invalid_session()
 
         user_id = uuid.UUID(session["user_id"])
+        signed_in_at = session.get("signed_in_at", session.get("created_at"))
         await self.redis.set(f"refresh_used:{token_hash}", str(user_id), ex=self.refresh_ttl)
         if self.grace > 0:
             grace_key = f"refresh_grace:{token_hash}"
@@ -106,6 +107,7 @@ class SessionService:
                     "family": session["family"],
                     "ip": ip,
                     "user_agent": user_agent[:200],
+                    "signed_in_at": signed_in_at,
                 },
             )
             await self.redis.expire(grace_key, self.grace)
@@ -115,7 +117,7 @@ class SessionService:
             ip,
             user_agent,
             family=session["family"],
-            signed_in_at=session.get("signed_in_at", session.get("created_at")),
+            signed_in_at=signed_in_at,
         )
         return new_token, user_id, session["family"]
 
@@ -131,7 +133,9 @@ class SessionService:
             return None
         user_id = uuid.UUID(grace["user_id"])
         logger.info("Refresh token retried within the grace window for user %s", user_id)
-        token = await self.create(user_id, ip, user_agent, family=grace["family"])
+        token = await self.create(
+            user_id, ip, user_agent, family=grace["family"], signed_in_at=grace.get("signed_in_at")
+        )
         return token, user_id, grace["family"]
 
     async def revoke(self, token: str) -> None:

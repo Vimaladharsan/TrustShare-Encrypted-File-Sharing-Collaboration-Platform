@@ -12,13 +12,14 @@ const SERVICES = {
   postgres: ['PostgreSQL', 'Users, roles, wrapped file keys, shares'],
   mongodb: ['MongoDB', 'File metadata, activity logs, security events'],
   redis: ['Redis', 'Sessions, rate limits, one-time tokens'],
-  storage: ['Object storage', 'Encrypted file objects (RustFS / AWS S3)'],
+  storage: ['Object storage', 'Encrypted file objects'],
 };
 
 /** System Monitoring: live health of every service and the state of the encryption keys. */
 export default function SystemPage() {
   const [health, setHealth] = useState(null);
   const [keys, setKeys] = useState(null);
+  const [provider, setProvider] = useState('');
   const [error, setError] = useState('');
   const [checkedAt, setCheckedAt] = useState(null);
 
@@ -30,6 +31,7 @@ export default function SystemPage() {
       .then(([h, overview]) => {
         setHealth(h);
         setKeys(overview.keys);
+        setProvider(overview.storage_provider);
         setCheckedAt(new Date());
       })
       .catch((err) => setError(getErrorMessage(err)));
@@ -65,7 +67,9 @@ export default function SystemPage() {
                   {name}{' '}
                   <span className="text-sm font-normal text-slate-500">– {ok ? 'Up' : 'Down'}</span>
                 </p>
-                <p className="text-sm text-slate-500">{role}</p>
+                <p className="text-sm text-slate-500">
+                  {key === 'storage' && provider ? `${role} · ${provider}` : role}
+                </p>
               </div>
             </div>
           );

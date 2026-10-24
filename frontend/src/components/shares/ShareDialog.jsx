@@ -17,7 +17,26 @@ const LINK_EXPIRY = [
   { value: 7 * 24 * HOUR, label: '7 days' },
   { value: 30 * 24 * HOUR, label: '30 days (maximum)' },
 ];
+const CUSTOM = -1;
 const PERSON_EXPIRY = [{ value: 0, label: 'Never' }, ...LINK_EXPIRY.slice(1, 3)];
+const LINK_MAX_DAYS = 30; // the server's SHARE_LINK_MAX_DAYS
+
+/** Value for <input type="datetime-local">: local time, minutes precision. */
+function toLocalInput(date) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+/** Problem with a custom expiry, or '' if it is fine. */
+function customExpiryError(value, mode) {
+  if (!value) return 'Pick a date and time.';
+  const when = new Date(value).getTime();
+  if (Number.isNaN(when) || when <= Date.now()) return 'Pick a time in the future.';
+  if (mode === 'link' && when > Date.now() + LINK_MAX_DAYS * 24 * HOUR) {
+    return `Links can last at most ${LINK_MAX_DAYS} days.`;
+  }
+  return '';
+}
 
 const inputClass =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 shadow-xs focus:ring-4 focus:ring-blue-500/15 focus:outline-none';
@@ -32,12 +51,15 @@ export default function ShareDialog({ file, onClose }) {
   const [mode, setMode] = useState('link'); // 'link' | 'user'
   const [permission, setPermission] = useState(canView ? 'view' : 'download');
   const [expiry, setExpiry] = useState(7 * 24 * HOUR);
+  const [customAt, setCustomAt] = useState('');
   const [limit, setLimit] = useState('');
   const [email, setEmail] = useState('');
   const [working, setWorking] = useState(false);
   const [createdUrl, setCreatedUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const [shares, setShares] = useState(null);
+
+  const customProblem = expiry === CUSTOM ? customExpiryError(customAt, mode) : '';
 
   const loadShares = useCallback(() => {
     listFileShares(file.id)
@@ -50,15 +72,21 @@ export default function ShareDialog({ file, onClose }) {
   function switchMode(next) {
     setMode(next);
     setExpiry(next === 'link' ? 7 * 24 * HOUR : 0);
+    setCustomAt('');
     setCreatedUrl('');
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (expiry === CUSTOM && customProblem) {
+      toast.error(customProblem);
+      return;
+    }
     setWorking(true);
     try {
       const body = { share_type: mode, permission };
-      if (expiry) body.expires_at = new Date(Date.now() + expiry).toISOString();
+      if (expiry === CUSTOM) body.expires_at = new Date(customAt).toISOString();
+      else if (expiry) body.expires_at = new Date(Date.now() + expiry).toISOString();
       if (permission === 'download' && limit) body.max_downloads = Number(limit);
       if (mode === 'user') body.recipient_email = email.trim();
       const created = await createShare(file.id, body);
@@ -149,6 +177,7 @@ export default function ShareDialog({ file, onClose }) {
                   {option.label}
                 </option>
               ))}
+              <option value={CUSTOM}>Custom date & time…</option>
             </select>
           </label>
           <label className="block text-sm">
@@ -166,8 +195,41 @@ export default function ShareDialog({ file, onClose }) {
           </label>
         </div>
 
+        {expiry === CUSTOM && (
+          <label className="block text-sm sm:max-w-xs">
+            <span className="mb-1 block font-medium text-slate-700">Expires on</span>
+            <input
+              type="datetime-local"
+              required
+              value={customAt}
+              min={toLocalInput(new Date(Date.now() + 5 * 60000))}
+              max={
+                mode === 'link'
+                  ? toLocalInput(new Date(Date.now() + LINK_MAX_DAYS * 24 * HOUR))
+                  : undefined
+              }
+              onChange={(e) => setCustomAt(e.target.value)}
+              aria-invalid={Boolean(customAt && customProblem)}
+              className={inputClass}
+            />
+            <span
+              className={`mt-1 block text-xs ${customAt && customProblem ? 'text-red-600' : 'text-slate-500'}`}
+            >
+              {customAt && customProblem
+                ? customProblem
+                : customAt
+                  ? `Stops working ${new Date(customAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })} (your time).`
+                  : 'Your local time.'}
+            </span>
+          </label>
+        )}
+
         <div className="flex justify-end">
-          <Button type="submit" loading={working}>
+          <Button
+            type="submit"
+            loading={working}
+            disabled={expiry === CUSTOM && Boolean(customProblem)}
+          >
             {mode === 'link' ? 'Create link' : 'Share'}
           </Button>
         </div>

@@ -136,4 +136,5 @@ class SystemOverview(BaseModel):
     shares: ShareStats
     activity_by_day: list[ActivityDay]
     keys: KeyStats
+    storage_provider: str  # e.g. "Azure Blob Storage" – admin-only, not on the public /health
     events_last_7_days: dict[str, int]  # by severity

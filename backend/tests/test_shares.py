@@ -2,7 +2,7 @@
 
 import hashlib
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
@@ -107,6 +107,22 @@ def test_link_expiry_rules(client: TestClient, new_email: Callable[[], str]) -> 
     for response in (missing, past, too_far):
         assert response.status_code == 400
         assert response.json()["error"]["code"] == "INVALID_EXPIRY"
+
+
+def test_link_keeps_the_exact_expiry_date_and_time(
+    client: TestClient, new_email: Callable[[], str]
+) -> None:
+    """The Share dialog's custom picker sends any future date and time (here: in 2 h 37 min,
+    written with an Indian +05:30 offset) – it is stored exactly, not rounded to a preset."""
+    _, owner, file_id = owner_with_file(client, new_email)
+    ist = timezone(timedelta(hours=5, minutes=30))
+    chosen = (datetime.now(ist) + timedelta(hours=2, minutes=37)).replace(second=0, microsecond=0)
+
+    created = share(client, owner, file_id, expires_at=chosen.isoformat())
+
+    assert created.status_code == 201, created.text
+    stored = datetime.fromisoformat(created.json()["expires_at"].replace("Z", "+00:00"))
+    assert stored == chosen  # same instant, whatever time zone it is shown in
 
 
 def test_expired_link_stops_working(client: TestClient, new_email: Callable[[], str]) -> None:

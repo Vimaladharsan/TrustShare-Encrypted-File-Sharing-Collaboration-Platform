@@ -110,6 +110,13 @@ class Settings(BaseSettings):
     s3_secret_access_key: SecretStr = SecretStr("")
 
     @property
+    def storage_label(self) -> str:
+        """Human-readable name of the object storage in use (shown to admins only)."""
+        if self.storage_provider == "azure":
+            return "Azure Blob Storage"
+        return "AWS S3" if not self.s3_endpoint_url else "RustFS (S3-compatible, local)"
+
+    @property
     def max_upload_bytes(self) -> int:
         return self.max_upload_mb * 1024 * 1024
 

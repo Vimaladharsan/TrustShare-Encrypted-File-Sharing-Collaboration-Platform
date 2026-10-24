@@ -220,6 +220,7 @@ def test_system_overview_shows_sizes_but_no_file_names(
     assert "very-private-name" not in response.text
     assert data["users"]["total"] >= 2 and data["keys"]["active_version"] >= 1
     assert len(data["activity_by_day"]) == 30
+    assert data["storage_provider"] == "RustFS (S3-compatible, local)"  # tests use local RustFS
 
 
 # ---------- helpers behind the reports ----------

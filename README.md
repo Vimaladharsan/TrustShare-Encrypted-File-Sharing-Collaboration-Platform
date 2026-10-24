@@ -56,7 +56,7 @@ TrustShare is built milestone by milestone. **Milestone 1** (foundation: auth, R
 - Decryption only in memory, after authorization; integrity failures return a safe error – details: [docs/key-management.md](docs/key-management.md)
 
 ### Secure sharing (Milestone 2)
-- **Share links** for anyone (no account): view-only or view & download, expiry (max 30 days), optional download limit, instant revoke; 256-bit tokens stored only as SHA-256 hashes and hidden in logs
+- **Share links** for anyone (no account): view-only or view & download, expiry as a preset (1 hour … 30 days) or an exact date and time (max 30 days), optional download limit, instant revoke; 256-bit tokens stored only as SHA-256 hashes and hidden in logs
 - **Direct sharing** with registered users ("Shared with me" / "Shared by me"); the recipient gets an email notice
 - Every access re-checks revocation, expiry, limit, file status and the owner's account and permissions – trashing a file or disabling its owner stops all links at once
 

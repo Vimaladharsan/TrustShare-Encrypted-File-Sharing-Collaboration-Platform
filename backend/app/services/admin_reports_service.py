@@ -385,6 +385,7 @@ class AdminReportsService:
                 keys_by_version=await FileKeyRepository(self.session).count_by_version(),
             ),
             events_last_7_days=severity_counts,
+            storage_provider=settings.storage_label,
         )
 
     # ---------- helpers ----------
