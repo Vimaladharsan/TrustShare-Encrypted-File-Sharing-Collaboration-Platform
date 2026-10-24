@@ -5,6 +5,8 @@ checked by the backend, not just hidden in the menu. Admins see who did what and
 much each account stores; they never get file contents (privacy rule, Milestone 2).
 """
 
+import csv
+import io
 import ipaddress
 import re
 import uuid
@@ -44,6 +46,42 @@ from app.services.security_events import EVENT_TYPES, SEVERITIES
 
 LOGIN_ACTIONS = {"auth.login.success": "success", "auth.login.failed": "failed"}
 UNAUTHORIZED_TYPES = ["unauthorized_access", "blocked_request"]
+
+
+AUDIT_EXPORT_LIMIT = 10_000
+AUDIT_CSV_COLUMNS = [
+    "time_utc",
+    "action",
+    "result",
+    "actor_email",
+    "user_id",
+    "ip_address",
+    "resource_type",
+    "resource_id",
+    "details",
+    "user_agent",
+]
+
+
+def _csv_safe(value: str) -> str:
+    """Stop spreadsheet formula injection: a cell starting with = + - @ (or tab/CR) would be run
+    as a formula when the CSV is opened in Excel, so it is prefixed with an apostrophe."""
+    return "'" + value if value[:1] in ("=", "+", "-", "@", "\t", "\r") else value
+
+
+def _audit_entry(e: dict[str, Any]) -> AuditEntry:
+    return AuditEntry(
+        action=e["action"],
+        status=e.get("status", "success"),
+        resource_type=e.get("resource_type"),
+        resource_id=e.get("resource_id"),
+        ip_address=e.get("ip_address"),
+        user_agent=e.get("user_agent"),
+        details=e.get("details") or {},
+        created_at=e["created_at"],
+        actor_email=e.get("actor_email"),
+        user_id=e.get("user_id"),
+    )
 
 
 def ip_location(ip: str | None) -> str:
@@ -173,6 +211,49 @@ class AdminReportsService:
         limit: int,
         offset: int,
     ) -> AuditPage:
+        match = self._audit_match(search, group, status)
+        total = await self.logs.count_documents(match)
+        return AuditPage(
+            items=[_audit_entry(e) for e in await self._page(self.logs, match, limit, offset)],
+            total=total,
+        )
+
+    async def audit_csv(
+        self, search: str | None, group: str | None, status: str | None
+    ) -> tuple[str, int]:
+        """The audit log (same filters as the viewer) as CSV text, newest first, at most
+        AUDIT_EXPORT_LIMIT rows. Returns (csv text, number of rows)."""
+        match = self._audit_match(search, group, status)
+        entries = await self._page(self.logs, match, AUDIT_EXPORT_LIMIT, 0)
+        out = io.StringIO()
+        writer = csv.writer(out)
+        writer.writerow(AUDIT_CSV_COLUMNS)
+        for e in entries:
+            entry = _audit_entry(e)
+            details = "; ".join(
+                f"{k}={v}" for k, v in entry.details.items() if v is not None and v != ""
+            )
+            writer.writerow(
+                [
+                    _csv_safe(value)
+                    for value in (
+                        entry.created_at.astimezone(UTC).isoformat(timespec="seconds"),
+                        entry.action,
+                        entry.status,
+                        entry.actor_email or "",
+                        entry.user_id or "",
+                        entry.ip_address or "",
+                        entry.resource_type or "",
+                        entry.resource_id or "",
+                        details,
+                        entry.user_agent or "",
+                    )
+                ]
+            )
+        return out.getvalue(), len(entries)
+
+    @staticmethod
+    def _audit_match(search: str | None, group: str | None, status: str | None) -> dict:
         match: dict[str, Any] = {}
         if search:
             pattern = {"$regex": re.escape(search), "$options": "i"}  # literal text, not a regex
@@ -188,25 +269,7 @@ class AdminReportsService:
             match["action"] = {"$regex": r"^admin\."}
         if status in ("success", "failure"):
             match["status"] = status
-        total = await self.logs.count_documents(match)
-        return AuditPage(
-            items=[
-                AuditEntry(
-                    action=e["action"],
-                    status=e.get("status", "success"),
-                    resource_type=e.get("resource_type"),
-                    resource_id=e.get("resource_id"),
-                    ip_address=e.get("ip_address"),
-                    user_agent=e.get("user_agent"),
-                    details=e.get("details") or {},
-                    created_at=e["created_at"],
-                    actor_email=e.get("actor_email"),
-                    user_id=e.get("user_id"),
-                )
-                for e in await self._page(self.logs, match, limit, offset)
-            ],
-            total=total,
-        )
+        return match
 
     # ---------- Admin Dashboard ----------
 

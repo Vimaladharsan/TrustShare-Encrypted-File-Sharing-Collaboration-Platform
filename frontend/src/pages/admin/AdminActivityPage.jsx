@@ -1,8 +1,10 @@
-import { Search } from 'lucide-react';
+import { FileDown, Search } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
-import { getAuditLog, getLogins, getSecurityEvents } from '../../api/adminReports';
+import { toast } from 'sonner';
+
+import { exportAuditLog, getAuditLog, getLogins, getSecurityEvents } from '../../api/adminReports';
 import { getErrorMessage } from '../../api/client';
 import {
   DateTime,
@@ -149,6 +151,19 @@ function AuditTab() {
   const [query, setQuery] = useState('');
   const [group, setGroup] = useState('');
   const [status, setStatus] = useState('');
+  const [exporting, setExporting] = useState(false);
+
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      await exportAuditLog({ q: query, group: group || undefined, status: status || undefined });
+      toast.success('Audit log exported (this export is itself recorded)');
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => setQuery(search.trim()), 300);
@@ -195,6 +210,14 @@ function AuditTab() {
               ['failure', 'Failures'],
             ]}
           />
+          <Button
+            variant="secondary"
+            loading={exporting}
+            onClick={exportCsv}
+            title="Download the records matching these filters (max 10,000) as CSV"
+          >
+            <FileDown className="size-4" aria-hidden="true" /> Export CSV
+          </Button>
         </div>
       </div>
       <Paged state={state}>

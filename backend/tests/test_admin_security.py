@@ -1,5 +1,8 @@
 """Admin Security Dashboard (Milestone 2, Phase 8): security events and admin-only reports."""
 
+import csv
+import io
+import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
 
@@ -234,3 +237,47 @@ def test_client_ip_and_location_helpers() -> None:
     assert ip_location("172.18.0.1") == "Local network"
     assert ip_location("8.8.8.8") == "Unknown (public IP)"
     assert ip_location("testclient") == "Unknown"
+
+
+# ---------- audit log CSV export ----------
+
+
+def test_admin_exports_the_audit_log_as_csv(
+    client: TestClient,
+    new_email: Callable[[], str],
+    admin_token: str,  # noqa: F811
+) -> None:
+    ghost = new_email()
+    login(client, ghost, "Wrong!Passw0rd")
+
+    response = client.get("/api/admin/audit/export", params={"q": ghost}, headers=auth(admin_token))
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert "attachment" in response.headers["content-disposition"]
+    rows = list(csv.reader(io.StringIO(response.text.lstrip("\ufeff"))))
+    assert rows[0][:3] == ["time_utc", "action", "result"]
+    assert len(rows) == 2 and rows[1][1] == "auth.login.failed" and ghost in rows[1][8]
+    assert events(type="admin_action", message="Exported the audit log (1 rows)")
+
+
+def test_csv_export_neutralises_spreadsheet_formulas(
+    client: TestClient,
+    admin_token: str,  # noqa: F811
+) -> None:
+    attacker = f"=HYPERLINK(1)-{uuid.uuid4().hex[:6]}@pytest.example.com"
+    login(client, attacker, "Wrong!Passw0rd")  # a crafted "email" lands in the log
+
+    response = client.get(
+        "/api/admin/audit/export", params={"q": attacker[1:]}, headers=auth(admin_token)
+    )
+
+    assert "'=HYPERLINK" in response.text or "=HYPERLINK" not in response.text
+
+
+def test_normal_user_cannot_export_the_audit_log(
+    client: TestClient, new_email: Callable[[], str]
+) -> None:
+    token = new_user(client, new_email())
+
+    assert client.get("/api/admin/audit/export", headers=auth(token)).status_code == 403

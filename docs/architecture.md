@@ -473,6 +473,7 @@ Files are never re-encrypted; downloads keep working during rotation.
 | GET | `/admin/security/overview?from&to&tz` | `audit:read` | Security Dashboard: metrics vs previous period, logins/day, unauthorized & blocked/day, events by type, recent logins (IP + location), recent events |
 | GET | `/admin/security/logins?status` · `/admin/security/events?severity&type` | `audit:read` | Full login history · security events |
 | GET | `/admin/audit?q&group&status` | `audit:read` | Audit log of every user (search by email, action or IP) |
+| GET | `/admin/audit/export?q&group&status` | `audit:read` | Same as CSV (max 10,000 rows; cells starting with = + - @ are neutralised; the export is logged and raises an `admin_action` event) |
 | GET | `/admin/overview` | `user:read` | Admin Dashboard: users, storage per account (sizes only), sharing, activity/day, key versions, events (7 days) |
 
 ### 8.8 Deployment view (Milestone 2 – local)

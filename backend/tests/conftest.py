@@ -219,6 +219,9 @@ def client() -> Iterator[TestClient]:
     # Many accounts are created quickly in tests, so raise the per-IP limits
     # (the rate-limit test lowers them again on purpose).
     settings = get_settings()
+    # Tests always use the local S3 storage (RustFS) – never the developer's real cloud storage
+    # (STORAGE_PROVIDER=azure in .env). The Azure tests switch to the Azurite emulator on purpose.
+    settings.storage_provider = "s3"
     settings.login_rate_limit_per_minute = 1000
     settings.register_rate_limit_per_minute = 1000
     settings.forgot_password_rate_limit_per_minute = 1000
