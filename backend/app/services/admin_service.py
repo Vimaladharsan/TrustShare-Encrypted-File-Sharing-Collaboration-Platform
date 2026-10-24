@@ -23,11 +23,9 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.permissions import RoleName
 from app.models import User
-from app.repositories.favorite_repository import FavoriteRepository
-from app.repositories.file_repository import FileRepository
-from app.repositories.folder_repository import FolderRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import AdminUserResponse, AdminUserUpdate, UserResponse
+from app.services.account_deletion import erase_account
 from app.services.activity_service import ActivityService
 from app.services.login_guard import LoginGuard
 from app.services.security_events import record_security_event
@@ -150,17 +148,9 @@ class AdminService:
             raise RuntimeError("AdminService needs a SecureFileStore to delete accounts")
 
         owner_id, email = str(user.id), user.email
-        files = await FileRepository(self.db).all_owned(owner_id)
-        for doc in files:  # safe to repeat if interrupted: deleting a missing object is a no-op
-            await self.storage.delete(doc)  # encrypted object + its key (crypto-shredding)
-        await FileRepository(self.db).delete_all_owned(owner_id)
-        await FolderRepository(self.db).delete_all_owned(owner_id)
-        await FavoriteRepository(self.db).delete_for_user(owner_id)
-
-        await self.users.delete(user_id)
-        await self.session.commit()
-        await SessionService(self.redis).revoke_all(user_id)
-        await self.guard.unlock(user_id)
+        erased = await erase_account(
+            user, session=self.session, db=self.db, redis=self.redis, storage=self.storage
+        )
         await self.activity.log(
             self.request,
             admin,
@@ -170,12 +160,11 @@ class AdminService:
             details={
                 "email": email,
                 "inactive_days": days,
-                "files_deleted": len(files),
-                "bytes_freed": sum(doc["size_bytes"] for doc in files),
+                **erased,
             },
         )
         await self._admin_event(
-            admin, f"Deleted inactive account {email}", {"files_deleted": len(files)}
+            admin, f"Deleted inactive account {email}", {"files_deleted": erased["files_deleted"]}
         )
 
     async def _admin_event(self, admin: User, message: str, details: dict) -> None:

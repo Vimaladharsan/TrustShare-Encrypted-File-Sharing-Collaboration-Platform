@@ -110,6 +110,17 @@ class MfaService:
         await self.users.delete_backup_codes(user.id)
         await self.session.commit()
 
+    async def regenerate_backup_codes(self, user: User, code: str) -> list[str]:
+        """New set of backup codes (the old ones stop working). Needs a current code."""
+        if not user.mfa_enabled:
+            raise AppError("MFA_NOT_ENABLED", "Two-step verification is not on.", 400)
+        if not await self.verify_code(user, code):
+            raise _invalid_code()
+        backup_codes = [_new_backup_code() for _ in range(BACKUP_CODE_COUNT)]
+        await self.users.replace_backup_codes(user.id, [_hash_backup_code(c) for c in backup_codes])
+        await self.session.commit()
+        return backup_codes
+
     # ---------- checking a code ----------
 
     async def verify_code(self, user: User, code: str) -> bool:

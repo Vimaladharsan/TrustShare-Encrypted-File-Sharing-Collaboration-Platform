@@ -61,8 +61,12 @@ def spend_password_check_time(password: str) -> None:
     _dummy_check(password)
 
 
-def create_access_token(user_id: uuid.UUID, role: str) -> tuple[str, int]:
-    """Signed JWT proving who the user is. Returns (token, lifetime in seconds)."""
+def create_access_token(
+    user_id: uuid.UUID, role: str, session_id: str | None = None
+) -> tuple[str, int]:
+    """Signed JWT proving who the user is. Returns (token, lifetime in seconds).
+    `session_id` names the device session it belongs to, so signing that device out also
+    stops its access token at once, and the Devices list can mark "this device"."""
     settings = get_settings()
     now = datetime.now(UTC)
     lifetime = timedelta(minutes=settings.access_token_ttl_minutes)
@@ -77,6 +81,8 @@ def create_access_token(user_id: uuid.UUID, role: str) -> tuple[str, int]:
         "iat_ms": int(now.timestamp() * 1000),
         "exp": now + lifetime,  # expires at
     }
+    if session_id:
+        payload["sid"] = session_id
     token = jwt.encode(
         payload, settings.jwt_secret.get_secret_value(), algorithm=settings.jwt_algorithm
     )

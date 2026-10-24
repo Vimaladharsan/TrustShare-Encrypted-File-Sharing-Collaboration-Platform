@@ -57,7 +57,7 @@ async def get_token_payload(
 
     # Logged out (this token) or logged out everywhere (all tokens before that moment).
     if await SessionService(redis).is_access_token_revoked(
-        user_id, payload.get("jti", ""), issued_at_ms(payload)
+        user_id, payload.get("jti", ""), issued_at_ms(payload), payload.get("sid")
     ):
         raise _invalid_token()
     return payload

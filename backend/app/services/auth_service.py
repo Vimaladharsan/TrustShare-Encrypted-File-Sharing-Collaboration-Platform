@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import uuid
 from datetime import UTC, datetime, timedelta
 
 from fastapi import Request
@@ -238,25 +239,28 @@ class AuthService:
     ) -> tuple[TokenResponse, str]:
         user.last_login_at = datetime.now(UTC)
         await self.session.commit()  # also saves a used backup code, if one was used
-        refresh_token = await self.sessions.create(user.id, ip, user_agent)
+        session_id = uuid.uuid4().hex  # one id per device, kept across token rotation
+        refresh_token = await self.sessions.create(user.id, ip, user_agent, family=session_id)
         await self._watch_new_ip(user)  # before logging this sign-in
         await self._log(user, "auth.login.success", details={"method": method})
-        return self._token_response(user), refresh_token
+        return self._token_response(user, session_id), refresh_token
 
     async def refresh(
         self, refresh_token: str, ip: str, user_agent: str
     ) -> tuple[TokenResponse, str]:
         """Rotate the refresh token and issue a new access token."""
-        new_refresh_token, user_id = await self.sessions.rotate(refresh_token, ip, user_agent)
+        new_refresh_token, user_id, session_id = await self.sessions.rotate(
+            refresh_token, ip, user_agent
+        )
         user = await self.users.get_by_id(user_id)
         if user is None or not user.is_active:
             await self.sessions.revoke(new_refresh_token)
             raise AppError("INVALID_SESSION", "Your session has expired. Please log in again.", 401)
-        return self._token_response(user), new_refresh_token
+        return self._token_response(user, session_id), new_refresh_token
 
     @staticmethod
-    def _token_response(user: User) -> TokenResponse:
-        token, expires_in = create_access_token(user.id, user.role.name)
+    def _token_response(user: User, session_id: str | None = None) -> TokenResponse:
+        token, expires_in = create_access_token(user.id, user.role.name, session_id)
         return TokenResponse(
             access_token=token, expires_in=expires_in, user=UserResponse.from_user(user)
         )

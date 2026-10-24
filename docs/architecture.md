@@ -175,6 +175,8 @@ sequenceDiagram
     end
 ```
 
+**Devices and per-device sign-out.** Every login starts a *session* (the refresh-token family, a random id). The id goes into each access token as the `sid` claim, and each refresh record keeps the browser, IP and `signed_in_at`. `GET /users/me/sessions` groups the refresh records by family (newest one wins) and marks the one matching the caller's `sid` as *This device*. `DELETE /users/me/sessions/{id}` deletes that family's refresh records and sets `revoked_sid:{id}` in Redis for 15 minutes (the access-token lifetime), so the signed-out device's access token is rejected on its very next request instead of working until it expires.
+
 ### 3.4 File upload
 
 ```mermaid
@@ -256,6 +258,9 @@ All routes are under `/api`. Interactive docs: `http://localhost:8000/docs`.
 | GET | `/auth/google/login` · `/auth/google/callback` | public | Google OAuth |
 | GET | `/users/me` | logged in | Profile, role, permissions, storage usage |
 | PATCH | `/users/me` | logged in | Update name |
+| DELETE | `/users/me` | logged in (password / typed email + 2-step code) | Delete own account and all its files; 409 for the last admin |
+| GET | `/users/me/sessions` | logged in | Signed-in devices (browser, OS, IP, location, last active, current) |
+| DELETE | `/users/me/sessions/{id}` | logged in (own sessions) | Sign out one device |
 | POST | `/users/me/password` | logged in | Change password |
 | POST | `/users/me/mfa/setup` · `/mfa/enable` · `/mfa/disable` · `/mfa/backup-codes` | logged in | Manage TOTP |
 | GET | `/admin/users` | `user:read` | List/search users |

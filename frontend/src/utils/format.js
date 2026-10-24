@@ -18,6 +18,19 @@ export function formatDate(iso) {
   });
 }
 
+/** ISO date → "just now", "5 min ago", "3 h ago", "2 days ago", or the date. */
+export function timeAgo(iso) {
+  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} h ago`;
+  if (seconds < 7 * 86400) {
+    const days = Math.floor(seconds / 86400);
+    return `${days} day${days === 1 ? '' : 's'} ago`;
+  }
+  return formatDate(iso);
+}
+
 export const CATEGORIES = [
   { value: '', label: 'All' },
   { value: 'document', label: 'Documents' },

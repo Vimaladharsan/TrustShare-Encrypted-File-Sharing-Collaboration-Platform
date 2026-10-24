@@ -197,3 +197,27 @@ def file_shared_email(
             "Not expecting this? You can ignore this email; the owner can revoke access any time.",
         ),
     )
+
+
+def account_deleted_email(to: str, name: str, files_deleted: int, link: str) -> Email:
+    """Confirmation after a user deleted their own account."""
+    safe_name = html.escape(name)
+    files = f"{files_deleted} file{'s' if files_deleted != 1 else ''}"
+    return Email(
+        to=to,
+        subject="Your TrustShare account was deleted",
+        text=(
+            f"Hi {name},\n\n"
+            f"Your TrustShare account and all your files ({files}) were permanently deleted, "
+            "together with their encryption keys, shares and sessions.\n\n"
+            "If you didn't do this, reply to this email right away.\n"
+        ),
+        html=_layout(
+            "Your account was deleted",
+            f"<p>Hi {safe_name},</p><p>Your TrustShare account and all your files ({files}) were "
+            "permanently deleted, together with their encryption keys, shares and sessions.</p>",
+            "Visit TrustShare",
+            link,
+            "If you didn't do this, reply to this email right away.",
+        ),
+    )

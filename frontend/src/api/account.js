@@ -32,3 +32,28 @@ export async function changePassword(currentPassword, newPassword) {
   setAccessToken(data.access_token); // the old token stopped working with the change
   return data;
 }
+
+/** Change my display name; returns the updated profile. */
+export async function updateProfile(fullName) {
+  const { data } = await api.patch('/users/me', { full_name: fullName });
+  return data;
+}
+
+/** My signed-in devices: [{ id, browser, os, kind, ip_address, location, signed_in_at, last_active_at, current }] */
+export async function getDevices() {
+  const { data } = await api.get('/users/me/sessions');
+  return data.items;
+}
+
+export const signOutDevice = (sessionId) => api.delete(`/users/me/sessions/${sessionId}`);
+
+/** New backup codes (needs a current authenticator code); the old codes stop working. */
+export async function regenerateBackupCodes(code) {
+  const { data } = await api.post('/users/me/mfa/backup-codes', { code });
+  return data.backup_codes;
+}
+
+/** Permanently delete my account: { password?, code?, confirm } */
+export async function deleteAccount(body) {
+  await api.delete('/users/me', { data: body });
+}
