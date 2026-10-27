@@ -1,9 +1,9 @@
 import { Clock, Download, Eye, Link2Off, Lock, ShieldCheck } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { toast } from 'sonner';
 
-import { getErrorMessage } from '../api/client';
+import { getErrorCode, getErrorMessage } from '../api/client';
 import { downloadPublic, getPublicShare, previewPublic } from '../api/shares';
 import Button from '../components/Button';
 import FilePreviewDialog from '../components/files/FilePreviewDialog';
@@ -12,6 +12,9 @@ import Logo from '../components/Logo';
 import { Loading } from '../components/StateMessage';
 import { formatBytes } from '../utils/format';
 import { expiryLabel } from '../utils/shares';
+
+// While the page is open, look again this often – a revoke or expiry shows without a reload.
+const RECHECK_MS = 15000;
 
 const ENDED = {
   SHARE_EXPIRED: { icon: Clock, title: 'This link has expired' },
@@ -39,25 +42,53 @@ export default function PublicSharePage() {
     return () => meta.remove();
   }, []);
 
-  useEffect(() => {
-    getPublicShare(token)
-      .then(setInfo)
-      .catch((err) =>
-        setFailure({
-          code: err.response?.data?.error?.code || 'ERROR',
-          message: getErrorMessage(err),
+  /** The link stopped working (revoked, expired, used up, gone): replace the card with why. */
+  const endIfGone = useCallback((err) => {
+    const code = getErrorCode(err);
+    if (!code || !(code in ENDED || code === 'SHARE_NOT_FOUND')) return false;
+    setFailure({ code, message: getErrorMessage(err) });
+    setInfo(null);
+    setPreviewing(false);
+    return true;
+  }, []);
+
+  const refresh = useCallback(
+    () =>
+      getPublicShare(token)
+        .then(setInfo)
+        .catch((err) => {
+          if (!endIfGone(err)) {
+            setFailure((current) => current ?? { code: 'ERROR', message: getErrorMessage(err) });
+          }
         }),
-      );
-  }, [token]);
+    [token, endIfGone],
+  );
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  // Re-check while the page is open and when the visitor comes back to the tab.
+  useEffect(() => {
+    if (failure) return undefined;
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') refresh();
+    }, RECHECK_MS);
+    const onVisible = () => document.visibilityState === 'visible' && refresh();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [failure, refresh]);
 
   async function download() {
     setDownloading(true);
     try {
       await downloadPublic(token, info.file_name);
-      const fresh = await getPublicShare(token).catch(() => null); // downloads left changed
-      if (fresh) setInfo(fresh);
+      await refresh(); // downloads left changed – or the limit is now reached
     } catch (err) {
-      toast.error(getErrorMessage(err));
+      if (!endIfGone(err)) toast.error(getErrorMessage(err));
     } finally {
       setDownloading(false);
     }
@@ -104,7 +135,12 @@ export default function PublicSharePage() {
             extension: info.extension,
             size_bytes: info.size_bytes,
           }}
-          load={(signal) => previewPublic(token, signal)}
+          load={(signal) =>
+            previewPublic(token, signal).catch((err) => {
+              endIfGone(err);
+              throw err;
+            })
+          }
           onDownload={info.permission === 'download' ? download : undefined}
           onClose={() => setPreviewing(false)}
         />

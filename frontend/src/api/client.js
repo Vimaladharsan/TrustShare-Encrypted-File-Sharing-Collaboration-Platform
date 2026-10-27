@@ -58,6 +58,16 @@ const NO_RETRY = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/mfa/v
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // File downloads ask for a Blob, so an error body arrives as a Blob too – turn the JSON
+    // error back into an object so the real message ("This link was revoked…") can be shown.
+    const body = error.response?.data;
+    if (typeof Blob !== 'undefined' && body instanceof Blob && body.type.includes('json')) {
+      try {
+        error.response.data = JSON.parse(await body.text());
+      } catch {
+        // not JSON after all – keep the generic message
+      }
+    }
     const original = error.config;
     const isAuthCall = NO_RETRY.some((path) => original?.url?.startsWith(path));
     if (error.response?.status === 401 && original && !original._retried && !isAuthCall) {
