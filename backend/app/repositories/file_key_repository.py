@@ -31,6 +31,11 @@ class FileKeyRepository:
         row = await self.session.get(FileKey, file_id)
         return EncryptedKey(row.wrapped_key, row.key_version) if row else None
 
+    async def set(self, file_id: str, key: EncryptedKey) -> None:
+        row = await self.session.get(FileKey, file_id)
+        if row is not None:
+            row.wrapped_key, row.key_version = key.wrapped_key, key.key_version
+
     async def delete(self, file_id: str) -> None:
         await self.session.execute(delete(FileKey).where(FileKey.file_id == file_id))
 

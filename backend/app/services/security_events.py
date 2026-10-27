@@ -14,6 +14,7 @@ should look at – each with a type and a severity (high / medium / low / info):
   file_threat              fake file type (content ≠ extension) or tampered file    high
   download_anomaly         unusually many downloads through one share link          medium
   admin_action             an admin changed, unlocked or deleted an account         info
+  vault_locked             the secure vault locked after repeated wrong passwords   high
 
 Recording must never break the user's request, so every failure here is only logged.
 No secrets (passwords, tokens, keys) are ever put into an event.
@@ -45,6 +46,7 @@ EVENT_TYPES: dict[str, tuple[str, str]] = {
     "file_threat": ("high", "Potential file threat"),
     "download_anomaly": ("medium", "Unusually many downloads"),
     "admin_action": ("info", "Admin action"),
+    "vault_locked": ("high", "Vault locked after wrong passwords"),
 }
 SEVERITIES = ("high", "medium", "low", "info")
 

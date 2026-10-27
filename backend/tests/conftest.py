@@ -61,6 +61,7 @@ def _delete_test_files(user_ids: list[str]) -> None:
         file_ids = [str(doc["_id"]) for doc in db["files"].find({"owner_id": {"$in": user_ids}})]
         db["security_events"].delete_many({"details.file_id": {"$in": file_ids}})
         db["files"].delete_many({"owner_id": {"$in": user_ids}})
+        db["vault_files"].delete_many({"owner_id": {"$in": user_ids}})
         db["folders"].delete_many({"owner_id": {"$in": user_ids}})
         db["favorites"].delete_many({"user_id": {"$in": user_ids}})
         db["activity_logs"].delete_many({"user_id": {"$in": user_ids}})

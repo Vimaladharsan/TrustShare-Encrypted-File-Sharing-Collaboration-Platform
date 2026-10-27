@@ -79,7 +79,7 @@ class FileService:
 
             temp = self.storage.temp_path(uuid.uuid4().hex)
             try:
-                size, sha256 = await self._receive(upload, temp, extension)
+                size, sha256 = await self.receive_upload(upload, temp, extension)
                 if used + size > user.storage_quota_bytes:
                     raise self._quota_error()
                 if not await asyncio.to_thread(office_structure_ok, extension, temp):
@@ -97,7 +97,7 @@ class FileService:
             finally:
                 await asyncio.to_thread(temp.unlink, missing_ok=True)
         except AppError as exc:
-            await self._security_check(user, name, exc)
+            await self.report_rejected_upload(user, name, exc)
             await self.activity.log(
                 self.request,
                 user,
@@ -144,7 +144,9 @@ class FileService:
         logger.info("File uploaded: %s (%d bytes) by %s", doc["_id"], size, user.id)
         return doc
 
-    async def _receive(self, upload: UploadFile, temp: Path, extension: str) -> tuple[int, str]:
+    async def receive_upload(
+        self, upload: UploadFile, temp: Path, extension: str
+    ) -> tuple[int, str]:
         """Copy the upload to a temp file in 1 MB chunks: count the size (stop at the limit),
         compute the SHA-256 fingerprint, and check the first bytes – all in one pass."""
         max_bytes = get_settings().max_upload_bytes
@@ -171,7 +173,7 @@ class FileService:
     def _type_mismatch() -> AppError:
         return AppError("UNSUPPORTED_FILE_TYPE", TYPE_MISMATCH, 415)
 
-    async def _security_check(self, user: User, name: str, exc: AppError) -> None:
+    async def report_rejected_upload(self, user: User, name: str, exc: AppError) -> None:
         """Rejected uploads worth an admin's attention: disguised files and disallowed types."""
         if exc.code != "UNSUPPORTED_FILE_TYPE":
             return

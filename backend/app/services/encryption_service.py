@@ -30,6 +30,7 @@ from typing import BinaryIO
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from app.crypto import vault_crypto
 from app.crypto.keyring import Keyring, KeyUnwrapError, get_keyring
 
 ALGORITHM = "AES-256-GCM"
@@ -176,18 +177,42 @@ class EncryptionService:
     def __init__(self, keyring: Keyring | None = None) -> None:
         self.keyring = keyring or get_keyring()
 
-    def new_file_key(self, file_id: str) -> tuple[bytes, EncryptedKey]:
-        """A fresh DEK for a file, plus its wrapped form to store."""
+    def new_file_key(
+        self, file_id: str, vault_key: bytes | None = None
+    ) -> tuple[bytes, EncryptedKey]:
+        """A fresh DEK for a file, plus its wrapped form to store. With a vault key the DEK is
+        first sealed with it (inner lock), then wrapped by the master key as usual."""
         dek = generate_dek()
-        wrapped, version = self.keyring.wrap(dek, file_id)
-        return dek, EncryptedKey(wrapped, version)
+        return dek, self.wrap_file_key(file_id, dek, vault_key)
 
-    def open_file_key(self, file_id: str, stored: EncryptedKey) -> bytes:
+    def wrap_file_key(
+        self, file_id: str, dek: bytes, vault_key: bytes | None = None
+    ) -> EncryptedKey:
+        inner = vault_crypto.seal_key(vault_key, dek, file_id) if vault_key else dek
+        wrapped, version = self.keyring.wrap(inner, file_id)
+        return EncryptedKey(wrapped, version)
+
+    def open_file_key(
+        self, file_id: str, stored: EncryptedKey, vault_key: bytes | None = None
+    ) -> bytes:
         """Unwrap a stored DEK. Raises DecryptionError if the wrapped key doesn't verify."""
         try:
-            return self.keyring.unwrap(stored.wrapped_key, stored.key_version, file_id)
-        except KeyUnwrapError as exc:
+            inner = self.keyring.unwrap(stored.wrapped_key, stored.key_version, file_id)
+            return vault_crypto.open_key(vault_key, inner, file_id) if vault_key else inner
+        except (KeyUnwrapError, vault_crypto.VaultKeyError) as exc:
             raise DecryptionError(str(exc)) from exc
+
+    def rekey(
+        self,
+        file_id: str,
+        stored: EncryptedKey,
+        old_vault_key: bytes | None,
+        new_vault_key: bytes | None,
+    ) -> EncryptedKey:
+        """Move a file key into / out of a vault, or to a new vault password. Only the key is
+        re-locked - the file's encrypted bytes don't change."""
+        dek = self.open_file_key(file_id, stored, old_vault_key)
+        return self.wrap_file_key(file_id, dek, new_vault_key)
 
     def rewrap(self, file_id: str, stored: EncryptedKey) -> EncryptedKey:
         """Key rotation: re-wrap a DEK with the active master key (the file itself is untouched)."""

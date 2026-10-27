@@ -18,6 +18,7 @@ import RecentPage from './pages/RecentPage';
 import RegisterPage from './pages/RegisterPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import SecurityPage from './pages/SecurityPage';
+import VaultPage from './pages/VaultPage';
 import SettingsPage from './pages/SettingsPage';
 import SharedByMePage from './pages/SharedByMePage';
 import SharedWithMePage from './pages/SharedWithMePage';
@@ -70,6 +71,7 @@ export default function App() {
         <Route path="/recent" element={<RecentPage />} />
         <Route path="/favorites" element={<FavoritesPage />} />
         <Route path="/trash" element={<TrashPage />} />
+        <Route path="/vault" element={<VaultPage />} />
         <Route path="/storage" element={<StoragePage />} />
         <Route path="/analytics" element={lazyPage(<AnalyticsPage />)} />
         <Route path="/activity" element={<ActivityPage />} />

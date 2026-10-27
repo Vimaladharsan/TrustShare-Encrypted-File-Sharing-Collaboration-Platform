@@ -12,6 +12,7 @@ import {
   ShieldEllipsis,
   Star,
   Trash2,
+  Vault,
 } from 'lucide-react';
 import { NavLink } from 'react-router';
 
@@ -31,6 +32,7 @@ const SECTIONS = [
       { to: '/shared-by-me', label: 'Shared by me', icon: Share2, permission: 'share:create' },
       { to: '/recent', label: 'Recent', icon: Clock },
       { to: '/favorites', label: 'Favorites', icon: Star },
+      { to: '/vault', label: 'Secure vault', icon: Vault, permission: 'file:upload' },
       { to: '/trash', label: 'Trash', icon: Trash2 },
     ],
   },

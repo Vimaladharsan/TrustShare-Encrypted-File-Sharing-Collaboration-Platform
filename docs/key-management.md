@@ -128,6 +128,32 @@ host never sees the master key – the `Keyring` is the single place to swap in 
 
 ---
 
+## 5a. Secure vault (extra encryption with the user's vault password)
+
+Vault files get a second, user-held lock (`app/crypto/vault_crypto.py`):
+
+```
+vault key   = scrypt(vault password, random 16-byte salt, N=2^15, r=8, p=1)   – never stored
+verifier    = HMAC-SHA256(vault key, "trustshare-vault")                      – stored in vaults
+inner       = AES-256-GCM(vault key, DEK, AAD="trustshare:vault:<file id>")
+file_keys   = Keyring.wrap(inner)                                             – usual envelope
+name_sealed = AES-256-GCM(vault key, file name, AAD="trustshare:vault-name:<file id>")
+```
+
+- Opening a vault file needs **both** the master key (server) and the vault password (user). With
+  the master key alone, unwrapping gives only the 60-byte sealed inner key, not the DEK.
+- The password is sent with every request (`X-Vault-Password`, URL-encoded), the key is derived,
+  checked against the verifier in constant time, used for that request and dropped.
+- Master-key rotation is unchanged: `rotate_keys` re-wraps the outer layer only.
+- Moving a file in/out of the vault and changing the vault password only re-lock the DEK
+  (`EncryptionService.rekey`); the encrypted object is never rewritten.
+- **Recovery:** there is none by design. A forgotten vault password means the vault can only be
+  reset (files deleted after the account password is confirmed).
+- Brute force: scrypt makes each guess slow and memory-hard; 5 wrong passwords lock the vault for
+  15 minutes (Redis) and record a `vault_locked` (high) security event.
+
+---
+
 ## 6. Error handling
 
 | Situation | Behaviour |

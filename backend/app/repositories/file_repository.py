@@ -39,15 +39,18 @@ class FileRepository:
         )
 
     async def used_bytes(self, owner_id: str) -> int:
-        """Total size of everything the user stores (trashed files still count)."""
-        cursor = await self.files.aggregate(
-            [
-                {"$match": {"owner_id": owner_id}},
-                {"$group": {"_id": None, "used": {"$sum": "$size_bytes"}}},
-            ]
-        )
-        result = await cursor.to_list(length=1)
-        return result[0]["used"] if result else 0
+        """Total size of everything the user stores (trashed files and the vault still count)."""
+        used = 0
+        for collection in (self.files, self.files.database["vault_files"]):
+            cursor = await collection.aggregate(
+                [
+                    {"$match": {"owner_id": owner_id}},
+                    {"$group": {"_id": None, "used": {"$sum": "$size_bytes"}}},
+                ]
+            )
+            result = await cursor.to_list(length=1)
+            used += result[0]["used"] if result else 0
+        return used
 
     async def update(self, file_id: ObjectId, changes: dict[str, Any]) -> None:
         await self.files.update_one({"_id": file_id}, {"$set": changes})

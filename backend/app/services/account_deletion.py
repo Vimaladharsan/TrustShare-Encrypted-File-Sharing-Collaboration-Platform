@@ -2,9 +2,10 @@
 admin deleting an account that has been inactive for 30+ days. One implementation, so both
 remove exactly the same things.
 
-Removed: every encrypted object and its key (crypto-shredding), file metadata, folders,
-favorites, shares (database cascade), MFA codes and Google links (cascade), all sessions, any
-lockout – then the account row. The activity log is kept: it is the audit trail.
+Removed: every encrypted object and its key (crypto-shredding), file metadata, vault files,
+folders, favorites, shares (database cascade), MFA codes, Google links and the vault row
+(cascade), all sessions, any lockout – then the account row.
+The activity log is kept: it is the audit trail.
 """
 
 from typing import Any
@@ -38,6 +39,11 @@ async def erase_account(
     for doc in owned:  # deleting a missing object is a no-op, so a retry is harmless
         await storage.delete(doc)  # encrypted object + its key + its shares
     await files.delete_all_owned(owner_id)
+    vault = db["vault_files"]
+    vault_docs = await vault.find({"owner_id": owner_id}).to_list(length=None)
+    for doc in vault_docs:  # the vault row itself goes with the user (database cascade)
+        await storage.delete(doc)
+    await vault.delete_many({"owner_id": owner_id})
     await FolderRepository(db).delete_all_owned(owner_id)
     await FavoriteRepository(db).delete_for_user(owner_id)
 
@@ -46,6 +52,6 @@ async def erase_account(
     await SessionService(redis).revoke_all(user_id)  # logged out everywhere, tokens rejected
     await LoginGuard(redis).unlock(user_id)
     return {
-        "files_deleted": len(owned),
-        "bytes_freed": sum(doc["size_bytes"] for doc in owned),
+        "files_deleted": len(owned) + len(vault_docs),
+        "bytes_freed": sum(doc["size_bytes"] for doc in [*owned, *vault_docs]),
     }

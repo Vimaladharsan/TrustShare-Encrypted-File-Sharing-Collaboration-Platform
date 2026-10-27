@@ -62,6 +62,9 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("type", ASCENDING), ("created_at", DESCENDING)], name="type_created"),
         IndexModel([("severity", ASCENDING), ("created_at", DESCENDING)], name="severity_created"),
     ],
+    "vault_files": [
+        IndexModel([("owner_id", ASCENDING), ("created_at", DESCENDING)], name="owner_created"),
+    ],
     "favorites": [
         IndexModel([("user_id", ASCENDING), ("file_id", ASCENDING)], name="user_file", unique=True),
     ],

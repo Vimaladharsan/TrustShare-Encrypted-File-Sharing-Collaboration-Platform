@@ -11,6 +11,7 @@ import {
   StarOff,
   Trash2,
   Upload,
+  Vault,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router';
@@ -29,6 +30,7 @@ import {
   updateFile,
   updateFolder,
 } from '../api/files';
+import { moveIntoVault } from '../api/vault';
 import { useAuth } from '../auth/useAuth';
 import Button from '../components/Button';
 import Breadcrumbs from '../components/files/Breadcrumbs';
@@ -40,6 +42,7 @@ import MoveDialog from '../components/MoveDialog';
 import NameDialog from '../components/NameDialog';
 import ShareDialog from '../components/shares/ShareDialog';
 import { Empty, ErrorState, Loading } from '../components/StateMessage';
+import VaultPasswordDialog from '../components/vault/VaultPasswordDialog';
 import { CATEGORIES } from '../utils/format';
 
 /**
@@ -144,6 +147,11 @@ export default function FilesPage({ mode = 'folder' }) {
       label: 'Move to…',
       icon: FolderInput,
       onClick: () => setDialog({ type: 'moveFile', item: file }),
+    },
+    canUpload && {
+      label: 'Move to vault',
+      icon: Vault,
+      onClick: () => setDialog({ type: 'moveToVault', item: file }),
     },
     canEditFiles && {
       label: 'Move to trash',
@@ -361,6 +369,19 @@ export default function FilesPage({ mode = 'folder' }) {
             toast.success('File moved');
             load();
           }}
+        />
+      )}
+      {dialog?.type === 'moveToVault' && (
+        <VaultPasswordDialog
+          title="Move to secure vault"
+          description={`“${dialog.item.name}” will be sealed with your vault password. Its share links stop working, and it disappears from My Files, search and Recent.`}
+          confirmLabel="Move to vault"
+          onConfirm={async (password) => {
+            await moveIntoVault(dialog.item.id, password);
+            toast.success(`“${dialog.item.name}” moved to your vault`);
+            load();
+          }}
+          onClose={() => setDialog(null)}
         />
       )}
       {dialog?.type === 'moveFolder' && (

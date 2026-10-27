@@ -60,6 +60,13 @@ TrustShare is built milestone by milestone. **Milestone 1** (foundation: auth, R
 - **Direct sharing** with registered users ("Shared with me" / "Shared by me"); the recipient gets an email notice
 - Every access re-checks revocation, expiry, limit, file status and the owner's account and permissions – trashing a file or disabling its owner stops all links at once
 
+### Secure vault
+- A private, password-protected place per user for the most sensitive files, with a **separate vault password** (must differ from the login password)
+- **Extra encryption:** each vault file's key is sealed with a key derived from the vault password (scrypt) *inside* the normal master-key envelope, and file names are encrypted too – without the vault password nobody can open them, not even someone with the database and master keys
+- The password is asked for **every** action (list, open, add, rename, delete, move) and never kept; 5 wrong passwords lock the vault for 15 minutes and raise a high-severity security event
+- Private only: no sharing, not in search, Recent or the normal file list; "Move to vault" / "Move to My Files" only re-lock the key (the encrypted file isn't touched)
+- Change the vault password (every key re-locked) or, if it's forgotten, reset the vault (deletes its files – they can't be recovered by design); vault files count toward the storage quota and are erased with the account
+
 ### Dashboards (Milestone 2)
 - **User:** Dashboard, Recent, Favorites, Storage breakdown, **File Analytics** (storage by type, uploads, downloads incl. unique users and shared downloads, sharing trends, date range, change vs previous period), own Activity Logs, and a Security page
 - **Admin panel:** **Security Dashboard** (logins, failed logins, unauthorized and blocked attempts, security events by severity, recent logins with IP and location), audit log viewer with **CSV export** (formula-injection safe, the export itself is audited), storage per account (sizes only – admins can't open users' files), sharing reports, system monitoring
@@ -292,6 +299,7 @@ Interactive documentation is available at `/docs` while the backend is running.
 | Files | `POST /api/files` (upload), `GET /api/files`, `GET /api/files/usage`, `GET/PATCH/DELETE /api/files/{id}`, `GET /api/files/{id}/download`, `GET /api/files/{id}/preview`, `POST /api/files/{id}/trash`, `/restore` |
 | Folders | `GET/POST /api/folders`, `GET/PATCH/DELETE /api/folders/{id}`, `POST /api/folders/{id}/trash`, `/restore` |
 | Trash | `POST /api/trash/restore`, `/delete`, `/restore-all`, `/empty` |
+| Secure vault | `GET/POST /api/vault` (status / create), `POST /api/vault/password`, `POST /api/vault/reset`, `GET/POST /api/vault/files`, `GET /api/vault/files/{id}/preview` · `/download`, `PATCH/DELETE /api/vault/files/{id}`, `POST /api/vault/files/{id}/move-out`, `POST /api/vault/import/{file_id}` – file routes need the `X-Vault-Password` header |
 | Sharing (M2) | `POST/GET /api/files/{id}/shares` (create link or direct share / list), `GET /api/shares/sent`, `GET /api/shares/received`, `DELETE /api/shares/{id}` (revoke), `GET /api/shares/{id}/preview` · `/download` (recipient) |
 | Analytics (M2) | `GET /api/analytics/me?from&to&tz`, `GET /api/files/storage`, `GET /api/files/recent`, `GET /api/files/favorites`, `PUT/DELETE /api/files/{id}/favorite`, `GET /api/activity/me` |
 | Admin reports (M2) | `GET /api/admin/overview` (`user:read`), `GET /api/admin/security/overview`, `/security/logins`, `/security/events`, `GET /api/admin/audit`, `GET /api/admin/audit/export` (CSV) (`audit:read`) |

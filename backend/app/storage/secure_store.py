@@ -72,9 +72,12 @@ class SecureFileStore:
 
     # ---------- write ----------
 
-    async def store(self, file_id: str, owner_id: uuid.UUID, plaintext: Path) -> dict[str, Any]:
-        """Encrypt a validated file and store it. Returns the storage fields for the metadata."""
-        dek, wrapped = self.encryption.new_file_key(file_id)
+    async def store(
+        self, file_id: str, owner_id: uuid.UUID, plaintext: Path, vault_key: bytes | None = None
+    ) -> dict[str, Any]:
+        """Encrypt a validated file and store it. Returns the storage fields for the metadata.
+        `vault_key`: a vault file - its key also needs the vault password to open."""
+        dek, wrapped = self.encryption.new_file_key(file_id, vault_key)
         encrypted = plaintext.with_name(plaintext.name + ".enc")
         key = f"{owner_id}/{uuid.uuid4()}"  # random object name – never the user's filename
         try:
@@ -103,7 +106,9 @@ class SecureFileStore:
 
     # ---------- read ----------
 
-    async def open(self, doc: dict[str, Any]) -> AsyncIterator[bytes]:
+    async def open(
+        self, doc: dict[str, Any], vault_key: bytes | None = None
+    ) -> AsyncIterator[bytes]:
         """Verified plaintext of a stored file. Raises AppError before anything is sent if the
         key is missing or the first chunk fails its integrity check."""
         if not doc.get("encryption"):
@@ -116,7 +121,7 @@ class SecureFileStore:
             await _file_threat(file_id, "encryption key missing")
             raise integrity_error()
         try:
-            dek = self.encryption.open_file_key(file_id, stored)
+            dek = self.encryption.open_file_key(file_id, stored, vault_key)
         except DecryptionError as exc:
             logger.error("Could not unwrap the key of file %s: %s", file_id, exc)
             await _file_threat(file_id, "key could not be unwrapped")
@@ -130,6 +135,23 @@ class SecureFileStore:
             await _file_threat(file_id, "encrypted data failed its integrity check")
             raise integrity_error() from exc
         return _chain(first, plaintext, file_id)
+
+    async def rekey(
+        self, doc: dict[str, Any], old_vault_key: bytes | None, new_vault_key: bytes | None
+    ) -> None:
+        """Move a file's key into / out of a vault (or to a new vault password) - the encrypted
+        object itself is not touched. The caller commits."""
+        file_id = str(doc["_id"])
+        stored = await self.keys.get(file_id)
+        if stored is None:
+            await _file_threat(file_id, "encryption key missing")
+            raise integrity_error()
+        try:
+            new = self.encryption.rekey(file_id, stored, old_vault_key, new_vault_key)
+        except DecryptionError as exc:
+            await _file_threat(file_id, "key could not be unwrapped")
+            raise integrity_error() from exc
+        await self.keys.set(file_id, new)
 
     # ---------- delete ----------
 

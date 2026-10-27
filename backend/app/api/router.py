@@ -13,6 +13,7 @@ from app.api.routes import (
     shares,
     trash,
     users,
+    vault,
 )
 
 api_router = APIRouter(prefix="/api")
@@ -27,3 +28,4 @@ api_router.include_router(trash.router)
 api_router.include_router(shares.router)
 api_router.include_router(shares.public_router)
 api_router.include_router(analytics.router)
+api_router.include_router(vault.router)

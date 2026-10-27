@@ -44,6 +44,9 @@ async def remove(domain: str) -> int:
                 for doc in await db["files"].find({"owner_id": owner}).to_list(length=None):
                     await store.delete(doc)  # object + key + shares
                 await db["files"].delete_many({"owner_id": owner})
+                for doc in await db["vault_files"].find({"owner_id": owner}).to_list(length=None):
+                    await store.delete(doc)  # vault files too (the vault row cascades)
+                await db["vault_files"].delete_many({"owner_id": owner})
                 await db["folders"].delete_many({"owner_id": owner})
                 await db["favorites"].delete_many({"user_id": owner})
                 await db["activity_logs"].delete_many(
