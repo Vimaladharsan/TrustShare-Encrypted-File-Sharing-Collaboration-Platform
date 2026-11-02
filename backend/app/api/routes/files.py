@@ -14,8 +14,17 @@ from app.repositories.favorite_repository import FavoriteRepository
 from app.repositories.file_repository import ALL_FOLDERS, FileRepository, to_object_id
 from app.repositories.folder_repository import FolderRepository
 from app.schemas.analytics import RecentFilesResponse, StorageReport
-from app.schemas.file import FileInfo, FileListResponse, FileUpdate, StorageUsageResponse
+from app.schemas.file import (
+    FileBulkMove,
+    FileInfo,
+    FileListResponse,
+    FileSelection,
+    FileUpdate,
+    StorageUsageResponse,
+)
+from app.schemas.trash import BulkResult
 from app.services.analytics_service import AnalyticsService
+from app.services.bulk_file_service import BulkFileService, zip_filename
 from app.services.file_service import FileService
 from app.storage.secure_store import SecureFileStore, get_file_store
 
@@ -45,6 +54,52 @@ async def upload_file(
 ) -> FileInfo:
     doc = await service.upload(user, file, folder_id, allow_duplicate)
     return FileInfo.from_doc(doc)
+
+
+def bulk_service(
+    request: Request,
+    db: AsyncDatabase = Depends(get_mongo),
+    storage: SecureFileStore = Depends(get_file_store),
+) -> BulkFileService:
+    return BulkFileService(db, storage, request)
+
+
+# ---------- several files at once (declared before "/{file_id}/…" so "bulk" isn't an id) ----------
+
+
+@router.post("/bulk/move", response_model=BulkResult, summary="Move the selected files")
+async def move_selected(
+    data: FileBulkMove,
+    user: User = Depends(can_update_files),
+    service: BulkFileService = Depends(bulk_service),
+) -> BulkResult:
+    return BulkResult(**await service.move(user, data.file_ids, data.folder_id))
+
+
+@router.post("/bulk/trash", response_model=BulkResult, summary="Move the selected files to trash")
+async def trash_selected(
+    data: FileSelection,
+    user: User = Depends(can_update_files),
+    service: BulkFileService = Depends(bulk_service),
+) -> BulkResult:
+    return BulkResult(**await service.trash(user, data.file_ids))
+
+
+@router.post("/bulk/download", summary="Download the selected files as one ZIP")
+async def download_selected(
+    data: FileSelection,
+    user: User = Depends(can_read_files),
+    service: BulkFileService = Depends(bulk_service),
+) -> StreamingResponse:
+    stream = await service.download_zip(user, data.file_ids)
+    return StreamingResponse(
+        stream,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": _disposition("attachment", zip_filename(len(data.file_ids))),
+            "Cache-Control": "private, no-store",
+        },
+    )
 
 
 @router.get("", response_model=FileListResponse, summary="List my files")

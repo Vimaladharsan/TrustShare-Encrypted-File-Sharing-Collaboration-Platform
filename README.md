@@ -44,6 +44,7 @@ TrustShare is built milestone by milestone. **Milestone 1** (foundation: auth, R
 - Drive-like layout: sidebar, search across all folders, storage meter, account menu
 - Nested folders with breadcrumbs; create, rename and move files and folders
 - Category filters, sortable file table, download, and **in-app preview** of PDFs, images and text files (served in a sandbox)
+- **Multi-select** in My Files and search: tick files, then move them, trash them or **download them as one ZIP** (decrypted on the fly into the archive – never written to disk; a ZIP counts once for the excessive-downloads rule)
 - Trash with restore, bulk restore/delete, empty trash and permanent delete
 - Loading, empty and error states; responsive layout
 - Buttons adapt to the user's permissions (enforced by the backend regardless)
@@ -308,7 +309,7 @@ See [.env.example](.env.example).
 
 Milestone 3 settings (optional): detection thresholds `DETECT_FAILED_LOGINS_LIMIT`/`_MINUTES` (5 / 10), `DETECT_UNAUTHORIZED_*` (4 / 10), `DETECT_DOWNLOADS_*` (20 / 5), `DETECT_EXPIRED_LINK_*` and `DETECT_REVOKED_LINK_*` (2 / 10) – an alert fires when the count goes above the limit; `SCHEDULER_ENABLED` (true), `SCHEDULER_INTERVAL_SECONDS` (300), `LINK_REMINDER_HOURS` (24), `DOWNLOAD_NOTICE_COOLDOWN_MINUTES` (10), `ADMIN_ALERT_EMAIL_COOLDOWN_MINUTES` (15), `SSE_HEARTBEAT_SECONDS` (25), `SSE_MAX_SECONDS` (3600).
 
-Optional settings with defaults include `MAX_UPLOAD_MB` (25), `DEFAULT_QUOTA_MB` (1024), `ACCESS_TOKEN_TTL_MINUTES` (15), `REFRESH_TOKEN_TTL_DAYS` (7), `MAX_FAILED_LOGINS` (5), `LOCKOUT_MINUTES` (15), `SHARE_LINK_MAX_DAYS` (30), `SHARE_LINK_RATE_LIMIT_PER_MINUTE` (60) and `INACTIVE_ACCOUNT_DAYS` (30).
+Optional settings with defaults include `MAX_UPLOAD_MB` (25), `DEFAULT_QUOTA_MB` (1024), `ZIP_MAX_FILES` (100), `ZIP_MAX_MB` (250), `ACCESS_TOKEN_TTL_MINUTES` (15), `REFRESH_TOKEN_TTL_DAYS` (7), `MAX_FAILED_LOGINS` (5), `LOCKOUT_MINUTES` (15), `SHARE_LINK_MAX_DAYS` (30), `SHARE_LINK_RATE_LIMIT_PER_MINUTE` (60) and `INACTIVE_ACCOUNT_DAYS` (30).
 
 > **Never commit `.env` files or secrets.**
 
@@ -322,7 +323,7 @@ Interactive documentation is available at `/docs` while the backend is running.
 | Auth | `POST /api/auth/register`, `/login`, `/mfa/verify`, `/refresh`, `/logout`, `/logout-all`, `/forgot-password`, `/reset-password`, `/verify-email`, `/verify-email/resend`; `GET /api/auth/providers`, `/google/login`, `/google/callback` |
 | Profile & MFA | `GET` · `PATCH` · `DELETE /api/users/me`, `POST /api/users/me/password`, `GET /api/users/me/sessions`, `DELETE /api/users/me/sessions/{id}`, `GET /api/users/me/mfa`, `POST /api/users/me/mfa/setup`, `/enable`, `/disable`, `/backup-codes` |
 | Admin | `GET /api/admin/users` (requires `user:read`), `PATCH /api/admin/users/{id}` (role, enable/disable), `POST /api/admin/users/{id}/unlock` (require `user:manage`), `DELETE /api/admin/users/{id}` (inactive 30+ days, requires `user:delete_inactive`) |
-| Files | `POST /api/files` (upload), `GET /api/files`, `GET /api/files/usage`, `GET/PATCH/DELETE /api/files/{id}`, `GET /api/files/{id}/download`, `GET /api/files/{id}/preview`, `POST /api/files/{id}/trash`, `/restore` |
+| Files | `POST /api/files` (upload), `GET /api/files`, `GET /api/files/usage`, `GET/PATCH/DELETE /api/files/{id}`, `GET /api/files/{id}/download`, `GET /api/files/{id}/preview`, `POST /api/files/{id}/trash`, `/restore`, `POST /api/files/bulk/move`, `/bulk/trash`, `/bulk/download` (ZIP) |
 | Folders | `GET/POST /api/folders`, `GET/PATCH/DELETE /api/folders/{id}`, `POST /api/folders/{id}/trash`, `/restore` |
 | Trash | `POST /api/trash/restore`, `/delete`, `/restore-all`, `/empty` |
 | Secure vault | `GET/POST /api/vault` (status / create), `POST /api/vault/password`, `POST /api/vault/reset`, `GET/POST /api/vault/files`, `GET /api/vault/files/{id}/preview` · `/download`, `PATCH/DELETE /api/vault/files/{id}`, `POST /api/vault/files/{id}/move-out`, `POST /api/vault/import/{file_id}` – file routes need the `X-Vault-Password` header |

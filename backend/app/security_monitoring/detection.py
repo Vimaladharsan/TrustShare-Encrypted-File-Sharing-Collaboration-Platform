@@ -76,8 +76,14 @@ RULES: list[Rule] = [
     ),
     Rule(
         name="excessive_downloads",
-        activity="file downloads",
-        applies=lambda a: a["action"] in ("file.download", "vault.file_downloaded"),
+        activity="file downloads (a ZIP of several files counts once)",
+        applies=lambda a: (
+            a["action"] == "file.download_zip"
+            or (
+                a["action"] in ("file.download", "vault.file_downloaded")
+                and (a.get("details") or {}).get("via") != "zip"
+            )
+        ),
         subject=_user_or_ip,
         setting="downloads",
         subject_kind="user or IP",

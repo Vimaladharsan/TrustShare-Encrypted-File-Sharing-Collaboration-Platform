@@ -10,7 +10,7 @@ import Modal from './Modal';
  * Lets the user browse folders and pick a destination.
  * excludeId: a folder being moved can't be opened/chosen as its own destination.
  */
-export default function MoveDialog({ itemName, excludeId, onMove, onClose }) {
+export default function MoveDialog({ itemName, title, excludeId, onMove, onClose }) {
   const [location, setLocation] = useState(null); // null = top level ("My Files")
   const [crumbs, setCrumbs] = useState([]);
   const [folders, setFolders] = useState([]);
@@ -54,7 +54,7 @@ export default function MoveDialog({ itemName, excludeId, onMove, onClose }) {
   }
 
   return (
-    <Modal title={`Move “${itemName}”`} onClose={onClose}>
+    <Modal title={title || `Move “${itemName}”`} onClose={onClose}>
       <nav className="flex flex-wrap items-center gap-1 text-sm" aria-label="Destination">
         <button
           type="button"

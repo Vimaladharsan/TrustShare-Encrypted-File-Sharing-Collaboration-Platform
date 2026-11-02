@@ -66,6 +66,32 @@ export async function downloadFile(file) {
   saveBlob(response.data, file.name);
 }
 
+// ---------- several files (My Files multi-select) ----------
+// Move and trash return { succeeded, failed: [{ id, type, code, message }] }, like the trash.
+
+export async function moveSelectedFiles(fileIds, folderId) {
+  const { data } = await api.post('/files/bulk/move', {
+    file_ids: fileIds,
+    folder_id: folderId || null,
+  });
+  return data;
+}
+
+export async function trashSelectedFiles(fileIds) {
+  const { data } = await api.post('/files/bulk/trash', { file_ids: fileIds });
+  return data;
+}
+
+/** The selected files as one ZIP (built and decrypted on the server while it downloads). */
+export async function downloadSelectedFiles(fileIds) {
+  const response = await api.post(
+    '/files/bulk/download',
+    { file_ids: fileIds },
+    { responseType: 'blob', timeout: 0 },
+  );
+  saveBlob(response.data, `TrustShare-${fileIds.length}-files.zip`);
+}
+
 /** Types the browser can display (same list as the backend's PREVIEWABLE). */
 export const PREVIEWABLE = ['pdf', 'png', 'jpg', 'jpeg', 'txt', 'csv'];
 

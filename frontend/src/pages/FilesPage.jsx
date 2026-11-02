@@ -12,6 +12,7 @@ import {
   Trash2,
   Upload,
   Vault,
+  X,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router';
@@ -22,11 +23,14 @@ import { getErrorMessage } from '../api/client';
 import {
   createFolder,
   downloadFile,
+  downloadSelectedFiles,
   getFolder,
   listFiles,
   listFolders,
+  moveSelectedFiles,
   trashFile,
   trashFolder,
+  trashSelectedFiles,
   updateFile,
   updateFolder,
 } from '../api/files';
@@ -43,7 +47,10 @@ import NameDialog from '../components/NameDialog';
 import ShareDialog from '../components/shares/ShareDialog';
 import { Empty, ErrorState, Loading } from '../components/StateMessage';
 import VaultPasswordDialog from '../components/vault/VaultPasswordDialog';
-import { CATEGORIES } from '../utils/format';
+import { CATEGORIES, formatBytes } from '../utils/format';
+
+const ZIP_MAX_FILES = 100; // same limit as the backend (ZIP_MAX_FILES)
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 /**
  * "My Files" (top level), one folder (/folders/:folderId), or search results (/search?q=).
@@ -64,9 +71,12 @@ export default function FilesPage({ mode = 'folder' }) {
   const [sort, setSort] = useState({ by: 'date', order: 'desc' });
   const [category, setCategory] = useState('');
   const [dialog, setDialog] = useState(null); // { type, item }
+  const [selected, setSelected] = useState(new Set()); // ticked file ids
+  const [zipping, setZipping] = useState(false);
 
   const load = useCallback(async () => {
     setStatus('loading');
+    setSelected(new Set()); // a new folder, filter or search starts with nothing ticked
     try {
       const fileOptions = { category, sort: sort.by, order: sort.order };
       if (mode === 'search') {
@@ -103,6 +113,49 @@ export default function FilesPage({ mode = 'folder' }) {
       refreshUsage();
     } catch (err) {
       toast.error(getErrorMessage(err));
+    }
+  }
+
+  function toggleSelected(id) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  /** Runs a bulk action; one toast sums up the result (some files may fail, e.g. already moved). */
+  async function runBulk(action, doneMessage) {
+    try {
+      const result = await action();
+      if (result.failed.length) {
+        toast.warning(
+          `${result.succeeded} done, ${result.failed.length} couldn't be processed: ${result.failed[0].message}`,
+        );
+      } else {
+        toast.success(doneMessage(result.succeeded));
+      }
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+    load();
+    refreshUsage();
+  }
+
+  async function downloadTicked() {
+    if (selected.size > ZIP_MAX_FILES) {
+      toast.error(`Select at most ${ZIP_MAX_FILES} files for one ZIP.`);
+      return;
+    }
+    setZipping(true);
+    try {
+      await downloadSelectedFiles([...selected]);
+      toast.success(`${plural(selected.size, 'file')} downloaded as a ZIP`);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setZipping(false);
     }
   }
 
@@ -184,6 +237,7 @@ export default function FilesPage({ mode = 'folder' }) {
       : [];
 
   const isEmpty = folders.length === 0 && files.length === 0;
+  const selectedBytes = files.reduce((sum, f) => sum + (selected.has(f.id) ? f.size_bytes : 0), 0);
 
   return (
     <div>
@@ -280,17 +334,68 @@ export default function FilesPage({ mode = 'folder' }) {
             )}
             {files.length > 0 && (
               <section>
-                <h2 className="eyebrow mb-3 flex items-center gap-2">
-                  Files
-                  <span className="rounded-full bg-slate-200/70 px-1.5 py-px text-[10px] text-slate-500">
-                    {files.length}
-                  </span>
-                </h2>
+                <div className="mb-3 flex min-h-9 flex-wrap items-center justify-between gap-2">
+                  <h2 className="eyebrow flex items-center gap-2">
+                    Files
+                    <span className="rounded-full bg-slate-200/70 px-1.5 py-px text-[10px] text-slate-500">
+                      {files.length}
+                    </span>
+                  </h2>
+                  {/* ---------- selection toolbar: acts on the ticked files ---------- */}
+                  {selected.size > 0 && (
+                    <div
+                      className="flex flex-wrap items-center gap-2"
+                      role="toolbar"
+                      aria-label="Selected files"
+                    >
+                      <span className="text-sm text-slate-600">
+                        {selected.size} selected · {formatBytes(selectedBytes)}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        loading={zipping}
+                        onClick={downloadTicked}
+                      >
+                        {!zipping && <Download className="size-3.5" aria-hidden="true" />}
+                        {zipping ? 'Preparing ZIP…' : 'Download ZIP'}
+                      </Button>
+                      {canEditFiles && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => setDialog({ type: 'moveSelected' })}
+                        >
+                          <FolderInput className="size-3.5" aria-hidden="true" /> Move to…
+                        </Button>
+                      )}
+                      {canEditFiles && (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() =>
+                            runBulk(
+                              () => trashSelectedFiles([...selected]),
+                              (n) => `${plural(n, 'file')} moved to trash`,
+                            )
+                          }
+                        >
+                          <Trash2 className="size-3.5" aria-hidden="true" /> Move to trash
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+                        <X className="size-3.5" aria-hidden="true" /> Clear
+                      </Button>
+                    </div>
+                  )}
+                </div>
                 <FileTable
                   files={files}
                   sort={sort}
                   onSort={toggleSort}
                   actionsFor={fileActions}
+                  selected={selected}
+                  onToggle={toggleSelected}
                   onOpen={(file) => setDialog({ type: 'preview', item: file })}
                 />
               </section>
@@ -368,6 +473,19 @@ export default function FilesPage({ mode = 'folder' }) {
             await updateFile(dialog.item.id, { folder_id: destination });
             toast.success('File moved');
             load();
+          }}
+        />
+      )}
+      {dialog?.type === 'moveSelected' && (
+        <MoveDialog
+          title={`Move ${plural(selected.size, 'file')}`}
+          itemName={plural(selected.size, 'file')}
+          onClose={() => setDialog(null)}
+          onMove={async (destination) => {
+            await runBulk(
+              () => moveSelectedFiles([...selected], destination),
+              (n) => `${plural(n, 'file')} moved`,
+            );
           }}
         />
       )}

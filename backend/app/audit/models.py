@@ -71,6 +71,7 @@ DESCRIPTIONS: dict[str, str] = {
     "file.upload": "Uploaded a file ({size})",
     "file.upload_rejected": "File upload rejected ({reason})",
     "file.download": "Downloaded a file (via {via})",
+    "file.download_zip": "Downloaded {count} files as one ZIP ({size})",
     "file.preview": "Opened a file preview",
     "file.access_denied": "Tried to open a file without permission",
     "file.rename": "Renamed a file",

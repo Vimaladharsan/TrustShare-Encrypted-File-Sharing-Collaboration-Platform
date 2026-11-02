@@ -54,3 +54,15 @@ class FileUpdate(BaseModel):
 
     name: str | None = Field(None, min_length=1, max_length=255)
     folder_id: str | None = None
+
+
+class FileSelection(BaseModel):
+    """Files ticked in My Files (or in search results)."""
+
+    file_ids: list[str] = Field(min_length=1, max_length=200)
+
+
+class FileBulkMove(FileSelection):
+    """Move the ticked files into `folder_id` (null = the top level)."""
+
+    folder_id: str | None = None

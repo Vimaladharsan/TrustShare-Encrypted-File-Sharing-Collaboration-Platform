@@ -116,6 +116,9 @@ class Settings(BaseSettings):
     # Files
     default_quota_mb: int = 1024
     max_upload_mb: int = 25
+    # Several files downloaded as one ZIP (My Files multi-select)
+    zip_max_files: int = 100
+    zip_max_mb: int = 250
     storage_dir: str = "/app/storage"  # inside the container; backend/storage on the laptop
 
     # Where the encrypted files live: "s3" (RustFS locally / AWS S3) or "azure" (Azure Blob).
@@ -141,6 +144,10 @@ class Settings(BaseSettings):
     @property
     def max_upload_bytes(self) -> int:
         return self.max_upload_mb * 1024 * 1024
+
+    @property
+    def zip_max_bytes(self) -> int:
+        return self.zip_max_mb * 1024 * 1024
 
     @field_validator("jwt_secret")
     @classmethod
