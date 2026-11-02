@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from app.activity_monitoring import routes as activity_monitoring
 from app.api.routes import (
     admin,
     admin_reports,
@@ -15,6 +16,7 @@ from app.api.routes import (
     users,
     vault,
 )
+from app.audit import routes as audit
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health.router)
@@ -29,3 +31,6 @@ api_router.include_router(shares.router)
 api_router.include_router(shares.public_router)
 api_router.include_router(analytics.router)
 api_router.include_router(vault.router)
+# Milestone 3 feature modules
+api_router.include_router(activity_monitoring.router)
+api_router.include_router(audit.router)

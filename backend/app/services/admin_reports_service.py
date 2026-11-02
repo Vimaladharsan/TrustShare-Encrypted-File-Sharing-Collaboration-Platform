@@ -17,6 +17,7 @@ from pymongo.asynchronous.database import AsyncDatabase
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.activity_monitoring.models import redact
 from app.core.config import get_settings
 from app.crypto.keyring import get_keyring
 from app.models import Role, Share, User
@@ -77,7 +78,7 @@ def _audit_entry(e: dict[str, Any]) -> AuditEntry:
         resource_id=e.get("resource_id"),
         ip_address=e.get("ip_address"),
         user_agent=e.get("user_agent"),
-        details=e.get("details") or {},
+        details=redact(e.get("details")),  # admins never see file or folder names
         created_at=e["created_at"],
         actor_email=e.get("actor_email"),
         user_id=e.get("user_id"),

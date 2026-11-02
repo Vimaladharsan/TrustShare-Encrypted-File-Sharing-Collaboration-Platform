@@ -223,6 +223,8 @@ def client() -> Iterator[TestClient]:
     # Tests always use the local S3 storage (RustFS) – never the developer's real cloud storage
     # (STORAGE_PROVIDER=azure in .env). The Azure tests switch to the Azurite emulator on purpose.
     settings.storage_provider = "s3"
+    # Tests append to their own audit chain, so the real one in the dev database stays intact.
+    settings.audit_collection = "audit_logs_test"
     settings.login_rate_limit_per_minute = 1000
     settings.register_rate_limit_per_minute = 1000
     settings.forgot_password_rate_limit_per_minute = 1000
@@ -236,6 +238,7 @@ def client() -> Iterator[TestClient]:
     # Remove everything the tests created, so the dev databases stay clean.
     _delete_test_files(asyncio.run(_test_user_ids()))
     asyncio.run(_delete_test_users())
+    MongoClient(settings.mongo_url)[settings.mongo_db].drop_collection("audit_logs_test")
     clear_rate_limits()
 
 

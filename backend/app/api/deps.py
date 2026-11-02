@@ -85,6 +85,15 @@ def require_permission(permission: Perm) -> Callable[..., Awaitable[User]]:
 
     async def checker(request: Request, user: User = Depends(get_current_user)) -> User:
         if permission not in user.permission_codes:
+            from app.activity_monitoring.service import record_activity
+
+            await record_activity(
+                request,
+                user,
+                "auth.access_denied",
+                status="failure",
+                details={"path": request.url.path, "permission": str(permission)},
+            )
             await record_security_event(
                 "unauthorized_access",
                 request=request,

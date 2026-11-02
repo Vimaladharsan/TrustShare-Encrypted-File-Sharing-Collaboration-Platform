@@ -1,4 +1,5 @@
 import contextlib
+import uuid
 from typing import Any
 from urllib.parse import urlencode
 
@@ -19,6 +20,7 @@ from app.db.mongo import get_mongo
 from app.db.postgres import get_db
 from app.db.redis import get_redis
 from app.models import User
+from app.repositories.user_repository import UserRepository
 from app.schemas.auth import (
     ForgotPasswordRequest,
     LoginRequest,
@@ -171,20 +173,27 @@ async def refresh(
     summary="Log out of this device",
 )
 async def logout(
+    request: Request,
     response: Response,
     refresh_token: str | None = Cookie(None, alias=REFRESH_COOKIE),
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     redis: Redis = Depends(get_redis),
+    session: AsyncSession = Depends(get_db),
+    db: AsyncDatabase = Depends(get_mongo),
 ) -> None:
     sessions = SessionService(redis)
     if refresh_token:
         await sessions.revoke(refresh_token)
+    user = None
     if credentials:
         # Also block the current access token for the rest of its 15 minutes.
-        with contextlib.suppress(jwt.InvalidTokenError):
+        with contextlib.suppress(jwt.InvalidTokenError, ValueError, KeyError):
             payload = decode_access_token(credentials.credentials)
             await sessions.deny_access_token(payload["jti"], payload["exp"])
+            user = await UserRepository(session).get_by_id(uuid.UUID(payload["sub"]))
     clear_refresh_cookie(response)
+    if user is not None:
+        await ActivityService(db).log(request, user, "auth.logout", resource_type="user")
 
 
 @router.post(

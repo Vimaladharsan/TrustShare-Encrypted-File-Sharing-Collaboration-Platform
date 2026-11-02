@@ -86,6 +86,8 @@ class Settings(BaseSettings):
     # Sharing (Milestone 2): links must expire within this many days; public link requests per
     # minute per IP (slows down anyone trying to guess links).
     share_link_max_days: int = 30
+    # Milestone 3: hash-chained audit log collection (tests use a separate one).
+    audit_collection: str = "audit_logs"
     share_link_rate_limit_per_minute: int = 60
 
     # Admins may delete an account (and all its files) only after this many days without a login.

@@ -51,6 +51,9 @@ INDEXES: dict[str, list[IndexModel]] = {
     "activity_logs": [
         IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_created"),
         IndexModel([("action", ASCENDING), ("created_at", DESCENDING)], name="action_created"),
+        # Milestone 3: admin activity feed filters.
+        IndexModel([("activity_type", ASCENDING), ("created_at", DESCENDING)], name="type_created"),
+        IndexModel([("file_id", ASCENDING), ("created_at", DESCENDING)], name="file_created"),
         # File Analytics: downloads of an owner's files (direct-share and link downloads too).
         IndexModel(
             [("details.owner_id", ASCENDING), ("action", ASCENDING), ("created_at", DESCENDING)],

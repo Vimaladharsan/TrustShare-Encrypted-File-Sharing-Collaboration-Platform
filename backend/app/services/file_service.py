@@ -197,8 +197,20 @@ class FileService:
         other people's files (privacy). Everyone else gets 404."""
         doc = await self.files.get(file_id)
         if doc is None or doc["owner_id"] != str(user.id):
+            await self._denied(user, file_id)
             raise _not_found()
         return doc
+
+    async def _denied(self, user: User, file_id: str) -> None:
+        """Someone tried to open a file that isn't theirs (or doesn't exist)."""
+        await self.activity.log(
+            self.request,
+            user,
+            "file.access_denied",
+            resource_type="file",
+            resource_id=file_id[:24],
+            status="failure",
+        )
 
     async def download(self, user: User, file_id: str) -> tuple[dict[str, Any], AsyncIterator]:
         doc = await self.get_for_read(user, file_id)
@@ -251,6 +263,7 @@ class FileService:
         """Only the owner may change a file – not even an Admin can alter someone else's."""
         doc = await self.files.get(file_id)
         if doc is None or doc["owner_id"] != str(user.id):
+            await self._denied(user, file_id)
             raise _not_found()
         if status and doc["status"] != status:
             raise _not_found()
