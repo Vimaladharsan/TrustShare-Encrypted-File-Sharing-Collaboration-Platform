@@ -100,6 +100,14 @@ class Settings(BaseSettings):
     detect_expired_link_minutes: int = 10
     detect_revoked_link_limit: int = 2
     detect_revoked_link_minutes: int = 10
+    # Milestone 3: notifications
+    scheduler_enabled: bool = True  # background job: link-expiry reminders, expired links
+    scheduler_interval_seconds: int = 300
+    link_reminder_hours: int = 24  # remind the owner this long before a share expires
+    download_notice_cooldown_minutes: int = 10  # max one "your file was downloaded" per file
+    admin_alert_email_cooldown_minutes: int = 15  # max one alert email per type to admins
+    sse_heartbeat_seconds: int = 25
+    sse_max_seconds: int = 3600  # the browser reconnects after this (fresh token check)
     share_link_rate_limit_per_minute: int = 60
 
     # Admins may delete an account (and all its files) only after this many days without a login.

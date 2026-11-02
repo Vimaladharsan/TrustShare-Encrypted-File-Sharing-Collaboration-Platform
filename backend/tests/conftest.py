@@ -64,6 +64,8 @@ def _delete_test_files(user_ids: list[str]) -> None:
         db["vault_files"].delete_many({"owner_id": {"$in": user_ids}})
         db["folders"].delete_many({"owner_id": {"$in": user_ids}})
         db["favorites"].delete_many({"user_id": {"$in": user_ids}})
+        db["notifications"].delete_many({"user_id": {"$in": user_ids}})
+        db["notification_preferences"].delete_many({"user_id": {"$in": user_ids}})
         db["activity_logs"].delete_many({"user_id": {"$in": user_ids}})
         # Link visitors have no account: their downloads of test files carry only the owner.
         db["activity_logs"].delete_many({"details.owner_id": {"$in": user_ids}})
@@ -207,7 +209,8 @@ def update_share(share_id: str, **values: object) -> None:
 
 def clear_rate_limits() -> None:
     redis = Redis.from_url(get_settings().redis_url)
-    for pattern in ("rl:*", "detect:*", "detect_cooldown:*"):  # rate limits + detection windows
+    # rate limits, detection windows, notification throttles
+    for pattern in ("rl:*", "detect:*", "detect_cooldown:*", "notify_*"):
         for key in redis.scan_iter(pattern):
             redis.delete(key)
     redis.close()
@@ -226,12 +229,14 @@ def client() -> Iterator[TestClient]:
     settings.storage_provider = "s3"
     # Tests append to their own audit chain, so the real one in the dev database stays intact.
     settings.audit_collection = "audit_logs_test"
+    settings.scheduler_enabled = False  # tests call the job directly (run_once)
     settings.login_rate_limit_per_minute = 1000
     settings.register_rate_limit_per_minute = 1000
     settings.forgot_password_rate_limit_per_minute = 1000
     settings.share_link_rate_limit_per_minute = 1000
     clear_rate_limits()
 
+    session_start = datetime.now(UTC)
     # Using TestClient as a context manager runs the app's startup/shutdown (DB connections).
     with TestClient(app) as test_client:
         yield test_client
@@ -240,6 +245,10 @@ def client() -> Iterator[TestClient]:
     _delete_test_files(asyncio.run(_test_user_ids()))
     asyncio.run(_delete_test_users())
     MongoClient(settings.mongo_url)[settings.mongo_db].drop_collection("audit_logs_test")
+    # Security-alert tests also notify the real admins of the dev database – remove those.
+    MongoClient(settings.mongo_url)[settings.mongo_db]["notifications"].delete_many(
+        {"type": "security_alert", "created_at": {"$gte": session_start}}
+    )
     clear_rate_limits()
 
 

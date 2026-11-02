@@ -27,6 +27,13 @@ async def close_postgres() -> None:
         await _engine.dispose()
 
 
+def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
+    """For work outside a request (background jobs, activity hooks)."""
+    if _sessionmaker is None:
+        raise RuntimeError("PostgreSQL is not initialised")
+    return _sessionmaker
+
+
 async def get_db() -> AsyncIterator[AsyncSession]:
     """FastAPI dependency: one database session per request, closed automatically afterwards."""
     if _sessionmaker is None:

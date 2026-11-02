@@ -161,6 +161,7 @@ class ShareService:
                 "permission": share.permission,
                 "file_name": file["original_name"],
                 "recipient_email": recipient.email if recipient else None,
+                "recipient_id": str(recipient.id) if recipient else None,
                 "expires_at": expires_at.isoformat() if expires_at else None,
                 "max_downloads": share.max_downloads,
             },

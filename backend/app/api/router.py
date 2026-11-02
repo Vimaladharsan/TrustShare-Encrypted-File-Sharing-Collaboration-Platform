@@ -17,6 +17,7 @@ from app.api.routes import (
     vault,
 )
 from app.audit import routes as audit
+from app.notifications import routes as notifications
 from app.security_monitoring import routes as security_monitoring
 
 api_router = APIRouter(prefix="/api")
@@ -36,3 +37,4 @@ api_router.include_router(vault.router)
 api_router.include_router(activity_monitoring.router)
 api_router.include_router(audit.router)
 api_router.include_router(security_monitoring.router)
+api_router.include_router(notifications.router)

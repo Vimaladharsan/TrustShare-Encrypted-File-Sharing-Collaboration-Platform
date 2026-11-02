@@ -17,7 +17,11 @@ from app.core.middleware import register_middleware
 from app.db.mongo import close_mongo, ensure_indexes, init_mongo
 from app.db.postgres import close_postgres, init_postgres
 from app.db.redis import close_redis, init_redis
+from app.notifications.scheduler import loop as notification_scheduler
+from app.notifications.service import bind_app
+from app.notifications.triggers import on_activity, on_security_event
 from app.security_monitoring.detection import evaluate
+from app.services.security_events import register_event_hook
 from app.storage.objects import get_object_storage
 
 setup_logging(get_settings().log_level)
@@ -35,7 +39,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await asyncio.to_thread(Path(settings.storage_dir).mkdir, parents=True, exist_ok=True)
     await _ensure_bucket()
     logger.info("%s API started", settings.app_name)
+    scheduler = (
+        asyncio.create_task(notification_scheduler()) if settings.scheduler_enabled else None
+    )
     yield
+    if scheduler is not None:
+        scheduler.cancel()
     await close_redis()
     await close_mongo()
     await close_postgres()
@@ -58,5 +67,9 @@ register_middleware(app)
 register_exception_handlers(app)
 app.include_router(api_router)
 
-# Milestone 3: every recorded activity is checked against the suspicious-activity rules.
+# Milestone 3: after every recorded activity – suspicious-activity rules, then notifications;
+# after every security event – alerts to admins and to the affected user.
 register_hook(evaluate)
+register_hook(on_activity)
+register_event_hook(on_security_event)
+bind_app(app)

@@ -33,7 +33,7 @@ from app.services.analytics_service import Period
 
 logger = logging.getLogger(__name__)
 
-ActivityHook = Callable[[dict[str, Any], User | None, Request], Awaitable[None]]
+ActivityHook = Callable[[dict[str, Any], User | None, Request | None], Awaitable[None]]
 _hooks: list[ActivityHook] = []
 
 
@@ -44,7 +44,7 @@ def register_hook(hook: ActivityHook) -> None:
 
 
 async def record_activity(
-    request: Request,
+    request: Request | None,
     user: User | None,
     action: str,
     *,
@@ -67,8 +67,8 @@ async def record_activity(
         "resource_id": resource_id,
         "file_id": file_id or (resource_id if resource_type == "file" else None),
         "status": status,
-        "ip_address": client_ip(request),
-        "user_agent": request.headers.get("user-agent", "")[:200],
+        "ip_address": client_ip(request) if request else None,  # None = background job
+        "user_agent": request.headers.get("user-agent", "")[:200] if request else "system",
         "request_id": request_id_ctx.get(),
         "details": details or {},
         "created_at": datetime.now(UTC),

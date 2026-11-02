@@ -30,7 +30,8 @@ class Email:
 
 
 class EmailSender:
-    def send(self, email: Email) -> None:
+    def send(self, email: Email) -> bool | None:
+        """True = sent, False = SMTP error, None = SMTP not configured (logged instead)."""
         settings = get_settings()
         password = settings.smtp_password.get_secret_value()
         if not settings.smtp_user or not password:
@@ -40,7 +41,7 @@ class EmailSender:
                 email.subject,
                 email.text,
             )
-            return
+            return None
 
         message = EmailMessage()
         message["From"] = formataddr((settings.mail_from_name, settings.smtp_user))
@@ -55,9 +56,11 @@ class EmailSender:
                 smtp.login(settings.smtp_user, password)
                 smtp.send_message(message)
             logger.info("Email sent to %s: %s", email.to, email.subject)
+            return True
         except (smtplib.SMTPException, OSError):
             # Runs in the background, so the user already got their answer; just record it.
             logger.exception("Could not send email to %s", email.to)
+            return False
 
 
 def get_email_sender() -> EmailSender:
@@ -219,5 +222,23 @@ def account_deleted_email(to: str, name: str, files_deleted: int, link: str) -> 
             "Visit TrustShare",
             link,
             "If you didn't do this, reply to this email right away.",
+        ),
+    )
+
+
+def notification_email(
+    to: str, name: str, title: str, message: str, button_text: str, link: str, footer: str
+) -> Email:
+    """A notification sent by email too (download notice, expiry reminder, security alert)."""
+    return Email(
+        to=to,
+        subject=f"{title} – TrustShare",
+        text=f"Hi {name},\n\n{message}\n\n{button_text}: {link}\n\n{footer}\n",
+        html=_layout(
+            html.escape(title),
+            f"<p>Hi {html.escape(name)},</p><p>{html.escape(message)}</p>",
+            html.escape(button_text),
+            link,
+            html.escape(footer),
         ),
     )

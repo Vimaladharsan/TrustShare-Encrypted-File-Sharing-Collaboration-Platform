@@ -54,6 +54,9 @@ class Share(Base):
     download_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_accessed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Milestone 3 background job: owner reminded before expiry / expiry recorded once.
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expiry_recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     def __repr__(self) -> str:  # never print the token hash

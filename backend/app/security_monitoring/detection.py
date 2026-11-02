@@ -118,7 +118,7 @@ def describe_rules() -> list[dict[str, Any]]:
     ]
 
 
-async def evaluate(activity: dict[str, Any], user: User | None, request: Request) -> None:
+async def evaluate(activity: dict[str, Any], user: User | None, request: Request | None) -> None:
     """Activity hook (registered in app/main.py): check every rule against this activity."""
     settings = get_settings()
     redis = get_redis()

@@ -68,6 +68,16 @@ INDEXES: dict[str, list[IndexModel]] = {
     "vault_files": [
         IndexModel([("owner_id", ASCENDING), ("created_at", DESCENDING)], name="owner_created"),
     ],
+    "notifications": [
+        IndexModel(
+            [("user_id", ASCENDING), ("read", ASCENDING), ("created_at", DESCENDING)],
+            name="user_read_created",
+        ),
+        IndexModel([("created_at", DESCENDING)], name="created"),
+    ],
+    "notification_preferences": [
+        IndexModel([("user_id", ASCENDING)], name="user_unique", unique=True),
+    ],
     "favorites": [
         IndexModel([("user_id", ASCENDING), ("file_id", ASCENDING)], name="user_file", unique=True),
     ],
