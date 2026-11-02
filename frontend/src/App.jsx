@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Link, Route, Routes } from 'react-router';
+import { Link, Navigate, Route, Routes } from 'react-router';
 
 import AdminLayout from './components/layout/AdminLayout';
 import DashboardLayout from './components/layout/DashboardLayout';
@@ -34,9 +34,12 @@ const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'));
 const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'));
 const AdminStoragePage = lazy(() => import('./pages/admin/AdminStoragePage'));
-const AdminSharingPage = lazy(() => import('./pages/admin/AdminSharingPage'));
 const SystemPage = lazy(() => import('./pages/admin/SystemPage'));
-const AdminActivityPage = lazy(() => import('./pages/admin/AdminActivityPage'));
+const ActivityMonitoringPage = lazy(() => import('./pages/admin/ActivityMonitoringPage'));
+const AuditLogsPage = lazy(() => import('./pages/admin/AuditLogsPage'));
+const ReportsPage = lazy(() => import('./pages/admin/ReportsPage'));
+const NotificationManagementPage = lazy(() => import('./pages/admin/NotificationManagementPage'));
+const AlertsPage = lazy(() => import('./pages/admin/AlertsPage'));
 const SecurityDashboardPage = lazy(() => import('./pages/admin/SecurityDashboardPage'));
 
 const lazyPage = (page) => <Suspense fallback={<Loading />}>{page}</Suspense>;
@@ -91,10 +94,18 @@ export default function App() {
         <Route path="/admin" element={lazyPage(<AdminDashboardPage />)} />
         <Route path="/admin/users" element={lazyPage(<AdminUsersPage />)} />
         <Route path="/admin/storage" element={lazyPage(<AdminStoragePage />)} />
-        <Route path="/admin/sharing" element={lazyPage(<AdminSharingPage />)} />
+        <Route
+          path="/admin/sharing"
+          element={<Navigate to="/admin/reports?tab=sharing" replace />}
+        />
         <Route path="/admin/security" element={lazyPage(<SecurityDashboardPage />)} />
         <Route path="/admin/system" element={lazyPage(<SystemPage />)} />
-        <Route path="/admin/activity" element={lazyPage(<AdminActivityPage />)} />
+        <Route path="/admin/activity" element={<Navigate to="/admin/audit" replace />} />
+        <Route path="/admin/activity-monitoring" element={lazyPage(<ActivityMonitoringPage />)} />
+        <Route path="/admin/audit" element={lazyPage(<AuditLogsPage />)} />
+        <Route path="/admin/reports" element={lazyPage(<ReportsPage />)} />
+        <Route path="/admin/notifications" element={lazyPage(<NotificationManagementPage />)} />
+        <Route path="/admin/alerts" element={lazyPage(<AlertsPage />)} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

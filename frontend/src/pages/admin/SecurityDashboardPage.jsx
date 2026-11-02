@@ -18,6 +18,7 @@ import {
   LoginActivityChart,
 } from '../../components/admin/SecurityCharts';
 import { DateRangeFilter, SummaryCard } from '../../components/analytics/AnalyticsParts';
+import MonitoringSummary from '../../components/admin/MonitoringSummary';
 import { ErrorState, Loading } from '../../components/StateMessage';
 import { presetRange } from '../../utils/charts';
 
@@ -47,6 +48,7 @@ export default function SecurityDashboardPage() {
       >
         <DateRangeFilter range={range} onChange={setRange} />
       </PageHeader>
+      <MonitoringSummary range={range} />
 
       {error && <ErrorState message={error} onRetry={load} />}
       {!error && !data && <Loading />}

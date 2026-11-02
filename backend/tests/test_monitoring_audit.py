@@ -266,3 +266,38 @@ def test_owner_still_sees_own_file_names(client: TestClient, new_email: Callable
     mine = client.get("/api/activity/me", headers=auth(token)).json()
     assert SECRET_NAME in str(mine)
     assert TEST_PASSWORD not in str(mine)
+
+
+def test_live_activity_feed_streams_redacted_activities(
+    client: TestClient, new_email: Callable[[], str]
+) -> None:
+    import time
+
+    from app.activity_monitoring.service import FEED_CHANNEL
+    from app.db.redis import get_redis
+    from app.notifications.stream import event_stream
+
+    token = new_user(client, new_email())
+    uid = user_id_of(client, token)
+
+    async def scenario() -> str:
+        payload = {"sub": uid, "exp": time.time() + 60, "jti": "t", "iat": time.time()}
+        stream = event_stream(None, get_redis(), FEED_CHANNEL, payload, {}, "activity")
+        await anext(stream)  # ready
+        from app.activity_monitoring.service import record_activity
+        from app.notifications.service import load_user
+
+        await record_activity(
+            None, await load_user(uid), "file.upload", resource_type="file",
+            resource_id="a" * 24, details={"file_name": SECRET_NAME, "size_bytes": 10},
+        )  # fmt: skip
+        event = await anext(stream)
+        await stream.aclose()
+        return event
+
+    event = client.portal.call(scenario)
+    assert event.startswith("event: activity") and '"activity_type": "upload"' in event.replace(
+        '":"', '": "'
+    )
+    assert SECRET_NAME not in event
+    assert client.get("/api/activity-monitoring/stream", headers=auth(token)).status_code == 403

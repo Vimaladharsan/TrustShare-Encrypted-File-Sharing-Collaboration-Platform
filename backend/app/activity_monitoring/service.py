@@ -28,6 +28,7 @@ from app.activity_monitoring.schemas import (
 from app.core.logging import request_id_ctx
 from app.core.rate_limit import client_ip
 from app.db.mongo import get_mongo
+from app.db.redis import get_redis
 from app.models import User
 from app.services.analytics_service import Period
 
@@ -81,6 +82,7 @@ async def record_activity(
         await AuditService(db).append(entry, user)
     except Exception:
         logger.exception("Could not write audit log for %s", action)
+    await _publish(entry)
     for hook in list(_hooks):
         try:
             await hook(entry, user, request)
@@ -89,6 +91,21 @@ async def record_activity(
                 "Activity hook %s failed for %s", getattr(hook, "__name__", hook), action
             )
     return entry
+
+
+FEED_CHANNEL = "activity_feed"
+
+
+async def _publish(entry: dict[str, Any]) -> None:
+    """Push the activity (names removed) to admins watching the live feed."""
+    try:
+        redis = get_redis()
+    except RuntimeError:
+        return  # scripts without Redis
+    try:
+        await redis.publish(FEED_CHANNEL, _record(entry).model_dump_json())
+    except Exception:
+        logger.exception("Could not publish activity %s", entry.get("action"))
 
 
 class ActivityMonitoringService:
@@ -131,9 +148,11 @@ class ActivityMonitoringService:
             await self.logs.aggregate(
                 [
                     {"$match": {"created_at": period.current()}},
+                    # Grouped by action, then mapped to a type here – so records from before
+                    # Milestone 3 (no stored activity_type) are counted under the right type too.
                     {
                         "$group": {
-                            "_id": {"type": "$activity_type", "status": "$status"},
+                            "_id": {"action": "$action", "status": "$status"},
                             "n": {"$sum": 1},
                         }
                     },
@@ -142,7 +161,7 @@ class ActivityMonitoringService:
         ).to_list(length=None)
         counts: dict[str, ActivityTypeCount] = {}
         for row in rows:
-            kind = row["_id"].get("type") or "other"  # records from before M3 have no type
+            kind = activity_type_of(row["_id"].get("action") or "")
             item = counts.setdefault(kind, ActivityTypeCount(activity_type=kind))
             if row["_id"].get("status") == "failure":
                 item.failure += row["n"]

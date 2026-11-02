@@ -4,16 +4,21 @@ Users see their own activity at /api/activity/me; admins see everyone's, without
 """
 
 from datetime import date
+from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import StreamingResponse
 from pymongo.asynchronous.database import AsyncDatabase
+from redis.asyncio import Redis
 
 from app.activity_monitoring.models import ACTIVITY_TYPES
 from app.activity_monitoring.schemas import ActivityFeed, ActivitySummary
-from app.activity_monitoring.service import ActivityMonitoringService
-from app.api.deps import require_permission
+from app.activity_monitoring.service import FEED_CHANNEL, ActivityMonitoringService
+from app.api.deps import get_token_payload, require_permission
 from app.core.permissions import Perm
 from app.db.mongo import get_mongo
+from app.db.redis import get_redis
+from app.notifications.stream import event_stream
 from app.services.analytics_service import Period
 
 router = APIRouter(
@@ -62,3 +67,20 @@ async def summary(
 @router.get("/types", response_model=list[str], summary="Activity types used for filtering")
 async def types() -> list[str]:
     return ACTIVITY_TYPES
+
+
+@router.get(
+    "/stream",
+    summary="Live activity feed (Server-Sent Events, file names removed)",
+    response_class=StreamingResponse,
+)
+async def stream(
+    request: Request,
+    payload: dict[str, Any] = Depends(get_token_payload),
+    redis: Redis = Depends(get_redis),
+) -> StreamingResponse:
+    return StreamingResponse(
+        event_stream(request, redis, FEED_CHANNEL, payload, {"channel": "activity"}, "activity"),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
+    )

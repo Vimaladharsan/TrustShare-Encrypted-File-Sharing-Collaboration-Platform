@@ -1,11 +1,14 @@
 import {
   Activity,
   ArrowLeft,
-  FolderLock,
+  BellRing,
+  FileBarChart,
+  HardDrive,
   LayoutDashboard,
-  Link2,
   Menu,
+  ScrollText,
   ServerCog,
+  Siren,
   ShieldAlert,
   ShieldCheck,
   ShieldOff,
@@ -21,27 +24,79 @@ import { Empty } from '../StateMessage';
 import NotificationBell from '../notifications/NotificationBell';
 import UserMenu from './UserMenu';
 
-// Admin panel menu (mentor's mockup). Each page's data is protected on the server by a
+// Admin panel menu, grouped like the Milestone 3 unified admin dashboard. Each page's data is protected on the server by a
 // permission (user:read / audit:read); the menu only hides what the role can't open anyway.
 const NAV = [
-  { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true, permission: 'user:read' },
-  { to: '/admin/users', label: 'User management', icon: UsersRound, permission: 'user:read' },
-  { to: '/admin/storage', label: 'File management', icon: FolderLock, permission: 'user:read' },
-  { to: '/admin/sharing', label: 'Sharing reports', icon: Link2, permission: 'user:read' },
   {
-    to: '/admin/security',
-    label: 'Security dashboard',
-    icon: ShieldAlert,
-    permission: 'audit:read',
+    section: 'Overview',
+    items: [
+      {
+        to: '/admin',
+        label: 'Dashboard',
+        icon: LayoutDashboard,
+        end: true,
+        permission: 'user:read',
+      },
+    ],
   },
-  { to: '/admin/system', label: 'System monitoring', icon: ServerCog, permission: 'user:read' },
-  { to: '/admin/activity', label: 'Activity logs', icon: Activity, permission: 'audit:read' },
+  {
+    section: 'Monitoring',
+    items: [
+      {
+        to: '/admin/activity-monitoring',
+        label: 'User activity',
+        icon: Activity,
+        permission: 'audit:read',
+      },
+      { to: '/admin/audit', label: 'Audit logs', icon: ScrollText, permission: 'audit:read' },
+      {
+        to: '/admin/security',
+        label: 'Security monitoring',
+        icon: ShieldAlert,
+        permission: 'audit:read',
+      },
+      { to: '/admin/alerts', label: 'Suspicious activity', icon: Siren, permission: 'audit:read' },
+    ],
+  },
+  {
+    section: 'Reports & analytics',
+    items: [
+      {
+        to: '/admin/reports',
+        label: 'File activity reports',
+        icon: FileBarChart,
+        permission: 'audit:read',
+      },
+      {
+        to: '/admin/storage',
+        label: 'Storage analytics',
+        icon: HardDrive,
+        permission: 'audit:read',
+      },
+    ],
+  },
+  {
+    section: 'Management',
+    items: [
+      { to: '/admin/users', label: 'User management', icon: UsersRound, permission: 'user:read' },
+      {
+        to: '/admin/notifications',
+        label: 'Notifications',
+        icon: BellRing,
+        permission: 'audit:read',
+      },
+      { to: '/admin/system', label: 'System monitoring', icon: ServerCog, permission: 'user:read' },
+    ],
+  },
 ];
 
 /** Dark admin frame around the admin pages. */
 export default function AdminLayout() {
   const { can } = useAuth();
-  const nav = NAV.filter((item) => can(item.permission));
+  const nav = NAV.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => can(item.permission)),
+  })).filter((group) => group.items.length > 0);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   if (!can('user:read')) {
@@ -66,39 +121,43 @@ export default function AdminLayout() {
       <div className="flex h-16 shrink-0 items-center px-5">
         <Logo variant="light" />
       </div>
-      <div className="px-3">
-        <p className="mb-1.5 px-3 text-[11px] font-semibold tracking-[0.08em] text-slate-500 uppercase">
-          Admin panel
-        </p>
-        <nav className="space-y-0.5" aria-label="Admin">
-          {nav.map(({ to, label, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              onClick={() => setDrawerOpen(false)}
-              className={({ isActive }) =>
-                `group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
-                  isActive ? 'bg-white/10 text-white' : 'hover:bg-white/5 hover:text-slate-100'
-                }`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  {isActive && (
-                    <span className="absolute top-1/2 -left-3 h-5 w-1 -translate-y-1/2 rounded-r-full bg-blue-400" />
+      <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-2" aria-label="Admin">
+        {nav.map((group) => (
+          <div key={group.section}>
+            <p className="mb-1.5 px-3 text-[11px] font-semibold tracking-[0.08em] text-slate-500 uppercase">
+              {group.section}
+            </p>
+            <div className="space-y-0.5">
+              {group.items.map(({ to, label, icon: Icon, end }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={end}
+                  onClick={() => setDrawerOpen(false)}
+                  className={({ isActive }) =>
+                    `group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                      isActive ? 'bg-white/10 text-white' : 'hover:bg-white/5 hover:text-slate-100'
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      {isActive && (
+                        <span className="absolute top-1/2 -left-3 h-5 w-1 -translate-y-1/2 rounded-r-full bg-blue-400" />
+                      )}
+                      <Icon
+                        className={`size-[18px] ${isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300'}`}
+                        aria-hidden="true"
+                      />
+                      {label}
+                    </>
                   )}
-                  <Icon
-                    className={`size-[18px] ${isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300'}`}
-                    aria-hidden="true"
-                  />
-                  {label}
-                </>
-              )}
-            </NavLink>
-          ))}
-        </nav>
-      </div>
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
       <div className="mt-auto p-3">
         <div className="mb-3 rounded-xl bg-white/5 p-3 text-xs leading-relaxed text-slate-400 ring-1 ring-white/10">
           <span className="font-semibold text-slate-200">Privacy by design.</span> Admins see
