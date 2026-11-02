@@ -88,6 +88,18 @@ class Settings(BaseSettings):
     share_link_max_days: int = 30
     # Milestone 3: hash-chained audit log collection (tests use a separate one).
     audit_collection: str = "audit_logs"
+    # Milestone 3: suspicious-activity rules – an alert fires when the count goes ABOVE the
+    # limit within the window (per account / user / IP). Lower them in .env for demos and tests.
+    detect_failed_logins_limit: int = 5
+    detect_failed_logins_minutes: int = 10
+    detect_unauthorized_limit: int = 4
+    detect_unauthorized_minutes: int = 10
+    detect_downloads_limit: int = 20
+    detect_downloads_minutes: int = 5
+    detect_expired_link_limit: int = 2
+    detect_expired_link_minutes: int = 10
+    detect_revoked_link_limit: int = 2
+    detect_revoked_link_minutes: int = 10
     share_link_rate_limit_per_minute: int = 60
 
     # Admins may delete an account (and all its files) only after this many days without a login.

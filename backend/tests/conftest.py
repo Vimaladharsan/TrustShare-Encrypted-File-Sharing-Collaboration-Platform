@@ -207,8 +207,9 @@ def update_share(share_id: str, **values: object) -> None:
 
 def clear_rate_limits() -> None:
     redis = Redis.from_url(get_settings().redis_url)
-    for key in redis.scan_iter("rl:*"):
-        redis.delete(key)
+    for pattern in ("rl:*", "detect:*", "detect_cooldown:*"):  # rate limits + detection windows
+        for key in redis.scan_iter(pattern):
+            redis.delete(key)
     redis.close()
 
 

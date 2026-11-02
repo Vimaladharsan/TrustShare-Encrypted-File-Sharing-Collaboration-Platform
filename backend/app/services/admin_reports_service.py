@@ -194,7 +194,7 @@ class AdminReportsService:
                     message=e.get("message", ""),
                     actor_email=e.get("actor_email"),
                     ip_address=e.get("ip_address"),
-                    details=e.get("details") or {},
+                    details=redact(e.get("details")),
                     created_at=e["created_at"],
                 )
                 for e in await self._page(self.events, match, limit, offset)

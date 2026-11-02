@@ -104,6 +104,9 @@ DESCRIPTIONS: dict[str, str] = {
     "admin.user_unlock": "Admin unlocked an account",
     "admin.user_delete": "Admin deleted an inactive account",
     "admin.audit_export": "Admin exported the audit log",
+    "admin.alert_acknowledged": "Admin acknowledged a security alert ({alert_type})",
+    "admin.alert_resolved": "Admin resolved a security alert ({alert_type})",
+    "admin.alert_reopened": "Admin reopened a security alert ({alert_type})",
 }
 
 

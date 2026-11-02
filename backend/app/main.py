@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
+from app.activity_monitoring.service import register_hook
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
@@ -16,6 +17,7 @@ from app.core.middleware import register_middleware
 from app.db.mongo import close_mongo, ensure_indexes, init_mongo
 from app.db.postgres import close_postgres, init_postgres
 from app.db.redis import close_redis, init_redis
+from app.security_monitoring.detection import evaluate
 from app.storage.objects import get_object_storage
 
 setup_logging(get_settings().log_level)
@@ -55,3 +57,6 @@ app = FastAPI(title="TrustShare API", version="0.1.0", lifespan=lifespan)
 register_middleware(app)
 register_exception_handlers(app)
 app.include_router(api_router)
+
+# Milestone 3: every recorded activity is checked against the suspicious-activity rules.
+register_hook(evaluate)

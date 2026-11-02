@@ -15,12 +15,22 @@ should look at – each with a type and a severity (high / medium / low / info):
   download_anomaly         unusually many downloads through one share link          medium
   admin_action             an admin changed, unlocked or deleted an account         info
   vault_locked             the secure vault locked after repeated wrong passwords   high
+Rule-based detection (app/security_monitoring/detection.py, Milestone 3):
+  repeated_failed_logins        > 5 failed sign-ins for one account in 10 min      high
+  repeated_unauthorized_access  ≥ 5 denied accesses by one user / IP in 10 min     high
+  excessive_downloads           > 20 downloads by one user / IP in 5 min           medium
+  expired_link_abuse            ≥ 3 attempts on expired links from one IP, 10 min   medium
+  revoked_link_abuse            ≥ 3 attempts on revoked links from one IP, 10 min   medium
+
+Every event is also an alert with a status: open → acknowledged → resolved (admin workflow).
 
 Recording must never break the user's request, so every failure here is only logged.
 No secrets (passwords, tokens, keys) are ever put into an event.
 """
 
 import logging
+import uuid
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -47,8 +57,23 @@ EVENT_TYPES: dict[str, tuple[str, str]] = {
     "download_anomaly": ("medium", "Unusually many downloads"),
     "admin_action": ("info", "Admin action"),
     "vault_locked": ("high", "Vault locked after wrong passwords"),
+    "repeated_failed_logins": ("high", "Repeated failed sign-ins (possible brute force)"),
+    "repeated_unauthorized_access": ("high", "Repeated unauthorized access attempts"),
+    "excessive_downloads": ("medium", "Too many downloads in a short time"),
+    "expired_link_abuse": ("medium", "Repeated attempts to use expired share links"),
+    "revoked_link_abuse": ("medium", "Repeated attempts to use revoked share links"),
 }
 SEVERITIES = ("high", "medium", "low", "info")
+ALERT_STATUSES = ("open", "acknowledged", "resolved")
+
+EventHook = Callable[[dict[str, Any]], Awaitable[None]]
+_event_hooks: list[EventHook] = []
+
+
+def register_event_hook(hook: EventHook) -> None:
+    """Run `hook(event)` after every recorded security event (e.g. notify admins)."""
+    if hook not in _event_hooks:
+        _event_hooks.append(hook)
 
 
 async def record_security_event(
@@ -61,9 +86,15 @@ async def record_security_event(
     severity: str | None = None,
     message: str | None = None,
     details: dict[str, Any] | None = None,
-) -> None:
+    rule: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Store the event (it is also an alert, status "open") and run the event hooks.
+    `rule`: for rule-based detections – {name, count, window_minutes, subject}."""
     default_severity, title = EVENT_TYPES[event_type]
     event = {
+        "alert_id": str(uuid.uuid4()),
+        "status": "open",
+        "rule": rule,
         "type": event_type,
         "severity": severity or default_severity,
         "message": message or title,
@@ -78,3 +109,10 @@ async def record_security_event(
         await get_mongo()["security_events"].insert_one(event)
     except Exception:
         logger.exception("Could not record security event %s", event_type)
+        return None
+    for hook in list(_event_hooks):
+        try:
+            await hook(event)
+        except Exception:
+            logger.exception("Security event hook failed for %s", event_type)
+    return event
