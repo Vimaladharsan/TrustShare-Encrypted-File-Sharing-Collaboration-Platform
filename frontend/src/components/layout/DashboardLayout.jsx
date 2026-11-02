@@ -4,6 +4,7 @@ import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router'
 
 import { getUsage } from '../../api/files';
 import Sidebar from './Sidebar';
+import NotificationBell from '../notifications/NotificationBell';
 import UserMenu from './UserMenu';
 import VerifyEmailBanner from './VerifyEmailBanner';
 
@@ -73,6 +74,7 @@ export default function DashboardLayout() {
             <Menu className="size-5" />
           </button>
           <SearchBox />
+          <NotificationBell />
           <UserMenu />
         </header>
         <VerifyEmailBanner />

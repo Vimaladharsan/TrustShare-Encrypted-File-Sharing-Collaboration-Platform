@@ -20,6 +20,11 @@ export function setAccessToken(token) {
   accessToken = token;
 }
 
+/** For fetch()-based calls (the live notification stream can't use Axios). */
+export function getAccessToken() {
+  return accessToken;
+}
+
 /** Called by AuthProvider: what to do when the session can't be renewed (go to login). */
 export function setSessionExpiredHandler(handler) {
   onSessionExpired = handler;

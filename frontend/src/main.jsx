@@ -5,6 +5,7 @@ import { Toaster } from 'sonner';
 
 import App from './App';
 import AuthProvider from './auth/AuthProvider';
+import NotificationsProvider from './notifications/NotificationsProvider';
 import './index.css';
 
 // Entry point: mount the React app into <div id="root"> in index.html.
@@ -12,7 +13,9 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <NotificationsProvider>
+          <App />
+        </NotificationsProvider>
         <Toaster position="bottom-right" richColors closeButton />
       </AuthProvider>
     </BrowserRouter>

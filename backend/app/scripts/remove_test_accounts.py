@@ -49,6 +49,8 @@ async def remove(domain: str) -> int:
                 await db["vault_files"].delete_many({"owner_id": owner})
                 await db["folders"].delete_many({"owner_id": owner})
                 await db["favorites"].delete_many({"user_id": owner})
+                await db["notifications"].delete_many({"user_id": owner})
+                await db["notification_preferences"].delete_many({"user_id": owner})
                 await db["activity_logs"].delete_many(
                     {"$or": [{"user_id": owner}, {"details.owner_id": owner}]}
                 )

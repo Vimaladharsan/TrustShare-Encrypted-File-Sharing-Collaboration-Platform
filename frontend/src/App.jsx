@@ -17,6 +17,7 @@ import PublicSharePage from './pages/PublicSharePage';
 import RecentPage from './pages/RecentPage';
 import RegisterPage from './pages/RegisterPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import NotificationsPage from './pages/NotificationsPage';
 import SecurityPage from './pages/SecurityPage';
 import VaultPage from './pages/VaultPage';
 import SettingsPage from './pages/SettingsPage';
@@ -77,6 +78,7 @@ export default function App() {
         <Route path="/activity" element={<ActivityPage />} />
         <Route path="/security" element={<SecurityPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
       </Route>
       {/* Admin panel – its own dark frame. Every API call behind it checks permissions. */}
       <Route

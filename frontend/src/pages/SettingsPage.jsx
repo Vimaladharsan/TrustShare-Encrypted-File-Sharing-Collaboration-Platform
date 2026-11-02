@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  Bell,
   CalendarDays,
   CheckCircle2,
   MonitorSmartphone,
@@ -12,6 +13,7 @@ import { useSearchParams } from 'react-router';
 import { useAuth } from '../auth/useAuth';
 import DeleteAccountCard from '../components/settings/DeleteAccountCard';
 import DevicesTab from '../components/settings/DevicesTab';
+import NotificationsTab from '../components/settings/NotificationsTab';
 import ProfileTab from '../components/settings/ProfileTab';
 import SecurityTab from '../components/settings/SecurityTab';
 import { formatDate } from '../utils/format';
@@ -20,6 +22,7 @@ const TABS = [
   { value: 'profile', label: 'Profile', icon: UserRound },
   { value: 'security', label: 'Security', icon: ShieldCheck },
   { value: 'devices', label: 'Devices', icon: MonitorSmartphone },
+  { value: 'notifications', label: 'Notifications', icon: Bell },
   { value: 'account', label: 'Account', icon: AlertTriangle },
 ];
 const ROLE_LABEL = { admin: 'Administrator', user: 'Standard user', guest: 'Guest' };
@@ -118,6 +121,7 @@ export default function SettingsPage() {
       {tab === 'profile' && <ProfileTab />}
       {tab === 'security' && <SecurityTab />}
       {tab === 'devices' && <DevicesTab />}
+      {tab === 'notifications' && <NotificationsTab />}
       {tab === 'account' && <DeleteAccountCard />}
     </div>
   );

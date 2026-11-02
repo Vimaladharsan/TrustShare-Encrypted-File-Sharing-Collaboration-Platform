@@ -53,7 +53,7 @@ export default function UserMenu() {
   ].filter(Boolean);
 
   return (
-    <div className="relative ml-auto" ref={ref}>
+    <div className="relative" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

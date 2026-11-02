@@ -3,8 +3,8 @@ admin deleting an account that has been inactive for 30+ days. One implementatio
 remove exactly the same things.
 
 Removed: every encrypted object and its key (crypto-shredding), file metadata, vault files,
-folders, favorites, shares (database cascade), MFA codes, Google links and the vault row
-(cascade), all sessions, any lockout – then the account row.
+folders, favorites, notifications, shares (database cascade), MFA codes, Google links and the
+vault row (cascade), all sessions, any lockout – then the account row.
 The activity log is kept: it is the audit trail.
 """
 
@@ -46,6 +46,8 @@ async def erase_account(
     await vault.delete_many({"owner_id": owner_id})
     await FolderRepository(db).delete_all_owned(owner_id)
     await FavoriteRepository(db).delete_for_user(owner_id)
+    await db["notifications"].delete_many({"user_id": owner_id})
+    await db["notification_preferences"].delete_many({"user_id": owner_id})
 
     await UserRepository(session).delete(user_id)
     await session.commit()

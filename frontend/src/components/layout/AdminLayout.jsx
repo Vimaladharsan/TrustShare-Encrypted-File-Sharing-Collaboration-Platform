@@ -18,6 +18,7 @@ import { NavLink, Outlet } from 'react-router';
 import { useAuth } from '../../auth/useAuth';
 import Logo from '../Logo';
 import { Empty } from '../StateMessage';
+import NotificationBell from '../notifications/NotificationBell';
 import UserMenu from './UserMenu';
 
 // Admin panel menu (mentor's mockup). Each page's data is protected on the server by a
@@ -158,6 +159,7 @@ export default function AdminLayout() {
           <span className="hidden text-sm text-slate-500 xl:block">
             Every request is permission-checked on the server
           </span>
+          <NotificationBell />
           <UserMenu />
         </header>
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
