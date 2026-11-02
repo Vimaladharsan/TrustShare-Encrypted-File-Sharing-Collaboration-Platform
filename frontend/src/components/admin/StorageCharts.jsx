@@ -1,6 +1,6 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
-import { OTHER, SERIES } from '../../utils/charts';
+import { OTHER, SERIES, SURFACE } from '../../utils/charts';
 import { formatBytes } from '../../utils/format';
 import { ChartCard, ChartTooltip } from '../analytics/AnalyticsParts';
 
@@ -45,7 +45,7 @@ export function StorageByUserChart({ users }) {
               innerRadius="55%"
               outerRadius="85%"
               paddingAngle={2}
-              stroke="#ffffff"
+              stroke={SURFACE}
               strokeWidth={2}
               isAnimationActive={false}
             >

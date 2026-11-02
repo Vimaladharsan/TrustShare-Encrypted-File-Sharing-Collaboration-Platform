@@ -18,6 +18,7 @@ import {
   GRID,
   LOGIN_SERIES,
   OTHER,
+  SURFACE,
   shortDay,
 } from '../../utils/charts';
 import { StackedBars } from '../analytics/AnalyticsCharts';
@@ -61,7 +62,7 @@ export function LoginActivityChart({ days }) {
                 fill={s.color}
                 fillOpacity={0.12}
                 dot={false}
-                activeDot={{ r: 4, stroke: '#ffffff', strokeWidth: 2 }}
+                activeDot={{ r: 4, stroke: SURFACE, strokeWidth: 2 }}
                 isAnimationActive={false}
               />
             ))}
@@ -129,7 +130,7 @@ export function EventsByTypeChart({ types }) {
                 nameKey="label"
                 innerRadius="66%"
                 outerRadius="100%"
-                stroke="#ffffff"
+                stroke={SURFACE}
                 strokeWidth={2}
                 isAnimationActive={false}
               >

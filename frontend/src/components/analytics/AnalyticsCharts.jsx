@@ -19,6 +19,7 @@ import {
   DOWNLOAD_SERIES,
   GRID,
   SHARE_SERIES,
+  SURFACE,
   shortDay,
 } from '../../utils/charts';
 import { formatBytes } from '../../utils/format';
@@ -64,7 +65,7 @@ export function StorageDonut({ usage, quotaBytes }) {
                 nameKey="label"
                 innerRadius="68%"
                 outerRadius="100%"
-                stroke="#ffffff"
+                stroke={SURFACE}
                 strokeWidth={2}
                 isAnimationActive={false}
               >
@@ -144,7 +145,7 @@ export function DownloadsChart({ days }) {
                 stroke={s.color}
                 strokeWidth={2}
                 dot={false}
-                activeDot={{ r: 4, stroke: '#ffffff', strokeWidth: 2 }}
+                activeDot={{ r: 4, stroke: SURFACE, strokeWidth: 2 }}
                 isAnimationActive={false}
               />
             ))}
@@ -191,7 +192,7 @@ export function StackedBars({ days, series }) {
               stackId="day"
               fill={s.color}
               maxBarSize={18}
-              stroke="#ffffff"
+              stroke={SURFACE}
               strokeWidth={1}
               // Only the top segment gets rounded corners.
               radius={index === series.length - 1 ? [4, 4, 0, 0] : 0}

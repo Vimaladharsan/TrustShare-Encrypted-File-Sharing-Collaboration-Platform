@@ -92,6 +92,90 @@
   }
 }
 
+/* ---------- admin console theme ----------
+   The admin panel is a dark operations console, deliberately unlike the light user workspace.
+   Tailwind builds every colour class from a CSS variable (bg-slate-50 → --color-slate-50), so
+   redefining the palette here re-themes every admin page without touching its code:
+   slate is inverted (50 = page background … 950 = brightest text), "white" is the card surface,
+   blue becomes the console's teal accent, and status colours become dark tints with bright text.
+   AdminLayout puts this class on <html> while the panel is open (so dialogs and menus follow). */
+.admin-console {
+  color-scheme: dark;
+
+  --color-white: #111821;
+  --color-slate-50: #0b1017;
+  --color-slate-100: #141c27;
+  --color-slate-200: #202b39;
+  --color-slate-300: #2f3c4d;
+  --color-slate-400: #6c7b8f;
+  --color-slate-500: #8e9cb0;
+  --color-slate-600: #a6b2c2;
+  --color-slate-700: #c2ccd8;
+  --color-slate-800: #d9e0e9;
+  --color-slate-900: #e8edf3;
+  --color-slate-950: #f5f7fa;
+
+  --color-blue-50: #0a2426;
+  --color-blue-100: #0d3234;
+  --color-blue-200: #12494a;
+  --color-blue-300: #1f6f6c;
+  --color-blue-400: #2dd4bf;
+  --color-blue-500: #2dd4bf;
+  --color-blue-600: #2dd4bf;
+  --color-blue-700: #5eead4;
+  --color-blue-800: #99f6e4;
+  --color-blue-900: #ccfbf1;
+  --color-indigo-500: #818cf8;
+  --color-indigo-600: #818cf8;
+
+  --color-red-50: #2a1215;
+  --color-red-100: #3b1519;
+  --color-red-200: #5c1d22;
+  --color-red-300: #8f2d33;
+  --color-red-500: #f87171;
+  --color-red-600: #f87171;
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+  --color-red-900: #fee2e2;
+
+  --color-amber-50: #2a1f0b;
+  --color-amber-100: #3a2a0c;
+  --color-amber-200: #5a420f;
+  --color-amber-500: #fbbf24;
+  --color-amber-600: #fbbf24;
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+
+  --color-emerald-50: #0b2419;
+  --color-emerald-100: #0f3322;
+  --color-emerald-200: #14532d;
+  --color-emerald-500: #34d399;
+  --color-emerald-600: #34d399;
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-900: #d1fae5;
+  --color-green-50: #0b2419;
+  --color-green-600: #4ade80;
+  --color-green-700: #86efac;
+
+  --color-orange-50: #2b1709;
+  --color-orange-600: #fb923c;
+  --color-orange-700: #fdba74;
+  --color-violet-50: #1e1533;
+  --color-violet-600: #a78bfa;
+  --color-violet-700: #c4b5fd;
+
+  --shadow-xs: 0 1px 0 0 rgb(0 0 0 / 0.35);
+  --shadow-card: 0 1px 0 0 rgb(255 255 255 / 0.02) inset, 0 1px 2px 0 rgb(0 0 0 / 0.45);
+  --shadow-card-hover: 0 10px 28px -8px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(45 212 191 / 0.15);
+  --shadow-pop: 0 24px 56px -12px rgb(0 0 0 / 0.8), 0 0 0 1px rgb(255 255 255 / 0.05);
+}
+
+/* Console panels: tighter corners and a hairline border instead of a soft card. */
+.admin-console .card {
+  border-radius: 0.75rem;
+  border-color: var(--color-slate-200);
+}
+
 /* Respect the operating system's "reduce motion" setting. */
 @media (prefers-reduced-motion: reduce) {
   *,

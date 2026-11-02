@@ -52,8 +52,11 @@ export const EVENT_TYPE_COLORS = {
 };
 
 // Recessive chart chrome (grid, axes) – text uses ink colours, never series colours.
-export const GRID = '#e2e8f0';
-export const AXIS_TEXT = '#64748b';
+// CSS variables (slate-200 / slate-500 / the card surface), so charts follow the admin console's
+// dark theme automatically and look exactly as before in the light workspace.
+export const GRID = 'var(--color-slate-200)';
+export const AXIS_TEXT = 'var(--color-slate-500)';
+export const SURFACE = 'var(--color-white)'; // gaps between pie slices, dot outlines
 
 /** '2026-10-05' → '5 Oct' (axis ticks) */
 export function shortDay(iso) {
