@@ -490,3 +490,68 @@ instead (`app/storage/azure_blob.py`, same five operations behind the `ObjectSto
 (`caddy/Caddyfile`: TLS 1.3 with Caddy's local CA, HTTP/2 + HTTP/3, `/api/*` → backend, rest → frontend).
 Uvicorn runs with `--proxy-headers --forwarded-allow-ips 172.16.0.0/12`, so the client IP used by logs and
 rate limits comes from `X-Forwarded-For` – trusted only from proxies inside the Docker network.
+
+---
+
+## 9. Milestone 3 – Monitoring, notifications & analytics
+
+### 9.1 Modules (named like the brief)
+
+| Module | Responsibility |
+|---|---|
+| `app/activity_monitoring/` | `record_activity()` – the one reusable recording function; admin feed, summary, live stream |
+| `app/audit/` | Append-only, hash-chained `audit_logs`; retrieval, filters, verification, CSV |
+| `app/security_monitoring/` | `detection.py` rule engine; alert summary, filters and workflow |
+| `app/notifications/` | Notifications + preferences, triggers, SSE stream, background scheduler, emails |
+| `app/reports/` | Upload, download, sharing, user-activity and security reports (+ CSV) |
+| `app/analytics/` | Admin storage analytics; shared query helpers (filters, file metadata without names) |
+
+M1/M2 code stays layered (routes → services → repositories); `ActivityService.log` now simply delegates to
+`record_activity`, so every existing call site feeds monitoring, audit, detection and notifications.
+
+### 9.2 Event flow
+
+```mermaid
+flowchart LR
+    A[Any action<br/>login · upload · download · share · denied access] --> R[record_activity]
+    R --> L[(activity_logs<br/>feed + own history)]
+    R --> AU[(audit_logs<br/>seq · prev_hash · hash)]
+    R --> P[[Redis pub/sub<br/>activity_feed]] --> F[Admin live feed - SSE]
+    R --> D{Detection rules<br/>Redis sliding windows}
+    D -- limit exceeded --> E[(security_events<br/>alert: severity, status)]
+    E --> N[Notifications]
+    R --> N
+    N --> NC[(notifications)]
+    N --> PS[[Redis pub/sub<br/>notifications:user]] --> B[Bell - SSE, real time]
+    N --> M[Email - Gmail SMTP<br/>per preferences]
+    S[Scheduler every 5 min<br/>Redis lock] --> N
+    S --> R
+```
+
+### 9.3 Design decisions
+
+- **Tamper-evident audit log.** `hash = SHA-256(prev_hash + canonical entry)`; a unique index on `seq` makes
+  concurrent writers retry instead of forking the chain. `GET /api/audit-logs/verify` re-computes every hash and
+  names the first broken entry. History recorded before M3 was imported once (`import_audit_history`, flagged
+  `imported`).
+- **Detection.** Each rule counts matching activities per subject (account, user or IP) in a Redis sorted set
+  scored by time; above the limit → one security event, then a cooldown for the rest of the window. Thresholds
+  come from `.env`. Every security event is also an alert with a status (open → acknowledged → resolved).
+- **Real-time delivery with Server-Sent Events.** One long-lived response per tab, fed by Redis pub/sub. The
+  browser reads it with `fetch` and the in-memory access token in the Authorization header (no token in the URL).
+  The server ends the stream with `reauth` when the token expires or the device is signed out, the client
+  refreshes and reconnects; a heartbeat every 25 s keeps proxies (Caddy) from closing it.
+- **Background scheduler.** A task started with the API (Redis lock → only one copy runs) sends expiry reminders
+  24 h before a share expires and records `share.expired` once.
+- **Privacy.** Admin reports, analytics, logs and alerts return file IDs, types and sizes – never names
+  (`activity_monitoring.models.redact`, name-free audit descriptions). This is a deliberate deviation from the
+  brief's "filter by file name", in line with the M2 rule that admins cannot see users' files.
+- **Storage of file metadata.** The brief assumes file metadata in PostgreSQL; TrustShare keeps it in MongoDB
+  (Milestone 1 requirement), so analytics read MongoDB `files`/`vault_files` and PostgreSQL `users`/`shares`.
+
+### 9.4 Unified admin dashboard
+
+Overview · **Monitoring** (User activity with live feed, Audit logs with integrity banner, Security monitoring,
+Suspicious activity alerts) · **Reports & analytics** (File activity reports, Storage analytics) ·
+**Management** (Users, Notifications, System). Users get a notification bell (live), a notifications page and
+Settings → Notifications (email per type).

@@ -147,6 +147,7 @@ Indexes: `UNIQUE(email)`, `INDEX(role_id)`.
 | download_count | `integer` | default 0. |
 | revoked_at | `timestamptz` | Set when the owner revokes. |
 | last_accessed_at, created_at | `timestamptz` | |
+| reminder_sent_at, expiry_recorded_at | `timestamptz` | M3 scheduler: owner reminded before expiry / expiry recorded once |
 
 Constraint: `UNIQUE(file_id, recipient_id)` for active direct shares (one direct share per person and file).
 A share is **usable** only if not revoked, not expired, under its limit, the file is active and the owner is
@@ -290,10 +291,64 @@ Indexes: `{ created_at: -1 }`, `{ type: 1, created_at: -1 }`, `{ severity: 1, cr
 Login history itself stays in `activity_logs` (`auth.login.success` / `auth.login.failed`); downloads are
 logged there too (`file.download` with `via: owner | direct_share | link`) for the analytics dashboards.
 
+Since Milestone 3 every event is also an **alert**: `alert_id` (UUID), `status` (`open` → `acknowledged` →
+`resolved`; missing = open), `acknowledged_by/at`, `resolved_by/at`, `note`, and for rule-based detections
+`rule: {name, count, limit, window_minutes, subject}`. New types: `repeated_failed_logins`,
+`repeated_unauthorized_access`, `excessive_downloads`, `expired_link_abuse`, `revoked_link_abuse`, `vault_locked`.
+
 ### 2.5 `favorites` *(Milestone 2)*
 
 `{ user_id, file_id, created_at }` – `UNIQUE(user_id, file_id)`. A user can star their own files or files
 shared with them.
+
+---
+
+### 2.6 `activity_logs` additions *(Milestone 3)*
+
+Two fields on every record: `activity_type` (`login`, `logout`, `upload`, `download`, `access`, `share`,
+`link_access`, `unauthorized`, `file_management`, `vault`, `account`, `admin`) and `file_id`. New actions:
+`auth.logout`, `auth.access_denied`, `file.access_denied`, `share.expired`, `admin.alert_*`, `vault.*`.
+Indexes added: `{ activity_type: 1, created_at: -1 }`, `{ file_id: 1, created_at: -1 }`.
+
+### 2.7 `audit_logs` *(Milestone 3 – permanent, hash-chained)*
+
+```json
+{
+  "log_id": "3f6c…-uuid", "seq": 418,
+  "user_id": "6f1c2a3e-…", "username": "Priya Natarajan",
+  "activity_type": "download", "action": "file.download", "file_id": "6718c2f0a1b2c3d4e5f60789",
+  "description": "Downloaded a file (via direct share)",
+  "status": "success", "ip_address": "172.18.0.1",
+  "created_at": ISODate("2026-11-02T13:05:21.425Z"),
+  "prev_hash": "9b1e…", "hash": "e3ca…"
+}
+```
+
+`hash = SHA-256(prev_hash + canonical JSON of the fields)`; the first entry uses 64 zeros. Descriptions are
+built from templates and never contain file names. Imported history has `imported: true` and
+`source_activity_id`. Indexes: `seq` (unique), `{user_id, seq}`, `{file_id, seq}`, `created_at`.
+No API can change or delete entries. Tests use a separate collection (`audit_logs_test`).
+
+### 2.8 `notifications` and `notification_preferences` *(Milestone 3)*
+
+```json
+{
+  "user_id": "6f1c2a3e-…", "type": "file_shared",
+  "title": "A file was shared with you", "message": "Arun Kumar shared “Plan.pdf” with you (view and download).",
+  "severity": "info", "link": "/shared-with-me", "data": { "file_id": "…", "share_id": "…" },
+  "read": false, "read_at": null, "email_status": "sent", "recipient_email": "bala@example.com",
+  "created_at": ISODate("2026-11-02T13:47:00Z")
+}
+```
+
+Types: `file_shared`, `file_downloaded`, `link_expiring`, `link_expired`, `account_security`, `security_alert`.
+`email_status`: `sent`, `failed`, `not_configured`, `pending`, `skipped` (turned off), `none` (in-app only).
+Index `{ user_id, read, created_at }`. Preferences: `{ user_id (unique), email: { <type>: bool } }`.
+Both are deleted with the account.
+
+### 2.9 `vault_files` *(Milestone 2 extra)*
+
+Like `files`, but the name is stored only encrypted (`name_sealed`) and the file key needs the vault password.
 
 ---
 
@@ -315,6 +370,12 @@ All one-time tokens are stored **hashed** (`sha256(token)`) – if Redis is dump
 | `login_fail:{user_id}` | counter | failures | 15 min | 5 failures → lockout. |
 | `lockout:{user_id}` | string | `1` | 15 min | Account temporarily locked. Admin "unlock" deletes it. |
 | `rl:{scope}:{ip}` | counter | requests | 60 s window | Rate limiting, e.g. `rl:login`, `rl:register`, `rl:forgot`, `rl:upload`. |
+| `detect:{rule}:{subject}` | sorted set | activity ids scored by time | rule window | M3 detection sliding window. |
+| `detect_cooldown:{rule}:{subject}` | string | `1` | rule window | One alert per rule and subject per window. |
+| `notify_download:{owner}:{file}` · `notify_alert_email:{type}` | string | `1` | 10 / 15 min | Notification throttles. |
+| `scheduler:lock` | string | `1` | ~interval | Only one background scheduler runs. |
+| `vault_fail:{user_id}` · `vault_lock:{user_id}` | counter / string | | 15 min | Vault lockout after 5 wrong passwords. |
+| channels `notifications:{user_id}`, `activity_feed` | pub/sub | JSON | – | Live delivery to SSE streams. |
 
 Why Redis and not PostgreSQL for these: they are read on almost every request, they must disappear on time, and losing them is harmless (worst case the user logs in again). TTL makes expiry automatic – no cleanup jobs.
 

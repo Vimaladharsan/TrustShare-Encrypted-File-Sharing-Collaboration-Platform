@@ -1,17 +1,17 @@
 # TrustShare: Secure File-Sharing System
 
-A secure file-sharing and document management platform – a private alternative to Google Drive. Every file is validated, **encrypted server-side with its own AES-256-GCM key** (envelope encryption with rotatable master keys) and stored in private cloud object storage (S3 API or Azure Blob Storage). Users organise files in folders and share them through **permission-controlled, expiring, revocable links** or directly with other users – with analytics for users and a security dashboard for admins.
+A secure file-sharing and document management platform – a private alternative to Google Drive. Every file is validated, **encrypted server-side with its own AES-256-GCM key** (envelope encryption with rotatable master keys) and stored in private cloud object storage (S3 API or Azure Blob Storage). Users organise files in folders and share them through **permission-controlled, expiring, revocable links** or directly with other users – with analytics for users and a security dashboard for admins. Every action is recorded in a **tamper-evident audit log**, suspicious behaviour raises **alerts**, and users and admins get **real-time notifications**.
 
 ![CI](https://github.com/Vimaladharsan/TrustShare-Encrypted-File-Sharing-Collaboration-Platform/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.12+-blue)
 ![FastAPI](https://img.shields.io/badge/backend-FastAPI-009688)
 ![React](https://img.shields.io/badge/frontend-React_%2B_Vite-61DAFB)
-![Status](https://img.shields.io/badge/milestone_2-complete-2ea44f)
+![Status](https://img.shields.io/badge/milestone_3-complete-2ea44f)
 
 ## Status
 
-TrustShare is built milestone by milestone. **Milestone 1** (foundation: auth, RBAC, MFA, upload, dashboard) and **Milestone 2** (encryption, cloud storage, secure sharing, key management, dashboards, HTTPS) are complete.
+TrustShare is built milestone by milestone. **Milestone 1** (foundation: auth, RBAC, MFA, upload, dashboard) **Milestone 2** (encryption, cloud storage, secure sharing, key management, dashboards, HTTPS) and **Milestone 3** (activity monitoring, audit logs, notifications, reports, storage analytics, suspicious-activity detection) are complete.
 
 ## Features
 
@@ -72,9 +72,21 @@ TrustShare is built milestone by milestone. **Milestone 1** (foundation: auth, R
 - **Admin panel:** **Security Dashboard** (logins, failed logins, unauthorized and blocked attempts, security events by severity, recent logins with IP and location), audit log viewer with **CSV export** (formula-injection safe, the export itself is audited), storage per account (sizes only – admins can't open users' files), sharing reports, system monitoring
 - **Security events** recorded automatically: repeated failed logins, lockouts, suspicious IPs, new-IP sign-ins, token reuse, 403s and forged tokens, rate-limit blocks, disguised or tampered files, download anomalies, admin actions
 
+### Monitoring, notifications & analytics (Milestone 3)
+New code lives in feature modules named like the brief: `activity_monitoring/`, `audit/`, `notifications/`, `reports/`, `analytics/`, `security_monitoring/`.
+- **Activity monitoring:** one reusable `record_activity()` records every important action automatically (login/logout, failed logins, uploads, downloads, file access, sharing, link creation/expiry/revocation, unauthorized attempts) with user, activity type, file ID, status, IP and time; admins watch a **live feed** (Server-Sent Events)
+- **Audit logs:** a separate, append-only `audit_logs` collection with the brief's fields; every entry is **hash-chained** to the one before (SHA-256), so any change or deletion is detected by `/api/audit-logs/verify`; filters by user, activity type, file ID, status and dates; CSV export; admins only
+- **Notifications & alerts:** in-app notifications delivered **in real time** (SSE over Redis pub/sub, authenticated with the normal Authorization header) and by **email** per the user's preferences – file shared with you, your shared file was downloaded, link about to expire / expired (background job), account security events; **security alerts to every admin** for rule-based and high-severity events
+- **Suspicious activity detection:** rule engine with sliding windows in Redis and thresholds in `.env` – more than 5 failed sign-ins in 10 min, repeated unauthorized access, more than 20 downloads in 5 min, repeated attempts on expired or revoked links; one alert per rule and subject per window; alert workflow open → acknowledged → resolved (with notes, audited)
+- **Reports:** uploads, downloads, sharing, one user's activity, security – summary, charts, tables and CSV export, with filters for date range, user, file type, activity type and file ID
+- **Storage analytics:** total and per-user storage (incl. vaults and trash), file, download and sharing statistics with the brief's charts (storage-by-user pie, uploads by date, downloads, sharing)
+- **Unified admin dashboard:** User activity · Audit logs · Security monitoring · Suspicious activity alerts · File activity reports · Storage analytics · Notification management · Users · System
+- **Privacy kept:** admins see file IDs, types and sizes in every report, log and alert – never file names (owners still see their own)
+- **Screenshots** of every module: [`docs/screenshots/m3/`](docs/screenshots/m3/) (demo data, personal addresses masked)
+
 ### Platform
 - **HTTPS** through a Caddy reverse proxy (TLS 1.3) at https://localhost:8443; real client IPs via trusted proxy headers
-- **Activity log** in MongoDB for every important action, including **login history** (successful logins with method, failed logins with reason, lockouts) and rejected uploads (who, what, IP, user agent, request ID)
+- **Activity log** in MongoDB for every important action (plus the hash-chained audit log since Milestone 3), including **login history** (successful logins with method, failed logins with reason, lockouts) and rejected uploads (who, what, IP, user agent, request ID)
 - Health endpoint that checks PostgreSQL, MongoDB, Redis and object storage
 - Standard JSON error format with request IDs, security headers, structured logging
 - Everything runs with Docker Compose; database migrations run automatically on start
@@ -124,6 +136,12 @@ Full design with diagrams: [docs/architecture.md](docs/architecture.md) · data 
 TrustShare/
 ├── backend/
 │   ├── app/
+│   │   ├── activity_monitoring/  # M3: record_activity(), admin feed, live stream
+│   │   ├── audit/                # M3: hash-chained audit_logs, filters, verify, CSV
+│   │   ├── notifications/        # M3: notifications, triggers, SSE stream, expiry scheduler
+│   │   ├── security_monitoring/  # M3: detection rules, alert workflow
+│   │   ├── reports/              # M3: upload/download/sharing/user/security reports
+│   │   ├── analytics/            # M3: admin storage analytics
 │   │   ├── api/            # Routes (auth, users, admin, files, folders, trash, shares, analytics, health)
 │   │   ├── core/           # Config, security, permissions, errors, logging, middleware
 │   │   ├── crypto/         # Master-key keyring (wraps and unwraps file keys)
@@ -145,7 +163,7 @@ TrustShare/
 │       └── utils/
 ├── caddy/                  # Caddyfile for local HTTPS
 ├── docs/                   # Architecture, database design, key management, requirements, wireframes
-├── postman/                # Postman collection + environment (Milestone 2 API checks)
+├── postman/                # Postman collections (Milestone 2 + 3) + environment
 ├── .github/workflows/      # CI pipeline
 ├── docker-compose.yml
 └── .env.example
@@ -262,6 +280,8 @@ docker run --rm --network trustshare_default -v "$PWD/postman:/etc/newman" postm
 It creates two throwaway accounts (`@postman.example.com`); remove them afterwards with
 `docker compose exec backend python -m app.scripts.remove_test_accounts postman.example.com`.
 
+`postman/TrustShare_M3.postman_collection.json` checks Milestone 3 – activity monitoring, audit logs (incl. the hash-chain verification), notifications, the brute-force alert and its workflow, reports and storage analytics – 47 requests, 77 checks. Admin endpoints need an admin, which can't be created through the API: fill `adminEmail` / `adminPassword` in the environment, or pass them to Newman with `--env-var adminEmail=… --env-var adminPassword=…`.
+
 ## Environment Variables
 
 See [.env.example](.env.example).
@@ -281,6 +301,8 @@ See [.env.example](.env.example).
 | `S3_ENDPOINT_URL` / `S3_BUCKET` / `S3_REGION` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Object storage for the encrypted files (empty endpoint = real AWS S3) |
 | `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY` | Credentials of the local RustFS container |
 | `STORAGE_PROVIDER` / `AZURE_STORAGE_CONNECTION_STRING` / `AZURE_CONTAINER` | `s3` (default) or `azure`; the Azure storage account's connection string and private container |
+
+Milestone 3 settings (optional): detection thresholds `DETECT_FAILED_LOGINS_LIMIT`/`_MINUTES` (5 / 10), `DETECT_UNAUTHORIZED_*` (4 / 10), `DETECT_DOWNLOADS_*` (20 / 5), `DETECT_EXPIRED_LINK_*` and `DETECT_REVOKED_LINK_*` (2 / 10) – an alert fires when the count goes above the limit; `SCHEDULER_ENABLED` (true), `SCHEDULER_INTERVAL_SECONDS` (300), `LINK_REMINDER_HOURS` (24), `DOWNLOAD_NOTICE_COOLDOWN_MINUTES` (10), `ADMIN_ALERT_EMAIL_COOLDOWN_MINUTES` (15), `SSE_HEARTBEAT_SECONDS` (25), `SSE_MAX_SECONDS` (3600).
 
 Optional settings with defaults include `MAX_UPLOAD_MB` (25), `DEFAULT_QUOTA_MB` (1024), `ACCESS_TOKEN_TTL_MINUTES` (15), `REFRESH_TOKEN_TTL_DAYS` (7), `MAX_FAILED_LOGINS` (5), `LOCKOUT_MINUTES` (15), `SHARE_LINK_MAX_DAYS` (30), `SHARE_LINK_RATE_LIMIT_PER_MINUTE` (60) and `INACTIVE_ACCOUNT_DAYS` (30).
 
@@ -303,13 +325,19 @@ Interactive documentation is available at `/docs` while the backend is running.
 | Sharing (M2) | `POST/GET /api/files/{id}/shares` (create link or direct share / list), `GET /api/shares/sent`, `GET /api/shares/received`, `DELETE /api/shares/{id}` (revoke), `GET /api/shares/{id}/preview` · `/download` (recipient) |
 | Analytics (M2) | `GET /api/analytics/me?from&to&tz`, `GET /api/files/storage`, `GET /api/files/recent`, `GET /api/files/favorites`, `PUT/DELETE /api/files/{id}/favorite`, `GET /api/activity/me` |
 | Admin reports (M2) | `GET /api/admin/overview` (`user:read`), `GET /api/admin/security/overview`, `/security/logins`, `/security/events`, `GET /api/admin/audit`, `GET /api/admin/audit/export` (CSV) (`audit:read`) |
+| Activity monitoring (M3) | `GET /api/activity-monitoring/activities`, `/summary`, `/types`, `/stream` (SSE) – `audit:read` |
+| Audit logs (M3) | `GET /api/audit-logs`, `/audit-logs/user/{user_id}`, `/audit-logs/file/{file_id}`, `/audit-logs/filter`, `/audit-logs/verify`, `/audit-logs/export` (CSV) – `audit:read` |
+| Notifications (M3) | `GET /api/notifications`, `/unread-count`, `POST /{id}/read`, `/read-all`, `GET/PUT /preferences`, `GET /stream` (SSE); `GET /api/notifications/admin/stats` (`audit:read`) |
+| Security monitoring (M3) | `GET /api/security-monitoring/summary`, `/events`, `GET/PATCH /events/{id}` (acknowledge / resolve / reopen), `/rules` – `audit:read` |
+| Reports (M3) | `GET /api/reports/uploads`, `/downloads`, `/sharing`, `/users/{id}`, `/security` (`format=csv`) – `audit:read` |
+| Storage analytics (M3) | `GET /api/analytics/storage`, `/analytics/users/storage`, `/analytics/files`, `/analytics/downloads`, `/analytics/sharing` – `audit:read` |
 | Public links (M2) | `GET /api/s/{token}` · `/preview` · `/download` – no login, rate-limited per IP |
 
 ## Roadmap
 
 - [x] **Milestone 1:** design, Docker setup, authentication, RBAC, MFA, secure upload, file dashboard, CI
 - [x] **Milestone 2:** AES-256-GCM envelope encryption, S3-compatible storage, secure links and direct sharing, key rotation, user analytics, admin security dashboard, HTTPS
-- [ ] **Milestone 3:** notifications, deeper monitoring and suspicious-activity detection (audit logs and analytics started in M2)
+- [x] **Milestone 3:** activity monitoring, tamper-evident audit logs, real-time + email notifications, security alerts, reports, storage analytics, rule-based suspicious-activity detection, unified admin dashboard
 - [ ] **Milestone 4:** security testing, cloud deployment, documentation, demo
 
 ## License

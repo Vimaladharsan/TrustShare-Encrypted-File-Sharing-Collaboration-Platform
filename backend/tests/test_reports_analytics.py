@@ -94,6 +94,7 @@ def test_file_download_and_sharing_statistics(
     sharing = get(client, admin_token, "/api/analytics/sharing", user_id=owner)
 
     assert files["uploaded"] == 2 and files["rejected_uploads"] == 1
+    assert files["shared_files"] == 2  # only this user's shares
     day = files["uploads_by_day"][-1]
     assert day["document"] == 1 and day["image"] == 1
     assert own["total"] == 2 and own["by_owner"] == 2

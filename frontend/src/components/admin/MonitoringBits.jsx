@@ -167,7 +167,7 @@ export function DataTable({ columns, rows, empty = 'Nothing to show.', render = 
   if (!rows.length) return <p className="py-8 text-center text-sm text-slate-500">{empty}</p>;
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] text-left text-sm">
+      <table className={`w-full text-left text-sm ${columns.length > 5 ? 'min-w-[640px]' : ''}`}>
         <thead className="text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
           <tr>
             {columns.map((c) => (
@@ -253,6 +253,9 @@ const STATUS = {
   resolved: 'bg-emerald-50 text-emerald-700 ring-emerald-600/15',
   success: 'bg-emerald-50 text-emerald-700 ring-emerald-600/15',
   failure: 'bg-red-50 text-red-700 ring-red-600/15',
+  sent: 'bg-emerald-50 text-emerald-700 ring-emerald-600/15',
+  failed: 'bg-red-50 text-red-700 ring-red-600/15',
+  pending: 'bg-amber-50 text-amber-800 ring-amber-600/20',
 };
 
 export function StatusBadge({ status }) {

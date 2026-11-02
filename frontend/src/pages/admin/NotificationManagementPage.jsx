@@ -13,10 +13,10 @@ import { TYPE_LABELS } from '../../notifications/types';
 import { useNotifications } from '../../notifications/useNotifications';
 
 const EMAIL_STATUS = {
-  sent: 'success',
-  failed: 'failure',
-  pending: 'acknowledged',
-  skipped: 'skipped',
+  sent: 'sent',
+  failed: 'failed',
+  pending: 'pending',
+  skipped: 'turned_off',
   none: 'in_app_only',
   not_configured: 'not_configured',
 };

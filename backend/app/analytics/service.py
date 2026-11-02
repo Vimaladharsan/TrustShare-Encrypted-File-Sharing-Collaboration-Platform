@@ -169,11 +169,15 @@ class AnalyticsService:
                 setattr(day, category, getattr(day, category) + 1)
         downloads = await self._downloads(filters)
         storage = await self.storage(filters)
-        shared = await self.session.scalars(
-            select(Share.file_id).where(
-                Share.created_at >= period.start, Share.created_at < period.end
-            )
+        shared_query = select(Share.file_id).where(
+            Share.created_at >= period.start, Share.created_at < period.end
         )
+        if filters.user_id:
+            try:
+                shared_query = shared_query.where(Share.owner_id == uuid.UUID(filters.user_id))
+            except ValueError:
+                shared_query = shared_query.where(Share.owner_id.is_(None))
+        shared = await self.session.scalars(shared_query)
         return FileStatistics(
             from_date=period.from_date,
             to_date=period.to_date,
