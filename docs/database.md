@@ -238,7 +238,7 @@ Storage usage per user: `aggregate([{ $match: { owner_id } }, { $group: { _id: n
 
 Indexes: unique `{ owner_id, parent_id, name_lower }` with partial filter `status: "active"` (no two active folders with the same name in one place); `{ ancestors: 1 }`.
 
-### 2.3 `activity_logs` (append-only audit trail)
+### 2.3 `activity_logs` (append-only activity feed – the hash-chained audit trail is `audit_logs`, §2.7)
 
 ```json
 {

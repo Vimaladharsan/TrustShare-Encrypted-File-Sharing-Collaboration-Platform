@@ -280,7 +280,11 @@ docker run --rm --network trustshare_default -v "$PWD/postman:/etc/newman" postm
 It creates two throwaway accounts (`@postman.example.com`); remove them afterwards with
 `docker compose exec backend python -m app.scripts.remove_test_accounts postman.example.com`.
 
-`postman/TrustShare_M3.postman_collection.json` checks Milestone 3 – activity monitoring, audit logs (incl. the hash-chain verification), notifications, the brute-force alert and its workflow, reports and storage analytics – 47 requests, 77 checks. Admin endpoints need an admin, which can't be created through the API: fill `adminEmail` / `adminPassword` in the environment, or pass them to Newman with `--env-var adminEmail=… --env-var adminPassword=…`.
+`postman/TrustShare_M3.postman_collection.json` checks Milestone 3 – activity monitoring, audit logs (incl. the hash-chain verification), notifications, the brute-force alert and its workflow, reports and storage analytics – 47 requests, 77 checks. Admin endpoints need an admin, which can't be created through the API: fill `adminEmail` / `adminPassword` in the environment, or pass them to Newman with `--env-var adminEmail=… --env-var adminPassword=…`. Run it from the repository root (the upload step reads `postman/sample-report.pdf`):
+
+```bash
+docker run --rm --network trustshare_default -v "$PWD/postman:/etc/newman" postman/newman:6-alpine run TrustShare_M3.postman_collection.json -e TrustShare_local.postman_environment.json --env-var baseUrl=http://backend:8000/api --env-var adminEmail=… --env-var adminPassword=…
+```
 
 ## Environment Variables
 

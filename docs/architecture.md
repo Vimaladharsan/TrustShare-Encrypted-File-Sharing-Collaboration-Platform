@@ -329,9 +329,9 @@ All services have health checks; the backend waits for the databases to be healt
 | File Service | `FileService`, `FolderService`, `StorageBackend` |
 | Encryption Service | **M2** – `EncryptionService` + `Keyring` (chunked AES-256-GCM, envelope keys, rotation), `S3Storage` |
 | Sharing Service | **M2** – `ShareService`: link + direct shares in PostgreSQL (hashed tokens, permission, expiry, revocation, limits) |
-| Notification Service | Email (M1: verification/reset) → **M3** in-app + email alerts |
-| Analytics Service | **M3** – aggregations over MongoDB activity logs |
-| Data layer: PostgreSQL, MongoDB, Redis, encrypted storage, audit logs | As in §1 (audit logs = MongoDB `activity_logs`) |
+| Notification Service | Email (M1: verification/reset) → **M3** `notifications` module: in-app (live via SSE) + email alerts, expiry reminders (§9) |
+| Analytics Service | **M3** – `reports` + `analytics` modules: aggregations over MongoDB files/activity logs and PostgreSQL users/shares (§9) |
+| Data layer: PostgreSQL, MongoDB, Redis, encrypted storage, audit logs | As in §1 (activity feed = MongoDB `activity_logs`; since M3 the tamper-evident audit trail = MongoDB `audit_logs`) |
 | Infrastructure: Docker, CI/CD (GitHub Actions), AWS | Docker Compose + GitHub Actions now; cloud in M4 |
 | Message queue, Kubernetes, SIEM/IDS, ML anomaly detection, mobile/desktop clients, FCM, Captcha | **Future scope** (see requirements §8) |
 
