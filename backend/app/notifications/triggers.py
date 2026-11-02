@@ -2,6 +2,7 @@
 needs to know about notifications):
 
   share.create (direct)            → recipient: "X shared “file” with you"          (+ email)
+  share.update (direct)            → recipient: "X changed your access to “file”"
   file.download via link / share   → owner: "X downloaded “file”" (max 1 per file per 10 min)
   security event, rule-based or high severity → every admin: security alert   (+ email if high,
                                                 max 1 email per type per 15 min)
@@ -65,6 +66,8 @@ async def on_activity(activity: dict[str, Any], user: User | None, _: Request | 
     action, details = activity["action"], activity.get("details") or {}
     if action == "share.create" and details.get("share_type") == "user" and user is not None:
         await _file_shared(user, details, activity.get("file_id"))
+    elif action == "share.update" and details.get("share_type") == "user" and user is not None:
+        await _access_changed(user, details, activity.get("file_id"))
     elif action == "file.download" and details.get("via") in ("link", "direct_share"):
         await _file_downloaded(activity, user, details)
 
@@ -97,6 +100,28 @@ async def _file_shared(owner: User, details: dict[str, Any], file_id: str | None
             expires=expires_text,
             link=_app_link("/shared-with-me"),
         ),
+    )
+
+
+async def _access_changed(owner: User, details: dict[str, Any], file_id: str | None) -> None:
+    recipient = await load_user(details.get("recipient_id") or "")
+    if recipient is None or not recipient.is_active:
+        return
+    access = "view and download" if details.get("permission") == "download" else "view only"
+    expires = details.get("expires_at")
+    until = (
+        f", until {datetime.fromisoformat(expires).strftime('%d %b %Y, %H:%M UTC')}"
+        if expires
+        else ", with no expiry"
+    )
+    file_name = details.get("file_name") or "a file"
+    await _service().notify(
+        recipient,
+        "file_shared",
+        "Your access to a shared file changed",
+        f"{owner.full_name} changed your access to “{file_name}”: {access}{until}.",
+        link="/shared-with-me",
+        data={"file_id": file_id, "share_id": details.get("share_id"), "owner": owner.email},
     )
 
 

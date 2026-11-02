@@ -6,6 +6,7 @@ import { getErrorMessage } from '../api/client';
 import { listSentShares, revokeShare } from '../api/shares';
 import Button from '../components/Button';
 import ConfirmDialog from '../components/ConfirmDialog';
+import EditShareDialog from '../components/shares/EditShareDialog';
 import ShareStatusBadge from '../components/shares/ShareStatusBadge';
 import { Empty, ErrorState, Loading } from '../components/StateMessage';
 import { formatDate } from '../utils/format';
@@ -23,6 +24,7 @@ export default function SharedByMePage() {
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('all');
   const [confirm, setConfirm] = useState(null);
+  const [editing, setEditing] = useState(null); // the share being edited
 
   const load = useCallback(() => {
     setError('');
@@ -137,9 +139,16 @@ export default function SharedByMePage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     {share.status !== 'revoked' && (
-                      <Button variant="secondary" onClick={() => askRevoke(share)}>
-                        Revoke
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        {share.file_name && share.status !== 'file_unavailable' && (
+                          <Button variant="secondary" onClick={() => setEditing(share)}>
+                            Edit
+                          </Button>
+                        )}
+                        <Button variant="secondary" onClick={() => askRevoke(share)}>
+                          Revoke
+                        </Button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -147,6 +156,10 @@ export default function SharedByMePage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {editing && (
+        <EditShareDialog share={editing} onSaved={load} onClose={() => setEditing(null)} />
       )}
 
       {confirm && (

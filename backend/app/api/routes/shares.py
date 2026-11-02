@@ -1,6 +1,7 @@
 """Sharing routes.
 
-Owner:      POST/GET /files/{id}/shares · GET /shares/sent · DELETE /shares/{id} (revoke)
+Owner:      POST/GET /files/{id}/shares · GET /shares/sent · PATCH /shares/{id} (edit)
+            · DELETE /shares/{id} (revoke)
 Recipient:  GET /shares/received · GET /shares/{id}/preview|download
 Public:     GET /s/{token} · /s/{token}/preview · /s/{token}/download (no login, rate-limited)
 """
@@ -24,7 +25,9 @@ from app.schemas.share import (
     ReceivedShareListResponse,
     ShareCreate,
     ShareCreated,
+    ShareInfo,
     ShareListResponse,
+    ShareUpdate,
 )
 from app.services.share_service import ShareService
 from app.storage.secure_store import SecureFileStore, get_file_store
@@ -89,6 +92,20 @@ async def list_sent(
     service: ShareService = Depends(share_service),
 ) -> ShareListResponse:
     return ShareListResponse(items=await service.list_sent(user))
+
+
+@router.patch(
+    "/shares/{share_id}",
+    response_model=ShareInfo,
+    summary="Edit a share: permission, expiry or download limit – the link stays the same",
+)
+async def update_share(
+    share_id: uuid.UUID,
+    data: ShareUpdate,
+    user: User = Depends(can_share),
+    service: ShareService = Depends(share_service),
+) -> ShareInfo:
+    return await service.update(user, share_id, data)
 
 
 @router.delete(

@@ -1,4 +1,4 @@
-import { Check, Copy, Link2, ShieldCheck, UserRound } from 'lucide-react';
+import { Check, Copy, Link2, Pencil, ShieldCheck, UserRound } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -7,10 +7,18 @@ import { PREVIEWABLE } from '../../api/files';
 import { createShare, listFileShares, revokeShare } from '../../api/shares';
 import Button from '../Button';
 import Modal from '../Modal';
-import { downloadsLabel, expiryLabel, permissionLabel } from '../../utils/shares';
+import {
+  HOUR,
+  LINK_MAX_DAYS,
+  customExpiryError,
+  downloadsLabel,
+  expiryLabel,
+  permissionLabel,
+  toLocalInput,
+} from '../../utils/shares';
+import EditShareDialog from './EditShareDialog';
 import ShareStatusBadge from './ShareStatusBadge';
 
-const HOUR = 60 * 60 * 1000;
 const LINK_EXPIRY = [
   { value: HOUR, label: '1 hour' },
   { value: 24 * HOUR, label: '1 day' },
@@ -19,24 +27,6 @@ const LINK_EXPIRY = [
 ];
 const CUSTOM = -1;
 const PERSON_EXPIRY = [{ value: 0, label: 'Never' }, ...LINK_EXPIRY.slice(1, 3)];
-const LINK_MAX_DAYS = 30; // the server's SHARE_LINK_MAX_DAYS
-
-/** Value for <input type="datetime-local">: local time, minutes precision. */
-function toLocalInput(date) {
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 16);
-}
-
-/** Problem with a custom expiry, or '' if it is fine. */
-function customExpiryError(value, mode) {
-  if (!value) return 'Pick a date and time.';
-  const when = new Date(value).getTime();
-  if (Number.isNaN(when) || when <= Date.now()) return 'Pick a time in the future.';
-  if (mode === 'link' && when > Date.now() + LINK_MAX_DAYS * 24 * HOUR) {
-    return `Links can last at most ${LINK_MAX_DAYS} days.`;
-  }
-  return '';
-}
 
 const inputClass =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 shadow-xs focus:ring-4 focus:ring-blue-500/15 focus:outline-none';
@@ -58,6 +48,7 @@ export default function ShareDialog({ file, onClose }) {
   const [createdUrl, setCreatedUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const [shares, setShares] = useState(null);
+  const [editing, setEditing] = useState(null); // the share being edited
 
   const customProblem = expiry === CUSTOM ? customExpiryError(customAt, mode) : '';
 
@@ -284,15 +275,29 @@ export default function ShareDialog({ file, onClose }) {
                 </div>
                 <ShareStatusBadge status={share.status} />
                 {share.status !== 'revoked' && (
-                  <Button variant="secondary" onClick={() => revoke(share)}>
-                    Revoke
-                  </Button>
+                  <>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setEditing(share)}
+                      aria-label="Edit share"
+                      title="Change permission, expiry or download limit"
+                    >
+                      <Pencil className="size-4" aria-hidden="true" />
+                    </Button>
+                    <Button variant="secondary" onClick={() => revoke(share)}>
+                      Revoke
+                    </Button>
+                  </>
                 )}
               </li>
             ))}
           </ul>
         )}
       </div>
+
+      {editing && (
+        <EditShareDialog share={editing} onSaved={loadShares} onClose={() => setEditing(null)} />
+      )}
     </Modal>
   );
 }

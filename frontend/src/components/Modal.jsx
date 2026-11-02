@@ -1,6 +1,9 @@
 import { X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
+// Open dialogs, newest last: Escape closes only the top one (e.g. Edit share over Share).
+const openDialogs = [];
+
 /**
  * Dialog: blurred backdrop, panel that pops in, closes on Escape, the ✕ button or a click on the
  * backdrop. The page behind doesn't scroll while it is open, and keyboard focus moves into it.
@@ -9,11 +12,23 @@ export default function Modal({ title, onClose, children, width = 'max-w-md' }) 
   const panelRef = useRef(null);
   const pressedOnBackdrop = useRef(false);
 
+  const closeRef = useRef(onClose);
   useEffect(() => {
-    const onKey = (event) => event.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    closeRef.current = onClose;
   }, [onClose]);
+
+  // Registered once per dialog, so re-renders never change which dialog is on top.
+  useEffect(() => {
+    const id = Symbol('dialog');
+    openDialogs.push(id);
+    const onKey = (event) =>
+      event.key === 'Escape' && openDialogs[openDialogs.length - 1] === id && closeRef.current();
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      openDialogs.splice(openDialogs.indexOf(id), 1);
+    };
+  }, []);
 
   useEffect(() => {
     const { overflow } = document.body.style;

@@ -40,6 +40,7 @@ from app.schemas.share import (
     ShareCreated,
     ShareInfo,
     ShareStatus,
+    ShareUpdate,
 )
 from app.services.activity_service import ActivityService
 from app.services.email_service import Email, file_shared_email
@@ -195,6 +196,95 @@ class ShareService:
             resource_id=share.file_id,
             details={"share_id": str(share.id), "share_type": share.share_type},
         )
+
+    async def update(self, owner: User, share_id: uuid.UUID, data: ShareUpdate) -> ShareInfo:
+        """Change permission, expiry and/or download limit of one of my shares (same link)."""
+        share = await self.shares.get(share_id)
+        if share is None or share.owner_id != owner.id:
+            raise _share_not_found()
+        if share.revoked_at is not None:
+            raise AppError(
+                "SHARE_REVOKED", "A revoked share can't be changed – create a new one.", 409
+            )
+        file = await self._owned_active_file(owner, share.file_id)
+        sent = data.model_fields_set
+        now = datetime.now(UTC)
+        before = (share.permission, share.expires_at, share.max_downloads)
+
+        permission = data.permission if "permission" in sent else share.permission
+        if permission == "view" and file["extension"] not in PREVIEWABLE:
+            raise AppError(
+                "VIEW_NOT_SUPPORTED",
+                f".{file['extension']} files can't be previewed in the browser, so they need "
+                "download permission.",
+                400,
+            )
+        expires_at = data.expires_at if "expires_at" in sent else share.expires_at
+        if "expires_at" in sent:
+            if expires_at is not None and expires_at <= now:
+                raise AppError("INVALID_EXPIRY", "The expiry time must be in the future.", 400)
+            max_days = get_settings().share_link_max_days
+            if share.share_type == "link" and (
+                expires_at is None or expires_at > now + timedelta(days=max_days, minutes=5)
+            ):
+                raise AppError(
+                    "INVALID_EXPIRY", f"Share links must expire within {max_days} days.", 400
+                )
+        max_downloads = data.max_downloads if "max_downloads" in sent else share.max_downloads
+        if permission == "view":
+            max_downloads = None  # a download limit means nothing without download permission
+        if max_downloads is not None and max_downloads < share.download_count:
+            raise AppError(
+                "INVALID_LIMIT",
+                f"The file was already downloaded {share.download_count} times – the limit "
+                "can't be lower than that.",
+                400,
+            )
+
+        changes = [
+            name
+            for name, old, new in zip(
+                ("permission", "expiry", "download limit"),
+                before,
+                (permission, expires_at, max_downloads),
+                strict=True,
+            )
+            if old != new
+        ]
+        recipient = await self._recipient_of(share)
+        if not changes:
+            return self._info(share, file, recipient)
+        share.permission = permission
+        share.expires_at = expires_at
+        share.max_downloads = max_downloads
+        if "expiry" in changes:
+            # New expiry → the owner gets a fresh reminder and the expiry is recorded again.
+            share.reminder_sent_at = None
+            share.expiry_recorded_at = None
+        await self.session.commit()
+        await self.session.refresh(share)
+
+        await self.activity.log(
+            self.request,
+            owner,
+            "share.update",
+            resource_type="file",
+            resource_id=share.file_id,
+            details={
+                "share_id": str(share.id),
+                "share_type": share.share_type,
+                "changes": ", ".join(changes),
+                "permission": share.permission,
+                "file_name": file["original_name"],
+                "recipient_id": str(recipient.id) if recipient else None,
+                "expires_at": expires_at.isoformat() if expires_at else None,
+                "max_downloads": max_downloads,
+            },
+        )
+        return self._info(share, file, recipient)
+
+    async def _recipient_of(self, share: Share) -> User | None:
+        return await self.users.get_by_id(share.recipient_id) if share.recipient_id else None
 
     # ---------- recipient: "Shared with Me" ----------
 

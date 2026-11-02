@@ -25,6 +25,12 @@ export async function listSentShares() {
   return data.items;
 }
 
+/** changes: any of { permission, expires_at (ISO or null), max_downloads (number or null) }. */
+export async function updateShare(shareId, changes) {
+  const { data } = await api.patch(`/shares/${shareId}`, changes);
+  return data;
+}
+
 export const revokeShare = (shareId) => api.delete(`/shares/${shareId}`);
 
 // ---------- recipient ("Shared with me") ----------

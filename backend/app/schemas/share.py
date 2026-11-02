@@ -37,6 +37,33 @@ class ShareCreate(BaseModel):
         return self
 
 
+class ShareUpdate(BaseModel):
+    """Change an existing share without revoking it – send only what changes.
+
+    - `permission`: "view" or "download" (switching to view also removes a download limit)
+    - `expires_at`: new expiry; links need one (within SHARE_LINK_MAX_DAYS), people may have null
+      (= never expires)
+    - `max_downloads`: new download limit, null = no limit; not below the downloads already made
+
+    Extending an expired share or raising a used-up limit makes it active again (same link).
+    A revoked share is final.
+    """
+
+    permission: SharePermission | None = None
+    expires_at: datetime | None = None
+    max_downloads: int | None = Field(None, ge=1, le=1000)
+
+    @model_validator(mode="after")
+    def check_values(self) -> "ShareUpdate":
+        if not self.model_fields_set:
+            raise ValueError("Nothing to change")
+        if "permission" in self.model_fields_set and self.permission is None:
+            raise ValueError("permission must be view or download")
+        if self.expires_at and self.expires_at.tzinfo is None:
+            raise ValueError("expires_at must include a time zone, e.g. 2026-11-01T12:00:00Z")
+        return self
+
+
 class ShareInfo(BaseModel):
     """A share as its owner sees it. Never contains the link token or its hash."""
 

@@ -86,6 +86,7 @@ DESCRIPTIONS: dict[str, str] = {
     "folder.restore": "Restored a folder",
     "folder.delete": "Deleted a folder permanently",
     "share.create": "Shared a file ({share_type}, {permission})",
+    "share.update": "Changed a share ({changes})",
     "share.revoke": "Revoked a share",
     "share.access_denied": "Share link access denied ({reason})",
     "share.expired": "A share link expired",
