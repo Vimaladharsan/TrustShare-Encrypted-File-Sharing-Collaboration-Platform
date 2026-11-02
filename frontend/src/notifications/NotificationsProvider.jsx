@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
 import {
@@ -9,12 +10,14 @@ import {
 } from '../api/notifications';
 import { useAuth } from '../auth/useAuth';
 import { NotificationsContext } from './NotificationsContext';
+import { showDesktop } from './desktop';
 
 const RECENT = 8;
 
 /**
  * Opens ONE live notification stream while someone is signed in and keeps the unread count and
- * the latest notifications up to date for the whole app. New ones also pop up as a toast.
+ * the latest notifications up to date for the whole app. New ones also pop up as a toast, and as
+ * a desktop pop-up when TrustShare is in a background tab (if turned on – see desktop.js).
  */
 export default function NotificationsProvider({ children }) {
   const { status } = useAuth();
@@ -22,6 +25,8 @@ export default function NotificationsProvider({ children }) {
   const [recent, setRecent] = useState([]);
   const [version, setVersion] = useState(0);
   const [live, setLive] = useState(false);
+  const navigate = useNavigate();
+  const openRef = useRef(null); // latest "open this notification" handler, for desktop pop-ups
 
   const reload = useCallback(async () => {
     try {
@@ -55,6 +60,7 @@ export default function NotificationsProvider({ children }) {
               ? toast.warning
               : toast.info;
         show(data.title, { description: data.message });
+        showDesktop(data, (n) => openRef.current?.(n));
       }
     });
     return () => {
@@ -69,6 +75,14 @@ export default function NotificationsProvider({ children }) {
     setUnread((n) => Math.max(0, n - 1));
     setVersion((v) => v + 1);
   }, []);
+
+  // Clicking a desktop pop-up: go where the notification points and mark it read.
+  useEffect(() => {
+    openRef.current = (notification) => {
+      markOne(notification.id).catch(() => {});
+      if (notification.link) navigate(notification.link);
+    };
+  }, [markOne, navigate]);
 
   const markAll = useCallback(async () => {
     await markAllRead();
