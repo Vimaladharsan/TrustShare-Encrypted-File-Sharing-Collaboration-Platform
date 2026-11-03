@@ -60,6 +60,8 @@ TrustShare is built milestone by milestone. **Milestone 1** (foundation: auth, R
 ### Secure sharing (Milestone 2)
 - **Share links** for anyone (no account): view-only or view & download, expiry as a preset (1 hour … 30 days) or an exact date and time (max 30 days), optional download limit, instant revoke; 256-bit tokens stored only as SHA-256 hashes and hidden in logs
 - **Direct sharing** with registered users ("Shared with me" / "Shared by me"); the recipient gets an email notice
+- **Share several files at once** from the My Files selection: one link per file (Copy all), or one person gets all of them with a single notification and email; each file is checked on its own
+- **QR code** for every new link, generated in the browser (the link is never sent to an online QR service), downloadable as PNG
 - **Edit a share without revoking it:** change view/download, extend or shorten the expiry (people's shares can also be set to never expire) or change the download limit – the link stays the same, an expired or used-up share becomes active again, the edit is audited and the recipient of a direct share is notified
 - Every access re-checks revocation, expiry, limit, file status and the owner's account and permissions – trashing a file or disabling its owner stops all links at once
 
@@ -329,7 +331,7 @@ Interactive documentation is available at `/docs` while the backend is running.
 | Folders | `GET/POST /api/folders`, `GET/PATCH/DELETE /api/folders/{id}`, `POST /api/folders/{id}/trash`, `/restore` |
 | Trash | `POST /api/trash/restore`, `/delete`, `/restore-all`, `/empty` |
 | Secure vault | `GET/POST /api/vault` (status / create), `POST /api/vault/password`, `POST /api/vault/reset`, `GET/POST /api/vault/files`, `GET /api/vault/files/{id}/preview` · `/download`, `PATCH/DELETE /api/vault/files/{id}`, `POST /api/vault/files/{id}/move-out`, `POST /api/vault/import/{file_id}` – file routes need the `X-Vault-Password` header |
-| Sharing (M2) | `POST/GET /api/files/{id}/shares` (create link or direct share / list), `GET /api/shares/sent`, `GET /api/shares/received`, `PATCH /api/shares/{id}` (edit permission / expiry / limit), `DELETE /api/shares/{id}` (revoke), `GET /api/shares/{id}/preview` · `/download` (recipient) |
+| Sharing (M2) | `POST/GET /api/files/{id}/shares` (create link or direct share / list), `GET /api/shares/sent`, `GET /api/shares/received`, `POST /api/shares/bulk` (several files at once), `PATCH /api/shares/{id}` (edit permission / expiry / limit), `DELETE /api/shares/{id}` (revoke), `GET /api/shares/{id}/preview` · `/download` (recipient) |
 | Analytics (M2) | `GET /api/analytics/me?from&to&tz`, `GET /api/files/storage`, `GET /api/files/recent`, `GET /api/files/favorites`, `PUT/DELETE /api/files/{id}/favorite`, `GET /api/activity/me` |
 | Admin reports (M2) | `GET /api/admin/overview` (`user:read`), `GET /api/admin/security/overview`, `/security/logins`, `/security/events`, `GET /api/admin/audit`, `GET /api/admin/audit/export` (CSV) (`audit:read`) |
 | Activity monitoring (M3) | `GET /api/activity-monitoring/activities`, `/summary`, `/types`, `/stream` (SSE) – `audit:read` |

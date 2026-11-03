@@ -1,10 +1,10 @@
-import { Check, Copy, Link2, Pencil, ShieldCheck, UserRound } from 'lucide-react';
+import { Copy, Link2, Pencil, ShieldCheck, UserRound } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { getErrorMessage } from '../../api/client';
 import { PREVIEWABLE } from '../../api/files';
-import { createShare, listFileShares, revokeShare } from '../../api/shares';
+import { createShare, createSharesBulk, listFileShares, revokeShare } from '../../api/shares';
 import Button from '../Button';
 import Modal from '../Modal';
 import {
@@ -16,6 +16,7 @@ import {
   permissionLabel,
   toLocalInput,
 } from '../../utils/shares';
+import CreatedLink from './CreatedLink';
 import EditShareDialog from './EditShareDialog';
 import ShareStatusBadge from './ShareStatusBadge';
 
@@ -32,12 +33,16 @@ const inputClass =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 shadow-xs focus:ring-4 focus:ring-blue-500/15 focus:outline-none';
 
 /**
- * Share one file: a secret link (anyone who has it) or a registered person ("Shared with me"),
- * with view / download permission, expiry and an optional download limit. Also lists the file's
- * existing shares so they can be revoked.
+ * Share one file – or several selected files at once (`files`) – as a secret link (anyone who has
+ * it; one link per file) or with a registered person ("Shared with me"), with view / download
+ * permission, expiry and an optional download limit. New links can be shown as a QR code.
+ * For a single file it also lists the file's existing shares (edit / revoke).
  */
-export default function ShareDialog({ file, onClose }) {
-  const canView = PREVIEWABLE.includes(file.extension);
+export default function ShareDialog({ file, files, onClose }) {
+  const items = files ?? [file];
+  const multi = items.length > 1;
+  const firstId = items[0].id;
+  const canView = items.every((item) => PREVIEWABLE.includes(item.extension));
   const [mode, setMode] = useState('link'); // 'link' | 'user'
   const [permission, setPermission] = useState(canView ? 'view' : 'download');
   const [expiry, setExpiry] = useState(7 * 24 * HOUR);
@@ -45,18 +50,18 @@ export default function ShareDialog({ file, onClose }) {
   const [limit, setLimit] = useState('');
   const [email, setEmail] = useState('');
   const [working, setWorking] = useState(false);
-  const [createdUrl, setCreatedUrl] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [createdLinks, setCreatedLinks] = useState([]); // [{ id, file_name, url }]
   const [shares, setShares] = useState(null);
   const [editing, setEditing] = useState(null); // the share being edited
 
   const customProblem = expiry === CUSTOM ? customExpiryError(customAt, mode) : '';
 
   const loadShares = useCallback(() => {
-    listFileShares(file.id)
+    if (multi) return;
+    listFileShares(firstId)
       .then(setShares)
       .catch(() => setShares([]));
-  }, [file.id]);
+  }, [firstId, multi]);
 
   useEffect(loadShares, [loadShares]);
 
@@ -64,7 +69,7 @@ export default function ShareDialog({ file, onClose }) {
     setMode(next);
     setExpiry(next === 'link' ? 7 * 24 * HOUR : 0);
     setCustomAt('');
-    setCreatedUrl('');
+    setCreatedLinks([]);
   }
 
   async function handleSubmit(event) {
@@ -80,15 +85,32 @@ export default function ShareDialog({ file, onClose }) {
       else if (expiry) body.expires_at = new Date(Date.now() + expiry).toISOString();
       if (permission === 'download' && limit) body.max_downloads = Number(limit);
       if (mode === 'user') body.recipient_email = email.trim();
-      const created = await createShare(file.id, body);
-      if (created.url) {
-        setCreatedUrl(created.url);
-        setCopied(false);
+      if (multi) {
+        const result = await createSharesBulk(
+          items.map((item) => item.id),
+          body,
+        );
+        const done = result.created.length;
+        if (mode === 'link') setCreatedLinks(result.created);
+        else if (done) {
+          toast.success(`Shared ${done} files with ${email.trim()} – they get one notice`);
+          setEmail('');
+        }
+        if (result.failed.length) {
+          const name = items.find((item) => item.id === result.failed[0].file_id)?.name;
+          toast.warning(
+            `${done} shared, ${result.failed.length} skipped – ${name}: ${result.failed[0].message}`,
+          );
+        }
       } else {
-        toast.success(`Shared with ${created.recipient_name} – we emailed them a notice`);
-        setEmail('');
+        const created = await createShare(firstId, body);
+        if (created.url) setCreatedLinks([created]);
+        else {
+          toast.success(`Shared with ${created.recipient_name} – we emailed them a notice`);
+          setEmail('');
+        }
+        loadShares();
       }
-      loadShares();
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -96,13 +118,13 @@ export default function ShareDialog({ file, onClose }) {
     }
   }
 
-  async function copy() {
+  async function copyAll() {
+    const text = createdLinks.map((link) => `${link.file_name}: ${link.url}`).join('\n');
     try {
-      await navigator.clipboard.writeText(createdUrl);
-      setCopied(true);
-      toast.success('Link copied');
+      await navigator.clipboard.writeText(text);
+      toast.success(`${createdLinks.length} links copied`);
     } catch {
-      toast.error('Copy failed – select the link and copy it manually.');
+      toast.error('Copy failed – copy the links one by one.');
     }
   }
 
@@ -117,7 +139,19 @@ export default function ShareDialog({ file, onClose }) {
   }
 
   return (
-    <Modal title={`Share “${file.name}”`} onClose={onClose} width="max-w-2xl">
+    <Modal
+      title={multi ? `Share ${items.length} files` : `Share “${items[0].name}”`}
+      onClose={onClose}
+      width="max-w-2xl"
+    >
+      {multi && (
+        <p
+          className="mb-4 truncate text-sm text-slate-500"
+          title={items.map((i) => i.name).join(', ')}
+        >
+          {items.map((item) => item.name).join(' · ')}
+        </p>
+      )}
       <div className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 text-sm font-medium">
         <ModeButton active={mode === 'link'} onClick={() => switchMode('link')} icon={Link2}>
           Anyone with the link
@@ -151,7 +185,8 @@ export default function ShareDialog({ file, onClose }) {
               className={inputClass}
             >
               <option value="view" disabled={!canView}>
-                View only{canView ? '' : ' (not for this type)'}
+                View only
+                {canView ? '' : multi ? ' (not for all selected types)' : ' (not for this type)'}
               </option>
               <option value="download">View & download</option>
             </select>
@@ -221,35 +256,48 @@ export default function ShareDialog({ file, onClose }) {
             loading={working}
             disabled={expiry === CUSTOM && Boolean(customProblem)}
           >
-            {mode === 'link' ? 'Create link' : 'Share'}
+            {mode === 'link'
+              ? multi
+                ? `Create ${items.length} links`
+                : 'Create link'
+              : multi
+                ? `Share ${items.length} files`
+                : 'Share'}
           </Button>
         </div>
       </form>
 
-      {createdUrl && (
+      {createdLinks.length > 0 && (
         <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
-          <div className="flex gap-2">
-            <input
-              readOnly
-              value={createdUrl}
-              onFocus={(e) => e.target.select()}
-              aria-label="Share link"
-              className="min-w-0 flex-1 rounded-lg border border-blue-200 bg-white px-3 py-2 font-mono text-xs"
-            />
-            <Button onClick={copy}>
-              {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-              {copied ? 'Copied' : 'Copy'}
-            </Button>
+          {multi && (
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-sm font-medium text-blue-900">
+                {createdLinks.length} links created – one per file
+              </p>
+              <Button size="sm" variant="secondary" onClick={copyAll}>
+                <Copy className="size-3.5" aria-hidden="true" /> Copy all
+              </Button>
+            </div>
+          )}
+          <div className={multi ? 'max-h-72 space-y-3 overflow-y-auto pr-1' : ''}>
+            {createdLinks.map((link) => (
+              <CreatedLink
+                key={link.id}
+                url={link.url}
+                fileName={link.file_name}
+                showName={multi}
+              />
+            ))}
           </div>
-          <p className="mt-2 flex items-start gap-1.5 text-xs text-blue-800">
+          <p className="mt-3 flex items-start gap-1.5 text-xs text-blue-800">
             <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-            Copy it now: TrustShare keeps only a fingerprint (hash) of this link, so it can&apos;t
-            be shown again. You can always create a new one.
+            Copy {multi ? 'them' : 'it'} now: TrustShare keeps only a fingerprint (hash) of each
+            link, so it can&apos;t be shown again. You can always create a new one.
           </p>
         </div>
       )}
 
-      <div className="mt-6">
+      <div className={multi ? 'hidden' : 'mt-6'}>
         <h3 className="mb-2 text-sm font-semibold text-slate-900">Current shares</h3>
         {shares === null && <p className="text-sm text-slate-500">Loading…</p>}
         {shares?.length === 0 && (

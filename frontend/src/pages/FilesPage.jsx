@@ -360,6 +360,20 @@ export default function FilesPage({ mode = 'folder' }) {
                         {!zipping && <Download className="size-3.5" aria-hidden="true" />}
                         {zipping ? 'Preparing ZIP…' : 'Download ZIP'}
                       </Button>
+                      {can('share:create') && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() =>
+                            setDialog({
+                              type: 'shareSelected',
+                              items: files.filter((f) => selected.has(f.id)),
+                            })
+                          }
+                        >
+                          <Share2 className="size-3.5" aria-hidden="true" /> Share
+                        </Button>
+                      )}
                       {canEditFiles && (
                         <Button
                           size="sm"
@@ -414,6 +428,9 @@ export default function FilesPage({ mode = 'folder' }) {
       )}
       {dialog?.type === 'share' && (
         <ShareDialog file={dialog.item} onClose={() => setDialog(null)} />
+      )}
+      {dialog?.type === 'shareSelected' && (
+        <ShareDialog files={dialog.items} onClose={() => setDialog(null)} />
       )}
       {dialog?.type === 'upload' && (
         <UploadModal

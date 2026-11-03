@@ -1,6 +1,7 @@
 """Sharing routes.
 
-Owner:      POST/GET /files/{id}/shares · GET /shares/sent · PATCH /shares/{id} (edit)
+Owner:      POST/GET /files/{id}/shares · POST /shares/bulk · GET /shares/sent
+            · PATCH /shares/{id} (edit)
             · DELETE /shares/{id} (revoke)
 Recipient:  GET /shares/received · GET /shares/{id}/preview|download
 Public:     GET /s/{token} · /s/{token}/preview · /s/{token}/download (no login, rate-limited)
@@ -21,8 +22,10 @@ from app.db.mongo import get_mongo
 from app.db.postgres import get_db
 from app.models import User
 from app.schemas.share import (
+    BulkShareResult,
     PublicShareInfo,
     ReceivedShareListResponse,
+    ShareBulkCreate,
     ShareCreate,
     ShareCreated,
     ShareInfo,
@@ -71,6 +74,20 @@ async def create_share(
     # A direct share notifies the recipient (in-app + email per their preferences) through the
     # notification module, which listens to the "share.create" activity.
     return await service.create(user, file_id, data)
+
+
+@router.post(
+    "/shares/bulk",
+    response_model=BulkShareResult,
+    status_code=status.HTTP_201_CREATED,
+    summary="Share several of my files at once (same settings; one link per file)",
+)
+async def create_shares_bulk(
+    data: ShareBulkCreate,
+    user: User = Depends(can_share),
+    service: ShareService = Depends(share_service),
+) -> BulkShareResult:
+    return await service.create_many(user, data)
 
 
 @router.get(

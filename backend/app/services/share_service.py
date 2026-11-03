@@ -34,8 +34,11 @@ from app.repositories.file_repository import FileRepository
 from app.repositories.share_repository import ShareRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.share import (
+    BulkShareFailure,
+    BulkShareResult,
     PublicShareInfo,
     ReceivedShare,
+    ShareBulkCreate,
     ShareCreate,
     ShareCreated,
     ShareInfo,
@@ -102,7 +105,9 @@ class ShareService:
 
     # ---------- owner: create, list, revoke ----------
 
-    async def create(self, owner: User, file_id: str, data: ShareCreate) -> ShareCreated:
+    async def create(
+        self, owner: User, file_id: str, data: ShareCreate, batch: bool = False
+    ) -> ShareCreated:
         file = await self._owned_active_file(owner, file_id)
         if data.permission == "view" and file["extension"] not in PREVIEWABLE:
             raise AppError(
@@ -165,11 +170,44 @@ class ShareService:
                 "recipient_id": str(recipient.id) if recipient else None,
                 "expires_at": expires_at.isoformat() if expires_at else None,
                 "max_downloads": share.max_downloads,
+                # part of a "share several files" request: the recipient is told once, below
+                "batch": batch,
             },
         )
         info = self._info(share, file, recipient)
         url = f"{get_settings().frontend_url}/s/{token}" if token else None
         return ShareCreated(**info.model_dump(), url=url)
+
+    async def create_many(self, owner: User, data: ShareBulkCreate) -> BulkShareResult:
+        """The same share for several files. Each file is checked on its own (one problem doesn't
+        stop the rest); a person gets ONE notification and email for the whole batch."""
+        recipient = None
+        if data.share_type == "user":  # an unknown person stops the whole request at once
+            recipient = await self._recipient(owner, str(data.recipient_email))
+        single = ShareCreate(**data.model_dump(exclude={"file_ids"}))
+        created: list[ShareCreated] = []
+        failed: list[BulkShareFailure] = []
+        for file_id in dict.fromkeys(data.file_ids):
+            try:
+                created.append(await self.create(owner, file_id, single, batch=True))
+            except AppError as exc:
+                failed.append(BulkShareFailure(file_id=file_id, code=exc.code, message=exc.message))
+        if recipient is not None and created:
+            await self.activity.log(
+                self.request,
+                owner,
+                "share.create_batch",
+                details={
+                    "share_type": "user",
+                    "permission": data.permission,
+                    "count": len(created),
+                    "file_names": [share.file_name for share in created][:20],
+                    "recipient_email": recipient.email,
+                    "recipient_id": str(recipient.id),
+                    "expires_at": data.expires_at.isoformat() if data.expires_at else None,
+                },
+            )
+        return BulkShareResult(created=created, failed=failed)
 
     async def list_for_file(self, owner: User, file_id: str) -> list[ShareInfo]:
         file = await self.files.get(file_id)

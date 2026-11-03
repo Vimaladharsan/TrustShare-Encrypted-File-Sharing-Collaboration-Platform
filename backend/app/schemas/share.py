@@ -37,6 +37,19 @@ class ShareCreate(BaseModel):
         return self
 
 
+class ShareBulkCreate(ShareCreate):
+    """Share several of my files at once with the same settings: one link per file
+    (`share_type: "link"`), or one person gets access to all of them (`share_type: "user"`)."""
+
+    file_ids: list[str] = Field(min_length=1, max_length=50)
+
+
+class BulkShareFailure(BaseModel):
+    file_id: str
+    code: str
+    message: str
+
+
 class ShareUpdate(BaseModel):
     """Change an existing share without revoking it – send only what changes.
 
@@ -85,6 +98,11 @@ class ShareInfo(BaseModel):
 class ShareCreated(ShareInfo):
     # The full link – returned ONLY in this response. The server keeps just its SHA-256 hash.
     url: str | None = None
+
+
+class BulkShareResult(BaseModel):
+    created: list[ShareCreated]  # links include their url – shown only in this response
+    failed: list[BulkShareFailure]
 
 
 class ShareListResponse(BaseModel):

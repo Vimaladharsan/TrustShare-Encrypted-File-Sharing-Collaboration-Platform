@@ -15,6 +15,15 @@ export async function createShare(fileId, body) {
   return data;
 }
 
+/**
+ * The same share for several files: { created: [share (+ url for links)], failed: [...] }.
+ * A person gets one notification and email for all of them.
+ */
+export async function createSharesBulk(fileIds, body) {
+  const { data } = await api.post('/shares/bulk', { ...body, file_ids: fileIds });
+  return data;
+}
+
 export async function listFileShares(fileId) {
   const { data } = await api.get(`/files/${fileId}/shares`);
   return data.items;

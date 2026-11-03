@@ -157,6 +157,52 @@ def password_reset_email(to: str, name: str, link: str, minutes: int) -> Email:
     )
 
 
+def files_shared_email(
+    to: str,
+    name: str,
+    owner_name: str,
+    owner_email: str,
+    file_names: list[str],
+    can_download: bool,
+    expires: str | None,
+    link: str,
+) -> Email:
+    """One email for several files shared with a registered user at once (no file content)."""
+    access = "view and download" if can_download else "view (preview only)"
+    until = f" until {expires}" if expires else ""
+    count = len(file_names)
+    shown = file_names[:10]
+    more = f"\n… and {count - len(shown)} more" if count > len(shown) else ""
+    safe_names = "".join(f"<li>{html.escape(n)}</li>" for n in shown)
+    safe_more = f"<li>… and {count - len(shown)} more</li>" if count > len(shown) else ""
+    safe = {
+        k: html.escape(v)
+        for k, v in {"name": name, "owner": owner_name, "email": owner_email}.items()
+    }
+    return Email(
+        to=to,
+        subject=f"{owner_name} shared {count} files with you on TrustShare",
+        text=(
+            f"Hi {name},\n\n"
+            f"{owner_name} ({owner_email}) shared {count} files with you:\n"
+            + "\n".join(f"- {n}" for n in shown)
+            + f"{more}\n\nYou can {access}{until}.\n\n"
+            f'Open them under "Shared with me" after logging in:\n{link}\n\n'
+            "Not expecting this? You can ignore this email; the owner can revoke access any time.\n"
+        ),
+        html=_layout(
+            f"{count} files were shared with you",
+            f"<p>Hi {safe['name']},</p><p><strong>{safe['owner']}</strong> ({safe['email']}) "
+            f"shared {count} files with you. You can {access}{until}.</p>"
+            f"<ul>{safe_names}{safe_more}</ul>"
+            "<p>The files stay encrypted on TrustShare and open after you log in.</p>",
+            "Open Shared with me",
+            link,
+            "Not expecting this? You can ignore this email; the owner can revoke access any time.",
+        ),
+    )
+
+
 def file_shared_email(
     to: str,
     name: str,

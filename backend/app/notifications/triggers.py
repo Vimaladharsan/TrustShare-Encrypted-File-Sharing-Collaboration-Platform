@@ -3,6 +3,7 @@ needs to know about notifications):
 
   share.create (direct)            → recipient: "X shared “file” with you"          (+ email)
   share.update (direct)            → recipient: "X changed your access to “file”"
+  share.create_batch (direct)      → recipient: "X shared 4 files with you"     (+ one email)
   file.download via link / share   → owner: "X downloaded “file”" (max 1 per file per 10 min)
   security event, rule-based or high severity → every admin: security alert   (+ email if high,
                                                 max 1 email per type per 15 min)
@@ -21,7 +22,11 @@ from app.db.mongo import get_mongo
 from app.db.redis import get_redis
 from app.models import User
 from app.notifications.service import NotificationService, active_admins, load_user
-from app.services.email_service import file_shared_email, notification_email
+from app.services.email_service import (
+    file_shared_email,
+    files_shared_email,
+    notification_email,
+)
 from app.services.security_events import EVENT_TYPES
 
 RULE_ALERTS = {
@@ -64,8 +69,11 @@ def _app_link(path: str) -> str:
 
 async def on_activity(activity: dict[str, Any], user: User | None, _: Request | None) -> None:
     action, details = activity["action"], activity.get("details") or {}
-    if action == "share.create" and details.get("share_type") == "user" and user is not None:
+    direct = details.get("share_type") == "user" and user is not None
+    if action == "share.create" and direct and not details.get("batch"):
         await _file_shared(user, details, activity.get("file_id"))
+    elif action == "share.create_batch" and direct:
+        await _files_shared(user, details)
     elif action == "share.update" and details.get("share_type") == "user" and user is not None:
         await _access_changed(user, details, activity.get("file_id"))
     elif action == "file.download" and details.get("via") in ("link", "direct_share"):
@@ -96,6 +104,39 @@ async def _file_shared(owner: User, details: dict[str, Any], file_id: str | None
             owner_name=owner.full_name,
             owner_email=owner.email,
             file_name=file_name,
+            can_download=can_download,
+            expires=expires_text,
+            link=_app_link("/shared-with-me"),
+        ),
+    )
+
+
+async def _files_shared(owner: User, details: dict[str, Any]) -> None:
+    recipient = await load_user(details.get("recipient_id") or "")
+    if recipient is None or not recipient.is_active:
+        return
+    names = details.get("file_names") or []
+    count = details.get("count") or len(names)
+    can_download = details.get("permission") == "download"
+    expires = details.get("expires_at")
+    expires_text = (
+        datetime.fromisoformat(expires).strftime("%d %b %Y, %H:%M UTC") if expires else None
+    )
+    listed = ", ".join(f"“{n}”" for n in names[:3]) + (" …" if count > 3 else "")
+    await _service().notify(
+        recipient,
+        "file_shared",
+        f"{count} files were shared with you",
+        f"{owner.full_name} shared {count} files with you: {listed} "
+        f"({'view and download' if can_download else 'view only'}).",
+        link="/shared-with-me",
+        data={"count": count, "owner": owner.email},
+        email=files_shared_email(
+            to=recipient.email,
+            name=recipient.full_name,
+            owner_name=owner.full_name,
+            owner_email=owner.email,
+            file_names=names,
             can_download=can_download,
             expires=expires_text,
             link=_app_link("/shared-with-me"),
