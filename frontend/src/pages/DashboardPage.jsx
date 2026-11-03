@@ -54,7 +54,7 @@ export default function DashboardPage() {
   const firstName = user.full_name.split(' ')[0];
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700 p-6 text-white shadow-lg shadow-blue-600/20 sm:p-8">
+      <section className="keep-colors relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700 p-6 text-white shadow-lg shadow-blue-600/20 sm:p-8">
         {/* Decorative light blobs and a subtle grid – purely visual. */}
         <div className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-white/10 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-32 left-1/3 size-72 rounded-full bg-indigo-400/30 blur-3xl" />
@@ -249,7 +249,7 @@ function Overview({ analytics, recent, received, canUpload, canShare }) {
               ))}
             </ul>
           </section>
-          <section className="shadow-card flex items-start gap-3 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 p-5 text-white">
+          <section className="keep-colors shadow-card flex items-start gap-3 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 p-5 text-white">
             <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white/10 ring-1 ring-white/15">
               <KeyRound className="size-[18px]" aria-hidden="true" />
             </span>

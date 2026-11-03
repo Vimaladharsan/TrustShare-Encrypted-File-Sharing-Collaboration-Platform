@@ -92,16 +92,21 @@
   }
 }
 
-/* ---------- admin console theme ----------
-   The admin panel is a dark operations console, deliberately unlike the light user workspace.
-   Tailwind builds every colour class from a CSS variable (bg-slate-50 → --color-slate-50), so
-   redefining the palette here re-themes every admin page without touching its code:
-   slate is inverted (50 = page background … 950 = brightest text), "white" is the card surface,
-   blue becomes the console's teal accent, and status colours become dark tints with bright text.
-   AdminLayout puts this class on <html> while the panel is open (so dialogs and menus follow). */
-.admin-console {
+/* ---------- dark themes ----------
+   Two dark looks share one palette: the admin console (always dark, its own violet identity) and the user
+   workspace's optional dark mode (blue accent). Tailwind builds every colour class from a CSS
+   variable (bg-slate-50 → --color-slate-50), so redefining the palette re-themes every page
+   without touching its code: slate is inverted (50 = page background … 950 = brightest text),
+   "white" is the card surface, accents are brightened and status colours become dark tints with
+   bright text. The layouts put `admin-console` / `theme-dark` on <html>; the palette is set on
+   <body>, so <html> (:root) keeps the original values for the keep-colors islands below. */
+.admin-console,
+.theme-dark {
   color-scheme: dark;
+}
 
+.admin-console body,
+.theme-dark body {
   --color-white: #111821;
   --color-slate-50: #0b1017;
   --color-slate-100: #141c27;
@@ -114,20 +119,6 @@
   --color-slate-800: #d9e0e9;
   --color-slate-900: #e8edf3;
   --color-slate-950: #f5f7fa;
-
-  --color-blue-50: #0a2426;
-  --color-blue-100: #0d3234;
-  --color-blue-200: #12494a;
-  --color-blue-300: #1f6f6c;
-  --color-blue-400: #2dd4bf;
-  --color-blue-500: #2dd4bf;
-  --color-blue-600: #2dd4bf;
-  --color-blue-700: #5eead4;
-  --color-blue-800: #99f6e4;
-  --color-blue-900: #ccfbf1;
-  --color-indigo-500: #818cf8;
-  --color-indigo-600: #818cf8;
-
   --color-red-50: #2a1215;
   --color-red-100: #3b1519;
   --color-red-200: #5c1d22;
@@ -137,7 +128,6 @@
   --color-red-700: #fca5a5;
   --color-red-800: #fecaca;
   --color-red-900: #fee2e2;
-
   --color-amber-50: #2a1f0b;
   --color-amber-100: #3a2a0c;
   --color-amber-200: #5a420f;
@@ -145,7 +135,7 @@
   --color-amber-600: #fbbf24;
   --color-amber-700: #fcd34d;
   --color-amber-800: #fde68a;
-
+  --color-amber-900: #fef3c7;
   --color-emerald-50: #0b2419;
   --color-emerald-100: #0f3322;
   --color-emerald-200: #14532d;
@@ -154,26 +144,279 @@
   --color-emerald-700: #6ee7b7;
   --color-emerald-900: #d1fae5;
   --color-green-50: #0b2419;
+  --color-green-100: #0f3322;
+  --color-green-500: #4ade80;
   --color-green-600: #4ade80;
   --color-green-700: #86efac;
-
   --color-orange-50: #2b1709;
   --color-orange-600: #fb923c;
   --color-orange-700: #fdba74;
   --color-violet-50: #1e1533;
+  --color-violet-100: #2a1d4a;
   --color-violet-600: #a78bfa;
   --color-violet-700: #c4b5fd;
+  --color-rose-50: #2a1219;
+  --color-rose-600: #fb7185;
+  --color-sky-50: #0c1c26;
+  --color-cyan-50: #0b2229;
+  --color-cyan-500: #22d3ee;
+  --color-cyan-600: #22d3ee;
 
   --shadow-xs: 0 1px 0 0 rgb(0 0 0 / 0.35);
   --shadow-card: 0 1px 0 0 rgb(255 255 255 / 0.02) inset, 0 1px 2px 0 rgb(0 0 0 / 0.45);
-  --shadow-card-hover: 0 10px 28px -8px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(45 212 191 / 0.15);
+  --shadow-card-hover: 0 10px 28px -8px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(255 255 255 / 0.06);
   --shadow-pop: 0 24px 56px -12px rgb(0 0 0 / 0.8), 0 0 0 1px rgb(255 255 255 / 0.05);
 }
 
-/* Console panels: tighter corners and a hairline border instead of a soft card. */
+.theme-dark body {
+  --color-blue-50: #0f1b2e;
+  --color-blue-100: #13233d;
+  --color-blue-200: #1c3459;
+  --color-blue-300: #2a4f86;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #60a5fa;
+  --color-blue-600: #60a5fa;
+  --color-blue-700: #93c5fd;
+  --color-blue-800: #bfdbfe;
+  --color-blue-900: #dbeafe;
+  --color-blue-950: #eff6ff;
+  --color-indigo-50: #17172e;
+  --color-indigo-100: #1e1e3f;
+  --color-indigo-200: #2b2b5c;
+  --color-indigo-400: #a5b4fc;
+  --color-indigo-500: #818cf8;
+  --color-indigo-600: #818cf8;
+  --color-indigo-700: #a5b4fc;
+  --color-indigo-950: #eef2ff;
+}
+
+/* Declared after the workspace palette, so the console keeps its own look even with dark mode on. */
+.admin-console body {
+  --color-white: #13102a;
+  --color-slate-50: #0b0918;
+  --color-slate-100: #16122e;
+  --color-slate-200: #251f45;
+  --color-slate-300: #362e5e;
+  --color-slate-400: #7a72a6;
+  --color-slate-500: #9c95c3;
+  --color-slate-600: #b5afd6;
+  --color-slate-700: #cdc8e7;
+  --color-slate-800: #e2dff2;
+  --color-slate-900: #efedf9;
+  --color-slate-950: #f8f7fd;
+  --color-blue-50: #1c1538;
+  --color-blue-100: #251b4a;
+  --color-blue-200: #35276b;
+  --color-blue-300: #5b45a8;
+  --color-blue-400: #a78bfa;
+  --color-blue-500: #a78bfa;
+  --color-blue-600: #a78bfa;
+  --color-blue-700: #c4b5fd;
+  --color-blue-800: #ddd6fe;
+  --color-blue-900: #ede9fe;
+  --color-indigo-500: #f0abfc;
+  --color-indigo-600: #f0abfc;
+}
+
+/* Console identity – deliberately unlike the workspace in either mode: square corners, a faint
+   grid with a violet glow behind everything, panels with a thin violet top edge, and table data
+   in a monospace font like an operations tool. */
+.admin-console body {
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 4px;
+  --radius-2xl: 6px;
+  --radius-3xl: 6px;
+  --font-console-mono: ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace;
+  background-image:
+    radial-gradient(1100px 520px at 85% -12%, rgb(139 92 246 / 0.14), transparent 62%),
+    radial-gradient(700px 420px at -10% 110%, rgb(245 158 11 / 0.06), transparent 60%),
+    linear-gradient(rgb(167 139 250 / 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(167 139 250 / 0.04) 1px, transparent 1px);
+  background-size:
+    auto,
+    auto,
+    28px 28px,
+    28px 28px;
+  background-attachment: fixed;
+}
+
 .admin-console .card {
-  border-radius: 0.75rem;
+  border-radius: 6px;
   border-color: var(--color-slate-200);
+  background-color: rgb(19 16 42 / 0.92);
+  box-shadow:
+    inset 0 1px 0 rgb(167 139 250 / 0.35),
+    0 1px 2px 0 rgb(0 0 0 / 0.5);
+}
+
+.admin-console tbody td {
+  font-family: var(--font-console-mono);
+  font-size: 0.78rem;
+}
+
+/* Buttons and fields inside tables keep the normal font. */
+.admin-console tbody td :is(button, select, input, a.inline-flex) {
+  font-family: var(--font-sans);
+}
+
+.admin-console thead th {
+  letter-spacing: 0.1em;
+}
+
+/* Keep-colors islands: hero banners that are deliberately blue/dark in light mode keep their
+   original colours in dark mode instead of being inverted. :root still holds the light values. */
+:root {
+  --keep-white: var(--color-white);
+  --keep-slate-50: var(--color-slate-50);
+  --keep-slate-100: var(--color-slate-100);
+  --keep-slate-200: var(--color-slate-200);
+  --keep-slate-300: var(--color-slate-300);
+  --keep-slate-400: var(--color-slate-400);
+  --keep-slate-500: var(--color-slate-500);
+  --keep-slate-600: var(--color-slate-600);
+  --keep-slate-700: var(--color-slate-700);
+  --keep-slate-800: var(--color-slate-800);
+  --keep-slate-900: var(--color-slate-900);
+  --keep-slate-950: var(--color-slate-950);
+  --keep-red-50: var(--color-red-50);
+  --keep-red-100: var(--color-red-100);
+  --keep-red-200: var(--color-red-200);
+  --keep-red-300: var(--color-red-300);
+  --keep-red-500: var(--color-red-500);
+  --keep-red-600: var(--color-red-600);
+  --keep-red-700: var(--color-red-700);
+  --keep-red-800: var(--color-red-800);
+  --keep-red-900: var(--color-red-900);
+  --keep-amber-50: var(--color-amber-50);
+  --keep-amber-100: var(--color-amber-100);
+  --keep-amber-200: var(--color-amber-200);
+  --keep-amber-500: var(--color-amber-500);
+  --keep-amber-600: var(--color-amber-600);
+  --keep-amber-700: var(--color-amber-700);
+  --keep-amber-800: var(--color-amber-800);
+  --keep-amber-900: var(--color-amber-900);
+  --keep-emerald-50: var(--color-emerald-50);
+  --keep-emerald-100: var(--color-emerald-100);
+  --keep-emerald-200: var(--color-emerald-200);
+  --keep-emerald-500: var(--color-emerald-500);
+  --keep-emerald-600: var(--color-emerald-600);
+  --keep-emerald-700: var(--color-emerald-700);
+  --keep-emerald-900: var(--color-emerald-900);
+  --keep-green-50: var(--color-green-50);
+  --keep-green-100: var(--color-green-100);
+  --keep-green-500: var(--color-green-500);
+  --keep-green-600: var(--color-green-600);
+  --keep-green-700: var(--color-green-700);
+  --keep-orange-50: var(--color-orange-50);
+  --keep-orange-600: var(--color-orange-600);
+  --keep-orange-700: var(--color-orange-700);
+  --keep-violet-50: var(--color-violet-50);
+  --keep-violet-100: var(--color-violet-100);
+  --keep-violet-600: var(--color-violet-600);
+  --keep-violet-700: var(--color-violet-700);
+  --keep-rose-50: var(--color-rose-50);
+  --keep-rose-600: var(--color-rose-600);
+  --keep-sky-50: var(--color-sky-50);
+  --keep-cyan-50: var(--color-cyan-50);
+  --keep-cyan-500: var(--color-cyan-500);
+  --keep-cyan-600: var(--color-cyan-600);
+  --keep-blue-50: var(--color-blue-50);
+  --keep-blue-100: var(--color-blue-100);
+  --keep-blue-200: var(--color-blue-200);
+  --keep-blue-300: var(--color-blue-300);
+  --keep-blue-400: var(--color-blue-400);
+  --keep-blue-500: var(--color-blue-500);
+  --keep-blue-600: var(--color-blue-600);
+  --keep-blue-700: var(--color-blue-700);
+  --keep-blue-800: var(--color-blue-800);
+  --keep-blue-900: var(--color-blue-900);
+  --keep-blue-950: var(--color-blue-950);
+  --keep-indigo-50: var(--color-indigo-50);
+  --keep-indigo-100: var(--color-indigo-100);
+  --keep-indigo-200: var(--color-indigo-200);
+  --keep-indigo-400: var(--color-indigo-400);
+  --keep-indigo-500: var(--color-indigo-500);
+  --keep-indigo-600: var(--color-indigo-600);
+  --keep-indigo-700: var(--color-indigo-700);
+  --keep-indigo-950: var(--color-indigo-950);
+}
+
+.theme-dark .keep-colors {
+  --color-white: var(--keep-white);
+  --color-slate-50: var(--keep-slate-50);
+  --color-slate-100: var(--keep-slate-100);
+  --color-slate-200: var(--keep-slate-200);
+  --color-slate-300: var(--keep-slate-300);
+  --color-slate-400: var(--keep-slate-400);
+  --color-slate-500: var(--keep-slate-500);
+  --color-slate-600: var(--keep-slate-600);
+  --color-slate-700: var(--keep-slate-700);
+  --color-slate-800: var(--keep-slate-800);
+  --color-slate-900: var(--keep-slate-900);
+  --color-slate-950: var(--keep-slate-950);
+  --color-red-50: var(--keep-red-50);
+  --color-red-100: var(--keep-red-100);
+  --color-red-200: var(--keep-red-200);
+  --color-red-300: var(--keep-red-300);
+  --color-red-500: var(--keep-red-500);
+  --color-red-600: var(--keep-red-600);
+  --color-red-700: var(--keep-red-700);
+  --color-red-800: var(--keep-red-800);
+  --color-red-900: var(--keep-red-900);
+  --color-amber-50: var(--keep-amber-50);
+  --color-amber-100: var(--keep-amber-100);
+  --color-amber-200: var(--keep-amber-200);
+  --color-amber-500: var(--keep-amber-500);
+  --color-amber-600: var(--keep-amber-600);
+  --color-amber-700: var(--keep-amber-700);
+  --color-amber-800: var(--keep-amber-800);
+  --color-amber-900: var(--keep-amber-900);
+  --color-emerald-50: var(--keep-emerald-50);
+  --color-emerald-100: var(--keep-emerald-100);
+  --color-emerald-200: var(--keep-emerald-200);
+  --color-emerald-500: var(--keep-emerald-500);
+  --color-emerald-600: var(--keep-emerald-600);
+  --color-emerald-700: var(--keep-emerald-700);
+  --color-emerald-900: var(--keep-emerald-900);
+  --color-green-50: var(--keep-green-50);
+  --color-green-100: var(--keep-green-100);
+  --color-green-500: var(--keep-green-500);
+  --color-green-600: var(--keep-green-600);
+  --color-green-700: var(--keep-green-700);
+  --color-orange-50: var(--keep-orange-50);
+  --color-orange-600: var(--keep-orange-600);
+  --color-orange-700: var(--keep-orange-700);
+  --color-violet-50: var(--keep-violet-50);
+  --color-violet-100: var(--keep-violet-100);
+  --color-violet-600: var(--keep-violet-600);
+  --color-violet-700: var(--keep-violet-700);
+  --color-rose-50: var(--keep-rose-50);
+  --color-rose-600: var(--keep-rose-600);
+  --color-sky-50: var(--keep-sky-50);
+  --color-cyan-50: var(--keep-cyan-50);
+  --color-cyan-500: var(--keep-cyan-500);
+  --color-cyan-600: var(--keep-cyan-600);
+  --color-blue-50: var(--keep-blue-50);
+  --color-blue-100: var(--keep-blue-100);
+  --color-blue-200: var(--keep-blue-200);
+  --color-blue-300: var(--keep-blue-300);
+  --color-blue-400: var(--keep-blue-400);
+  --color-blue-500: var(--keep-blue-500);
+  --color-blue-600: var(--keep-blue-600);
+  --color-blue-700: var(--keep-blue-700);
+  --color-blue-800: var(--keep-blue-800);
+  --color-blue-900: var(--keep-blue-900);
+  --color-blue-950: var(--keep-blue-950);
+  --color-indigo-50: var(--keep-indigo-50);
+  --color-indigo-100: var(--keep-indigo-100);
+  --color-indigo-200: var(--keep-indigo-200);
+  --color-indigo-400: var(--keep-indigo-400);
+  --color-indigo-500: var(--keep-indigo-500);
+  --color-indigo-600: var(--keep-indigo-600);
+  --color-indigo-700: var(--keep-indigo-700);
+  --color-indigo-950: var(--keep-indigo-950);
 }
 
 /* Respect the operating system's "reduce motion" setting. */

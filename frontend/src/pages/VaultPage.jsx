@@ -273,7 +273,7 @@ export default function VaultPage() {
 
 function VaultHeader({ status, unlocked, children }) {
   return (
-    <section className="shadow-card relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 p-6 text-white">
+    <section className="keep-colors shadow-card relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 p-6 text-white">
       <div className="pointer-events-none absolute -top-20 -right-10 size-64 rounded-full bg-indigo-500/20 blur-3xl" />
       <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-4">

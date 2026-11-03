@@ -92,7 +92,7 @@ const NAV = [
 ];
 
 // Console chrome colours: fixed (not theme tokens), so the frame looks the same on every page.
-const RAIL = 'border-[#1a2330] bg-[#070b11]';
+const RAIL = 'border-[#231d42] bg-[#08061a]/95';
 
 /** The nav entry for the current address (longest match), for the header's breadcrumb. */
 function currentEntry(pathname) {
@@ -145,17 +145,17 @@ export default function AdminLayout() {
   }
 
   const sidebar = (
-    <div className={`flex h-full flex-col border-r ${RAIL} text-[#8e9cb0]`}>
+    <div className={`flex h-full flex-col border-r ${RAIL} text-[#a39cc8]`}>
       <div className={`flex h-16 shrink-0 items-center gap-2.5 border-b ${RAIL} px-5`}>
         <Logo />
-        <span className="rounded border border-teal-400/30 bg-teal-400/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-wider text-teal-300 uppercase">
+        <span className="rounded border border-[#fbbf24]/35 bg-[#fbbf24]/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-wider text-[#fcd34d] uppercase">
           Console
         </span>
       </div>
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5" aria-label="Admin">
         {nav.map((group) => (
           <div key={group.section}>
-            <p className="mb-2 px-3 font-mono text-[10px] font-medium tracking-[0.14em] text-[#56657a] uppercase">
+            <p className="mb-2 px-3 font-mono text-[10px] font-medium tracking-[0.14em] text-[#6f6898] uppercase">
               {group.section}
             </p>
             <div className="space-y-px">
@@ -168,18 +168,18 @@ export default function AdminLayout() {
                   className={({ isActive }) =>
                     `group relative flex items-center gap-3 rounded-md px-3 py-[7px] text-[13px] font-medium transition ${
                       isActive
-                        ? 'bg-teal-400/[0.08] text-teal-200'
-                        : 'hover:bg-white/[0.04] hover:text-[#e8edf3]'
+                        ? 'bg-[#a78bfa]/[0.12] text-[#f3f1fb]'
+                        : 'hover:bg-white/[0.04] hover:text-[#f3f1fb]'
                     }`
                   }
                 >
                   {({ isActive }) => (
                     <>
                       {isActive && (
-                        <span className="absolute inset-y-1.5 -left-3 w-[3px] rounded-r bg-teal-400 shadow-[0_0_12px_rgb(45_212_191/0.6)]" />
+                        <span className="absolute inset-y-1.5 -left-3 w-[3px] rounded-r bg-[#fbbf24] shadow-[0_0_12px_rgb(251_191_36/0.6)]" />
                       )}
                       <Icon
-                        className={`size-4 ${isActive ? 'text-teal-300' : 'text-[#56657a] group-hover:text-[#a6b2c2]'}`}
+                        className={`size-4 ${isActive ? 'text-[#fcd34d]' : 'text-[#6f6898] group-hover:text-[#c9c3e6]'}`}
                         aria-hidden="true"
                       />
                       {label}
@@ -192,8 +192,8 @@ export default function AdminLayout() {
         ))}
       </nav>
       <div className={`mt-auto border-t ${RAIL} p-3`}>
-        <div className="mb-2 rounded-md border border-[#1a2330] bg-[#0b1017] p-3 text-[11px] leading-relaxed">
-          <p className="mb-1 flex items-center gap-1.5 font-mono text-[10px] font-semibold tracking-wider text-teal-300 uppercase">
+        <div className="mb-2 rounded-md border border-[#231d42] bg-[#110d26] p-3 text-[11px] leading-relaxed">
+          <p className="mb-1 flex items-center gap-1.5 font-mono text-[10px] font-semibold tracking-wider text-[#fcd34d] uppercase">
             <ShieldCheck className="size-3.5" aria-hidden="true" /> Privacy by design
           </p>
           Admins see accounts, sizes and security events – never the names or contents of
@@ -201,7 +201,7 @@ export default function AdminLayout() {
         </div>
         <NavLink
           to="/dashboard"
-          className="flex items-center gap-2 rounded-md px-3 py-2 text-[13px] font-medium transition hover:bg-white/[0.04] hover:text-[#e8edf3]"
+          className="flex items-center gap-2 rounded-md px-3 py-2 text-[13px] font-medium transition hover:bg-white/[0.04] hover:text-[#f3f1fb]"
         >
           <ArrowLeft className="size-4" aria-hidden="true" /> Back to my workspace
         </NavLink>
@@ -210,7 +210,7 @@ export default function AdminLayout() {
   );
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen">
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 lg:block">{sidebar}</aside>
 
       {drawerOpen && (
@@ -228,7 +228,7 @@ export default function AdminLayout() {
             <button
               type="button"
               onClick={() => setDrawerOpen(false)}
-              className="absolute top-4 right-3 z-10 rounded-md p-1.5 text-[#8e9cb0] hover:bg-white/10 hover:text-[#e8edf3]"
+              className="absolute top-4 right-3 z-10 rounded-md p-1.5 text-[#a39cc8] hover:bg-white/10 hover:text-[#f3f1fb]"
               aria-label="Close menu"
             >
               <X className="size-5" />
@@ -239,7 +239,7 @@ export default function AdminLayout() {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-200 bg-[#0b1017]/85 px-4 backdrop-blur-md sm:px-6">
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-200 bg-[#0b0918]/80 px-4 backdrop-blur-md sm:px-6">
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}

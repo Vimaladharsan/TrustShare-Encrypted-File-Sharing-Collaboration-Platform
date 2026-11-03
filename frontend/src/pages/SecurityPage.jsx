@@ -76,7 +76,7 @@ export default function SecurityPage() {
           Your files and account are protected by these measures.
         </p>
       </div>
-      <section className="shadow-card relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950 p-6 text-white">
+      <section className="keep-colors shadow-card relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950 p-6 text-white">
         <div className="pointer-events-none absolute -top-20 -right-10 size-64 rounded-full bg-blue-500/20 blur-3xl" />
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">

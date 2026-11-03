@@ -1,10 +1,12 @@
 import { Menu, Search, X } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router';
 
 import { getUsage } from '../../api/files';
+import { useTheme } from '../../theme/useTheme';
 import Sidebar from './Sidebar';
 import NotificationBell from '../notifications/NotificationBell';
+import ThemeToggle from './ThemeToggle';
 import UserMenu from './UserMenu';
 import VerifyEmailBanner from './VerifyEmailBanner';
 
@@ -13,6 +15,16 @@ export default function DashboardLayout() {
   const [usage, setUsage] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
+  const { resolved } = useTheme();
+
+  // Dark mode: the `theme-dark` class on <html> switches the palette (index.css) for every
+  // workspace page, dialog and menu. Before the first paint, and removed when leaving the
+  // workspace (sign-in and other public pages stay light).
+  useLayoutEffect(() => {
+    const html = document.documentElement;
+    html.classList.toggle('theme-dark', resolved === 'dark');
+    return () => html.classList.remove('theme-dark');
+  }, [resolved]);
 
   const refreshUsage = useCallback(() => {
     getUsage()
@@ -75,6 +87,7 @@ export default function DashboardLayout() {
           </button>
           <SearchBox />
           <NotificationBell />
+          <ThemeToggle />
           <UserMenu />
         </header>
         <VerifyEmailBanner />

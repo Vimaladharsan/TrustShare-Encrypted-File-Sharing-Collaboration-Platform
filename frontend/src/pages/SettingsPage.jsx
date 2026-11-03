@@ -45,7 +45,7 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <section className="card overflow-hidden">
-        <div className="relative h-28 bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700">
+        <div className="keep-colors relative h-28 bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700">
           <div className="pointer-events-none absolute -top-10 right-10 size-48 rounded-full bg-white/10 blur-2xl" />
           <div
             className="pointer-events-none absolute inset-0 opacity-[0.08]"

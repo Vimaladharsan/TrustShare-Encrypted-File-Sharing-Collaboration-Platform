@@ -47,6 +47,7 @@ TrustShare is built milestone by milestone. **Milestone 1** (foundation: auth, R
 - **Multi-select** in My Files and search: tick files, then move them, trash them or **download them as one ZIP** (decrypted on the fly into the archive – never written to disk; a ZIP counts once for the excessive-downloads rule)
 - Trash with restore, bulk restore/delete, empty trash and permanent delete
 - Loading, empty and error states; responsive layout
+- **Light and dark mode** for the workspace (sun/moon button in the top bar, or Light / Dark / System in the account menu; remembered per browser, applied before the page paints, "System" follows the operating system live). Sign-in and share-link pages stay light; the admin console is always its own dark theme
 - Buttons adapt to the user's permissions (enforced by the backend regardless)
 
 ### Encryption and storage (Milestone 2)

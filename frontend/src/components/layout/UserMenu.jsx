@@ -1,11 +1,26 @@
-import { ChevronDown, LogOut, Settings, ShieldCheck, ShieldEllipsis } from 'lucide-react';
+import {
+  ChevronDown,
+  LogOut,
+  Monitor,
+  Moon,
+  Settings,
+  ShieldCheck,
+  ShieldEllipsis,
+  Sun,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
 import { useAuth } from '../../auth/useAuth';
+import { useTheme } from '../../theme/useTheme';
 
 const ROLE_LABEL = { admin: 'Administrator', user: 'Standard user', guest: 'Guest' };
+const APPEARANCE = [
+  { value: 'light', label: 'Light', icon: Sun },
+  { value: 'dark', label: 'Dark', icon: Moon },
+  { value: 'system', label: 'System', icon: Monitor },
+];
 
 function initialsOf(name) {
   return name
@@ -20,6 +35,9 @@ function initialsOf(name) {
 export default function UserMenu() {
   const { user, logout, can } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const { preference, setPreference } = useTheme();
+  const inConsole = pathname.startsWith('/admin');
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -94,6 +112,36 @@ export default function UserMenu() {
                 {label}
               </button>
             ))}
+            {!inConsole && (
+              <div className="px-2.5 pt-2 pb-1.5">
+                <p className="mb-1.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
+                  Appearance
+                </p>
+                <div
+                  className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1"
+                  role="radiogroup"
+                  aria-label="Appearance"
+                >
+                  {APPEARANCE.map(({ value, label, icon: Icon }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      aria-checked={preference === value}
+                      onClick={() => setPreference(value)}
+                      className={`flex items-center justify-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium transition ${
+                        preference === value
+                          ? 'bg-white text-slate-900 shadow-sm'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                    >
+                      <Icon className="size-3.5" aria-hidden="true" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="mx-1 my-1 h-px bg-slate-100" />
             <button
               type="button"
