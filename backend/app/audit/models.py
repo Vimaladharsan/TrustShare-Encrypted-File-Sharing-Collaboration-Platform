@@ -89,6 +89,7 @@ DESCRIPTIONS: dict[str, str] = {
     "share.create_batch": "Shared {count} files with one person ({permission})",
     "share.update": "Changed a share ({changes})",
     "share.revoke": "Revoked a share",
+    "share.link_opened": "Opened a share link page",
     "share.access_denied": "Share link access denied ({reason})",
     "share.expired": "A share link expired",
     "vault.created": "Created the secure vault",

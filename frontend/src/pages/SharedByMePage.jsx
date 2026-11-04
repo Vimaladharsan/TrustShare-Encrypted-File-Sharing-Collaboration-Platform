@@ -1,4 +1,4 @@
-import { Link2, Share2, UserRound } from 'lucide-react';
+import { History, Link2, Share2, UserRound } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -6,6 +6,7 @@ import { getErrorMessage } from '../api/client';
 import { listSentShares, revokeShare } from '../api/shares';
 import Button from '../components/Button';
 import ConfirmDialog from '../components/ConfirmDialog';
+import AccessHistoryDialog from '../components/shares/AccessHistoryDialog';
 import EditShareDialog from '../components/shares/EditShareDialog';
 import ShareStatusBadge from '../components/shares/ShareStatusBadge';
 import { Empty, ErrorState, Loading } from '../components/StateMessage';
@@ -25,6 +26,7 @@ export default function SharedByMePage() {
   const [filter, setFilter] = useState('all');
   const [confirm, setConfirm] = useState(null);
   const [editing, setEditing] = useState(null); // the share being edited
+  const [historyOf, setHistoryOf] = useState(null); // the share whose access history is open
 
   const load = useCallback(() => {
     setError('');
@@ -138,18 +140,28 @@ export default function SharedByMePage() {
                     <ShareStatusBadge status={share.status} />
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {share.status !== 'revoked' && (
-                      <div className="flex justify-end gap-2">
-                        {share.file_name && share.status !== 'file_unavailable' && (
-                          <Button variant="secondary" onClick={() => setEditing(share)}>
-                            Edit
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        onClick={() => setHistoryOf(share)}
+                        aria-label={`Access history of ${share.file_name ?? 'this share'}`}
+                        title="Who opened, viewed or downloaded it"
+                      >
+                        <History className="size-4" aria-hidden="true" />
+                      </Button>
+                      {share.status !== 'revoked' && (
+                        <>
+                          {share.file_name && share.status !== 'file_unavailable' && (
+                            <Button variant="secondary" onClick={() => setEditing(share)}>
+                              Edit
+                            </Button>
+                          )}
+                          <Button variant="secondary" onClick={() => askRevoke(share)}>
+                            Revoke
                           </Button>
-                        )}
-                        <Button variant="secondary" onClick={() => askRevoke(share)}>
-                          Revoke
-                        </Button>
-                      </div>
-                    )}
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -157,6 +169,8 @@ export default function SharedByMePage() {
           </table>
         </div>
       )}
+
+      {historyOf && <AccessHistoryDialog share={historyOf} onClose={() => setHistoryOf(null)} />}
 
       {editing && (
         <EditShareDialog share={editing} onSaved={load} onClose={() => setEditing(null)} />

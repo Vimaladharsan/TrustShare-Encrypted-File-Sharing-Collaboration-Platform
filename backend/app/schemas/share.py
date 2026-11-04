@@ -77,6 +77,33 @@ class ShareUpdate(BaseModel):
         return self
 
 
+class ShareAccessEvent(BaseModel):
+    """One use of a share, as its owner sees it."""
+
+    at: datetime
+    event: Literal["opened", "viewed", "downloaded", "refused"]
+    detail: str | None  # why it was refused, e.g. "link expired"
+    visitor: str  # the person's name for direct shares, "Anonymous visitor" for links
+    visitor_email: str | None
+    device: str  # e.g. "Chrome on Windows"
+    kind: Literal["mobile", "desktop"]
+    ip: str | None  # last part hidden for the visitor's privacy, e.g. "203.0.113.x"
+
+
+class ShareAccessSummary(BaseModel):
+    opened: int
+    viewed: int
+    downloaded: int
+    refused: int
+    visitors: int  # distinct people / devices
+
+
+class ShareAccessHistory(BaseModel):
+    share_id: uuid.UUID
+    summary: ShareAccessSummary
+    items: list[ShareAccessEvent]  # newest first, at most 200
+
+
 class ShareInfo(BaseModel):
     """A share as its owner sees it. Never contains the link token or its hash."""
 

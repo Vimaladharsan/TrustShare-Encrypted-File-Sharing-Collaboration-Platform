@@ -1,4 +1,4 @@
-import { Copy, Link2, Pencil, ShieldCheck, UserRound } from 'lucide-react';
+import { Copy, History, Link2, Pencil, ShieldCheck, UserRound } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -16,6 +16,7 @@ import {
   permissionLabel,
   toLocalInput,
 } from '../../utils/shares';
+import AccessHistoryDialog from './AccessHistoryDialog';
 import CreatedLink from './CreatedLink';
 import EditShareDialog from './EditShareDialog';
 import ShareStatusBadge from './ShareStatusBadge';
@@ -53,6 +54,7 @@ export default function ShareDialog({ file, files, onClose }) {
   const [createdLinks, setCreatedLinks] = useState([]); // [{ id, file_name, url }]
   const [shares, setShares] = useState(null);
   const [editing, setEditing] = useState(null); // the share being edited
+  const [historyOf, setHistoryOf] = useState(null); // the share whose access history is open
 
   const customProblem = expiry === CUSTOM ? customExpiryError(customAt, mode) : '';
 
@@ -322,6 +324,14 @@ export default function ShareDialog({ file, files, onClose }) {
                   </p>
                 </div>
                 <ShareStatusBadge status={share.status} />
+                <Button
+                  variant="ghost"
+                  onClick={() => setHistoryOf(share)}
+                  aria-label="Access history"
+                  title="Who opened, viewed or downloaded it"
+                >
+                  <History className="size-4" aria-hidden="true" />
+                </Button>
                 {share.status !== 'revoked' && (
                   <>
                     <Button
@@ -343,6 +353,7 @@ export default function ShareDialog({ file, files, onClose }) {
         )}
       </div>
 
+      {historyOf && <AccessHistoryDialog share={historyOf} onClose={() => setHistoryOf(null)} />}
       {editing && (
         <EditShareDialog share={editing} onSaved={loadShares} onClose={() => setEditing(null)} />
       )}

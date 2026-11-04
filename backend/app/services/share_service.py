@@ -29,6 +29,8 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.permissions import Perm
 from app.core.rate_limit import client_ip
+from app.core.user_agent import describe_device
+from app.db.redis import get_redis
 from app.models import Share, User
 from app.repositories.file_repository import FileRepository
 from app.repositories.share_repository import ShareRepository
@@ -38,6 +40,9 @@ from app.schemas.share import (
     BulkShareResult,
     PublicShareInfo,
     ReceivedShare,
+    ShareAccessEvent,
+    ShareAccessHistory,
+    ShareAccessSummary,
     ShareBulkCreate,
     ShareCreate,
     ShareCreated,
@@ -52,6 +57,34 @@ from app.services.security_events import record_security_event
 from app.storage.secure_store import SecureFileStore
 
 Action = Literal["info", "preview", "download"]
+
+# Access history: activity → what the owner sees. Refusal codes in plain words.
+ACCESS_EVENTS = {
+    "share.link_opened": "opened",
+    "file.preview": "viewed",
+    "file.download": "downloaded",
+    "share.access_denied": "refused",
+}
+REFUSAL_TEXT = {
+    "SHARE_EXPIRED": "link expired",
+    "SHARE_REVOKED": "share revoked",
+    "SHARE_LIMIT_REACHED": "download limit reached",
+    "SHARE_DOWNLOAD_NOT_ALLOWED": "download not allowed (view only)",
+    "SHARE_NOT_FOUND": "file no longer available",
+}
+LINK_OPEN_THROTTLE_SECONDS = 300  # a reload within 5 minutes isn't a new visit
+
+
+def mask_ip(ip: str | None) -> str | None:
+    """203.0.113.42 → 203.0.113.x; IPv6 keeps its first four groups. Owners see roughly where a
+    visit came from, not the visitor's exact address."""
+    if not ip or ip in {"testclient", "unknown"}:
+        return ip
+    if "." in ip and ":" not in ip:
+        return ".".join(ip.split(".")[:3] + ["x"])
+    return ":".join(ip.split(":")[:4]) + ":…"
+
+
 DOWNLOAD_ANOMALY_THRESHOLD = 20
 
 
@@ -321,6 +354,53 @@ class ShareService:
         )
         return self._info(share, file, recipient)
 
+    async def access_history(self, owner: User, share_id: uuid.UUID) -> ShareAccessHistory:
+        """Who opened, viewed or downloaded one of my shares, when and from which device –
+        including refused attempts (expired, revoked, limit reached …)."""
+        share = await self.shares.get(share_id)
+        if share is None or share.owner_id != owner.id:
+            raise _share_not_found()
+        entries = (
+            await self.activity.logs.find(
+                {"details.share_id": str(share.id), "action": {"$in": list(ACCESS_EVENTS)}}
+            )
+            .sort("created_at", -1)
+            .limit(200)
+            .to_list(length=200)
+        )
+        names: dict[str, str] = {}  # registered visitors (direct shares, signed-in link visitors)
+        for user_id in {e["user_id"] for e in entries if e.get("user_id")}:
+            person = await self.users.get_by_id(uuid.UUID(user_id))
+            if person is not None:
+                names[user_id] = person.full_name
+        items: list[ShareAccessEvent] = []
+        visitors: set[str] = set()
+        for entry in entries:
+            device = describe_device(entry.get("user_agent", ""))
+            email = entry.get("actor_email")
+            name = names.get(entry.get("user_id") or "")
+            visitors.add(email or f"{entry.get('ip_address')}|{entry.get('user_agent')}")
+            event = ACCESS_EVENTS[entry["action"]]
+            reason = (entry.get("details") or {}).get("reason")
+            items.append(
+                ShareAccessEvent(
+                    at=entry["created_at"],
+                    event=event,
+                    detail=REFUSAL_TEXT.get(reason, reason) if event == "refused" else None,
+                    visitor=name or email or "Anonymous visitor",
+                    visitor_email=email,
+                    device=f"{device['browser']} on {device['os']}",
+                    kind=device["kind"],
+                    ip=mask_ip(entry.get("ip_address")),
+                )
+            )
+        counts = {kind: sum(1 for i in items if i.event == kind) for kind in ACCESS_EVENTS.values()}
+        return ShareAccessHistory(
+            share_id=share.id,
+            summary=ShareAccessSummary(**counts, visitors=len(visitors)),
+            items=items,
+        )
+
     async def _recipient_of(self, share: Share) -> User | None:
         return await self.users.get_by_id(share.recipient_id) if share.recipient_id else None
 
@@ -370,6 +450,7 @@ class ShareService:
 
     async def link_info(self, token: str) -> PublicShareInfo:
         share, file, owner = await self._resolve_link(token, "info")
+        await self._record_link_open(share)
         downloads_left = (
             share.max_downloads - share.download_count if share.max_downloads is not None else None
         )
@@ -384,6 +465,22 @@ class ShareService:
             expires_at=share.expires_at,
             downloads_left=downloads_left,
             can_preview=file["extension"] in PREVIEWABLE,
+        )
+
+    async def _record_link_open(self, share: Share) -> None:
+        """Someone opened the link page – once per visitor (IP + browser) per 5 minutes."""
+        ip = client_ip(self.request)
+        agent = hashlib.sha256(self.request.headers.get("user-agent", "").encode()).hexdigest()[:16]
+        key = f"link_open:{share.id}:{ip}:{agent}"
+        if not await get_redis().set(key, "1", nx=True, ex=LINK_OPEN_THROTTLE_SECONDS):
+            return
+        await self.activity.log(
+            self.request,
+            None,
+            "share.link_opened",
+            resource_type="file",
+            resource_id=share.file_id,
+            details={"share_id": str(share.id), "owner_id": str(share.owner_id)},
         )
 
     async def open_link(

@@ -59,6 +59,12 @@ INDEXES: dict[str, list[IndexModel]] = {
             [("details.owner_id", ASCENDING), ("action", ASCENDING), ("created_at", DESCENDING)],
             name="owner_action_created",
         ),
+        # Access history of one share (Shared by me → Access history).
+        IndexModel(
+            [("details.share_id", ASCENDING), ("created_at", DESCENDING)],
+            name="share_created",
+            sparse=True,
+        ),
     ],
     "security_events": [
         IndexModel([("created_at", DESCENDING)], name="created"),

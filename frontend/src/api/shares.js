@@ -40,6 +40,12 @@ export async function updateShare(shareId, changes) {
   return data;
 }
 
+/** Who opened, viewed or downloaded one of my shares: { summary, items }. */
+export async function getShareAccess(shareId) {
+  const { data } = await api.get(`/shares/${shareId}/access`);
+  return data;
+}
+
 export const revokeShare = (shareId) => api.delete(`/shares/${shareId}`);
 
 // ---------- recipient ("Shared with me") ----------

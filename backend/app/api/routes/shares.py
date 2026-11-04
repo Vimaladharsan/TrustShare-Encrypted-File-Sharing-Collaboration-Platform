@@ -1,7 +1,7 @@
 """Sharing routes.
 
 Owner:      POST/GET /files/{id}/shares · POST /shares/bulk · GET /shares/sent
-            · PATCH /shares/{id} (edit)
+            · PATCH /shares/{id} (edit) · GET /shares/{id}/access (access history)
             · DELETE /shares/{id} (revoke)
 Recipient:  GET /shares/received · GET /shares/{id}/preview|download
 Public:     GET /s/{token} · /s/{token}/preview · /s/{token}/download (no login, rate-limited)
@@ -25,6 +25,7 @@ from app.schemas.share import (
     BulkShareResult,
     PublicShareInfo,
     ReceivedShareListResponse,
+    ShareAccessHistory,
     ShareBulkCreate,
     ShareCreate,
     ShareCreated,
@@ -123,6 +124,19 @@ async def update_share(
     service: ShareService = Depends(share_service),
 ) -> ShareInfo:
     return await service.update(user, share_id, data)
+
+
+@router.get(
+    "/shares/{share_id}/access",
+    response_model=ShareAccessHistory,
+    summary="Access history of one of my shares: who opened, viewed or downloaded it, and when",
+)
+async def share_access_history(
+    share_id: uuid.UUID,
+    user: User = Depends(get_current_user),  # your own shares only (checked in the service)
+    service: ShareService = Depends(share_service),
+) -> ShareAccessHistory:
+    return await service.access_history(user, share_id)
 
 
 @router.delete(
