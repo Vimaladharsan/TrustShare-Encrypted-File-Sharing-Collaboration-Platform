@@ -166,8 +166,9 @@ def files_shared_email(
     can_download: bool,
     expires: str | None,
     link: str,
+    folder_name: str | None = None,
 ) -> Email:
-    """One email for several files shared with a registered user at once (no file content)."""
+    """One email for several files (or a whole folder) shared with a registered user at once."""
     access = "view and download" if can_download else "view (preview only)"
     until = f" until {expires}" if expires else ""
     count = len(file_names)
@@ -181,7 +182,11 @@ def files_shared_email(
     }
     return Email(
         to=to,
-        subject=f"{owner_name} shared {count} files with you on TrustShare",
+        subject=(
+            f'{owner_name} shared the folder "{folder_name}" with you on TrustShare'
+            if folder_name
+            else f"{owner_name} shared {count} files with you on TrustShare"
+        ),
         text=(
             f"Hi {name},\n\n"
             f"{owner_name} ({owner_email}) shared {count} files with you:\n"

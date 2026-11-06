@@ -16,6 +16,7 @@ class ShareCreate(BaseModel):
     - `permission`: "view" = preview in the browser only, "download" = preview + download
     - `expires_at`: required for links (at most SHARE_LINK_MAX_DAYS ahead), optional for people
     - `max_downloads`: optional download limit (needs "download" permission)
+    - `password`: optional password for a link – visitors must enter it first (links only)
     """
 
     share_type: ShareType
@@ -23,6 +24,7 @@ class ShareCreate(BaseModel):
     expires_at: datetime | None = None
     max_downloads: int | None = Field(None, ge=1, le=1000)
     recipient_email: EmailStr | None = None
+    password: str | None = Field(None, min_length=4, max_length=72)
 
     @model_validator(mode="after")
     def check_combination(self) -> "ShareCreate":
@@ -34,6 +36,8 @@ class ShareCreate(BaseModel):
             raise ValueError("A download limit needs the download permission")
         if self.expires_at and self.expires_at.tzinfo is None:
             raise ValueError("expires_at must include a time zone, e.g. 2026-11-01T12:00:00Z")
+        if self.password and self.share_type != "link":
+            raise ValueError("A password can only be set for share links")
         return self
 
 
@@ -65,6 +69,7 @@ class ShareUpdate(BaseModel):
     permission: SharePermission | None = None
     expires_at: datetime | None = None
     max_downloads: int | None = Field(None, ge=1, le=1000)
+    password: str | None = Field(None, min_length=4, max_length=72)  # links: new one, null = remove
 
     @model_validator(mode="after")
     def check_values(self) -> "ShareUpdate":
@@ -117,6 +122,7 @@ class ShareInfo(BaseModel):
     expires_at: datetime | None
     max_downloads: int | None
     download_count: int
+    has_password: bool = False
     status: ShareStatus
     created_at: datetime
     last_accessed_at: datetime | None

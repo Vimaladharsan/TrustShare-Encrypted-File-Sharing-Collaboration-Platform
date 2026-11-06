@@ -49,7 +49,9 @@ def activity_type_of(action: str) -> str:
 
 # Admins never see the names of users' files or folders (privacy rule, Milestone 2) – these
 # detail keys are removed from everything shown to an admin. Owners still see their own names.
-PRIVATE_DETAIL_KEYS = frozenset({"file_name", "file_names", "original_name", "name", "from", "to"})
+PRIVATE_DETAIL_KEYS = frozenset(
+    {"file_name", "file_names", "folder_name", "original_name", "name", "from", "to"}
+)
 
 
 def redact(details: dict[str, Any] | None) -> dict[str, Any]:

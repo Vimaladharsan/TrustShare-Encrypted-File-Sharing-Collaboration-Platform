@@ -19,6 +19,7 @@ import uuid
 from collections.abc import AsyncIterator, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
+from urllib.parse import unquote
 
 from fastapi import Request
 from pymongo.asynchronous.database import AsyncDatabase
@@ -29,10 +30,12 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.permissions import Perm
 from app.core.rate_limit import client_ip
+from app.core.security import hash_password, verify_password
 from app.core.user_agent import describe_device
 from app.db.redis import get_redis
 from app.models import Share, User
 from app.repositories.file_repository import FileRepository
+from app.repositories.folder_repository import FolderRepository
 from app.repositories.share_repository import ShareRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.share import (
@@ -71,7 +74,14 @@ REFUSAL_TEXT = {
     "SHARE_LIMIT_REACHED": "download limit reached",
     "SHARE_DOWNLOAD_NOT_ALLOWED": "download not allowed (view only)",
     "SHARE_NOT_FOUND": "file no longer available",
+    "SHARE_PASSWORD_INVALID": "wrong password",
+    "SHARE_PASSWORD_LOCKED": "too many wrong passwords",
 }
+# Header name, not a secret. URL-encoded, so any characters work in a header.
+PASSWORD_HEADER = "X-Share-Password"  # noqa: S105
+PASSWORD_MAX_TRIES = 5  # wrong passwords per link and visitor IP …
+PASSWORD_LOCK_SECONDS = 15 * 60  # … then that visitor is locked out of the link for 15 minutes
+FOLDER_SHARE_MAX_FILES = 50
 LINK_OPEN_THROTTLE_SECONDS = 300  # a reload within 5 minutes isn't a new visit
 
 
@@ -132,6 +142,8 @@ class ShareService:
         self.shares = ShareRepository(session)
         self.users = UserRepository(session)
         self.files = FileRepository(db)
+        self.folders = FolderRepository(db)
+        self.db = db
         self.activity = ActivityService(db)
         self.storage = storage
         self.request = request
@@ -139,7 +151,12 @@ class ShareService:
     # ---------- owner: create, list, revoke ----------
 
     async def create(
-        self, owner: User, file_id: str, data: ShareCreate, batch: bool = False
+        self,
+        owner: User,
+        file_id: str,
+        data: ShareCreate,
+        batch: bool = False,
+        password_hash: str | None = None,  # already hashed (a batch hashes the password once)
     ) -> ShareCreated:
         file = await self._owned_active_file(owner, file_id)
         if data.permission == "view" and file["extension"] not in PREVIEWABLE:
@@ -179,6 +196,8 @@ class ShareService:
             expires_at=expires_at,
             max_downloads=data.max_downloads,
             download_count=0,
+            password_hash=password_hash
+            or (hash_password(data.password) if data.password else None),
         )
         try:
             await self.shares.add(share)
@@ -203,6 +222,7 @@ class ShareService:
                 "recipient_id": str(recipient.id) if recipient else None,
                 "expires_at": expires_at.isoformat() if expires_at else None,
                 "max_downloads": share.max_downloads,
+                "password_protected": share.password_hash is not None,
                 # part of a "share several files" request: the recipient is told once, below
                 "batch": batch,
             },
@@ -211,9 +231,12 @@ class ShareService:
         url = f"{get_settings().frontend_url}/s/{token}" if token else None
         return ShareCreated(**info.model_dump(), url=url)
 
-    async def create_many(self, owner: User, data: ShareBulkCreate) -> BulkShareResult:
+    async def create_many(
+        self, owner: User, data: ShareBulkCreate, folder_name: str | None = None
+    ) -> BulkShareResult:
         """The same share for several files. Each file is checked on its own (one problem doesn't
         stop the rest); a person gets ONE notification and email for the whole batch."""
+        password_hash = hash_password(data.password) if data.password else None
         recipient = None
         if data.share_type == "user":  # an unknown person stops the whole request at once
             recipient = await self._recipient(owner, str(data.recipient_email))
@@ -222,7 +245,11 @@ class ShareService:
         failed: list[BulkShareFailure] = []
         for file_id in dict.fromkeys(data.file_ids):
             try:
-                created.append(await self.create(owner, file_id, single, batch=True))
+                created.append(
+                    await self.create(
+                        owner, file_id, single, batch=True, password_hash=password_hash
+                    )
+                )
             except AppError as exc:
                 failed.append(BulkShareFailure(file_id=file_id, code=exc.code, message=exc.message))
         if recipient is not None and created:
@@ -238,9 +265,41 @@ class ShareService:
                     "recipient_email": recipient.email,
                     "recipient_id": str(recipient.id),
                     "expires_at": data.expires_at.isoformat() if data.expires_at else None,
+                    "folder_name": folder_name,
                 },
             )
         return BulkShareResult(created=created, failed=failed)
+
+    async def share_folder(self, owner: User, folder_id: str, data: ShareCreate) -> BulkShareResult:
+        """Share every file in one of my folders (sub-folders included) with the same settings.
+        The files in the folder now are shared – files added later are not included."""
+        folder = await self.folders.get_active_owned(str(owner.id), folder_id)
+        if folder is None:
+            raise AppError("FOLDER_NOT_FOUND", "Folder not found.", 404)
+        folder_ids = [folder["_id"]] + [
+            sub["_id"]
+            for sub in await self.folders.descendants(folder["_id"])
+            if sub.get("status") == "active"
+        ]
+        files = (
+            await self.db["files"]
+            .find(
+                {"owner_id": str(owner.id), "status": "active", "folder_id": {"$in": folder_ids}},
+                {"_id": 1},
+            )
+            .sort("name_lower", 1)
+            .to_list(length=FOLDER_SHARE_MAX_FILES + 1)
+        )
+        if not files:
+            raise AppError("FOLDER_EMPTY", "This folder has no files to share.", 400)
+        if len(files) > FOLDER_SHARE_MAX_FILES:
+            raise AppError(
+                "FOLDER_TOO_LARGE",
+                f"A folder can be shared with up to {FOLDER_SHARE_MAX_FILES} files at once.",
+                400,
+            )
+        bulk = ShareBulkCreate(**data.model_dump(), file_ids=[str(f["_id"]) for f in files])
+        return await self.create_many(owner, bulk, folder_name=folder["name"])
 
     async def list_for_file(self, owner: User, file_id: str) -> list[ShareInfo]:
         file = await self.files.get(file_id)
@@ -322,6 +381,13 @@ class ShareService:
             )
             if old != new
         ]
+        if "password" in sent:
+            if share.share_type != "link":
+                raise AppError(
+                    "PASSWORD_ONLY_FOR_LINKS", "A password can only be set for share links.", 400
+                )
+            share.password_hash = hash_password(data.password) if data.password else None
+            changes.append("password" if data.password else "password removed")
         recipient = await self._recipient_of(share)
         if not changes:
             return self._info(share, file, recipient)
@@ -450,6 +516,7 @@ class ShareService:
 
     async def link_info(self, token: str) -> PublicShareInfo:
         share, file, owner = await self._resolve_link(token, "info")
+        await self._check_password(share)
         await self._record_link_open(share)
         downloads_left = (
             share.max_downloads - share.download_count if share.max_downloads is not None else None
@@ -490,7 +557,35 @@ class ShareService:
         if share is None:
             await self._invalid_link()
             raise _share_not_found()
+        await self._check_password(share)
         return await self._open(share, action, visitor=None)
+
+    async def _check_password(self, share: Share) -> None:
+        """Links with a password: the visitor sends it in the X-Share-Password header. 403 (not
+        401, which the web app treats as "signed out") when it is missing or wrong; 5 wrong tries
+        lock that visitor out of the link for 15 minutes."""
+        if share.password_hash is None:
+            return
+        redis = get_redis()
+        key = f"share_pw_fail:{share.id}:{client_ip(self.request)}"
+        if int(await redis.get(key) or 0) >= PASSWORD_MAX_TRIES:
+            await self._denied(None, "SHARE_PASSWORD_LOCKED", share=share)
+            raise AppError(
+                "SHARE_PASSWORD_LOCKED",
+                "Too many wrong passwords. Try again in 15 minutes.",
+                429,
+            )
+        typed = unquote(self.request.headers.get(PASSWORD_HEADER, ""))
+        if not typed:
+            raise AppError(
+                "SHARE_PASSWORD_REQUIRED", "This link is protected with a password.", 403
+            )
+        if not verify_password(typed, share.password_hash):
+            await redis.incr(key)
+            await redis.expire(key, PASSWORD_LOCK_SECONDS)
+            await self._denied(None, "SHARE_PASSWORD_INVALID", share=share)
+            raise AppError("SHARE_PASSWORD_INVALID", "Wrong password.", 403)
+        await redis.delete(key)
 
     # ---------- the checks ----------
 
@@ -676,6 +771,7 @@ class ShareService:
             expires_at=share.expires_at,
             max_downloads=share.max_downloads,
             download_count=share.download_count,
+            has_password=share.password_hash is not None,
             status=status,
             created_at=share.created_at,
             last_accessed_at=share.last_accessed_at,

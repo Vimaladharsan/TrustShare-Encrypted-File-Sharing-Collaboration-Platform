@@ -41,6 +41,8 @@ export default function EditShareDialog({ share, onSaved, onClose }) {
   const [customAt, setCustomAt] = useState('');
   const [limit, setLimit] = useState(share.max_downloads ? String(share.max_downloads) : '');
   const [working, setWorking] = useState(false);
+  const [passwordMode, setPasswordMode] = useState('keep'); // keep | set | remove (links only)
+  const [newPassword, setNewPassword] = useState('');
 
   const customProblem = expiry === CUSTOM ? customExpiryError(customAt, share.share_type) : '';
   const limitNumber = limit ? Number(limit) : null;
@@ -62,6 +64,8 @@ export default function EditShareDialog({ share, onSaved, onClose }) {
     if (newLimit !== share.max_downloads && permission === 'download') {
       result.max_downloads = newLimit;
     }
+    if (passwordMode === 'set') result.password = newPassword;
+    if (passwordMode === 'remove') result.password = null;
     return result;
   }
 
@@ -183,6 +187,39 @@ export default function EditShareDialog({ share, onSaved, onClose }) {
             >
               {(customAt && customProblem) || 'Your local time.'}
             </span>
+          </label>
+        )}
+
+        {isLink && (
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium text-slate-700">Password</span>
+            <select
+              value={passwordMode}
+              onChange={(e) => setPasswordMode(e.target.value)}
+              className={inputClass}
+            >
+              <option value="keep">
+                {share.has_password ? 'Keep the current password' : 'No password'}
+              </option>
+              <option value="set">
+                {share.has_password ? 'Set a new password' : 'Add a password'}
+              </option>
+              {share.has_password && <option value="remove">Remove the password</option>}
+            </select>
+            {passwordMode === 'set' && (
+              <input
+                type="password"
+                required
+                minLength={4}
+                maxLength={72}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="At least 4 characters"
+                aria-label="New link password"
+                autoComplete="new-password"
+                className={`${inputClass} mt-2`}
+              />
+            )}
           </label>
         )}
 

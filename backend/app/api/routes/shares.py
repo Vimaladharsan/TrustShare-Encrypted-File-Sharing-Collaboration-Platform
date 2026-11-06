@@ -1,6 +1,7 @@
 """Sharing routes.
 
-Owner:      POST/GET /files/{id}/shares · POST /shares/bulk · GET /shares/sent
+Owner:      POST/GET /files/{id}/shares · POST /shares/bulk · POST /folders/{id}/shares
+            · GET /shares/sent
             · PATCH /shares/{id} (edit) · GET /shares/{id}/access (access history)
             · DELETE /shares/{id} (revoke)
 Recipient:  GET /shares/received · GET /shares/{id}/preview|download
@@ -89,6 +90,21 @@ async def create_shares_bulk(
     service: ShareService = Depends(share_service),
 ) -> BulkShareResult:
     return await service.create_many(user, data)
+
+
+@router.post(
+    "/folders/{folder_id}/shares",
+    response_model=BulkShareResult,
+    status_code=status.HTTP_201_CREATED,
+    summary="Share every file in one of my folders (sub-folders included) with the same settings",
+)
+async def share_folder(
+    folder_id: str,
+    data: ShareCreate,
+    user: User = Depends(can_share),
+    service: ShareService = Depends(share_service),
+) -> BulkShareResult:
+    return await service.share_folder(user, folder_id, data)
 
 
 @router.get(

@@ -1,10 +1,16 @@
-import { Copy, History, Link2, Pencil, ShieldCheck, UserRound } from 'lucide-react';
+import { Copy, History, KeyRound, Link2, Pencil, ShieldCheck, UserRound } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { getErrorMessage } from '../../api/client';
 import { PREVIEWABLE } from '../../api/files';
-import { createShare, createSharesBulk, listFileShares, revokeShare } from '../../api/shares';
+import {
+  createFolderShares,
+  createShare,
+  createSharesBulk,
+  listFileShares,
+  revokeShare,
+} from '../../api/shares';
 import Button from '../Button';
 import Modal from '../Modal';
 import {
@@ -34,18 +40,22 @@ const inputClass =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 shadow-xs focus:ring-4 focus:ring-blue-500/15 focus:outline-none';
 
 /**
- * Share one file – or several selected files at once (`files`) – as a secret link (anyone who has
- * it; one link per file) or with a registered person ("Shared with me"), with view / download
- * permission, expiry and an optional download limit. New links can be shown as a QR code.
- * For a single file it also lists the file's existing shares (edit / revoke).
+ * Share one file – several selected files (`files`) – or every file in a folder (`folder`) as a
+ * secret link (anyone who has it; one link per file, optionally with a password) or with a
+ * registered person ("Shared with me"), with view / download permission, expiry and an optional
+ * download limit. New links can be shown as a QR code. For a single file it also lists the file's
+ * existing shares (history / edit / revoke).
  */
-export default function ShareDialog({ file, files, onClose }) {
-  const items = files ?? [file];
-  const multi = items.length > 1;
-  const firstId = items[0].id;
-  const canView = items.every((item) => PREVIEWABLE.includes(item.extension));
+export default function ShareDialog({ file, files, folder, onClose }) {
+  const items = folder ? [] : (files ?? [file]);
+  const multi = Boolean(folder) || items.length > 1;
+  const firstId = items[0]?.id;
+  // A folder can hold any file type: offer both, the server skips files that can't be view-only.
+  const canView = folder ? true : items.every((item) => PREVIEWABLE.includes(item.extension));
   const [mode, setMode] = useState('link'); // 'link' | 'user'
-  const [permission, setPermission] = useState(canView ? 'view' : 'download');
+  const [permission, setPermission] = useState(canView && !folder ? 'view' : 'download');
+  const [usePassword, setUsePassword] = useState(false);
+  const [password, setPassword] = useState('');
   const [expiry, setExpiry] = useState(7 * 24 * HOUR);
   const [customAt, setCustomAt] = useState('');
   const [limit, setLimit] = useState('');
@@ -87,21 +97,28 @@ export default function ShareDialog({ file, files, onClose }) {
       else if (expiry) body.expires_at = new Date(Date.now() + expiry).toISOString();
       if (permission === 'download' && limit) body.max_downloads = Number(limit);
       if (mode === 'user') body.recipient_email = email.trim();
+      if (mode === 'link' && usePassword) body.password = password;
       if (multi) {
-        const result = await createSharesBulk(
-          items.map((item) => item.id),
-          body,
-        );
+        const result = folder
+          ? await createFolderShares(folder.id, body)
+          : await createSharesBulk(
+              items.map((item) => item.id),
+              body,
+            );
         const done = result.created.length;
         if (mode === 'link') setCreatedLinks(result.created);
         else if (done) {
-          toast.success(`Shared ${done} files with ${email.trim()} – they get one notice`);
+          toast.success(
+            folder
+              ? `Folder shared with ${email.trim()} (${done} files) – they get one notice`
+              : `Shared ${done} files with ${email.trim()} – they get one notice`,
+          );
           setEmail('');
         }
         if (result.failed.length) {
           const name = items.find((item) => item.id === result.failed[0].file_id)?.name;
           toast.warning(
-            `${done} shared, ${result.failed.length} skipped – ${name}: ${result.failed[0].message}`,
+            `${done} shared, ${result.failed.length} skipped${name ? ` – ${name}` : ''}: ${result.failed[0].message}`,
           );
         }
       } else {
@@ -142,11 +159,23 @@ export default function ShareDialog({ file, files, onClose }) {
 
   return (
     <Modal
-      title={multi ? `Share ${items.length} files` : `Share “${items[0].name}”`}
+      title={
+        folder
+          ? `Share folder “${folder.name}”`
+          : multi
+            ? `Share ${items.length} files`
+            : `Share “${items[0].name}”`
+      }
       onClose={onClose}
       width="max-w-2xl"
     >
-      {multi && (
+      {folder && (
+        <p className="mb-4 text-sm text-slate-500">
+          Every file in this folder – sub-folders included – is shared with the same settings. Files
+          added later are not included.
+        </p>
+      )}
+      {multi && !folder && (
         <p
           className="mb-4 truncate text-sm text-slate-500"
           title={items.map((i) => i.name).join(', ')}
@@ -252,6 +281,41 @@ export default function ShareDialog({ file, files, onClose }) {
           </label>
         )}
 
+        {mode === 'link' && (
+          <div className="rounded-lg border border-slate-200 p-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <input
+                type="checkbox"
+                checked={usePassword}
+                onChange={(e) => setUsePassword(e.target.checked)}
+                className="size-4 rounded border-slate-300 accent-blue-600"
+              />
+              <KeyRound className="size-4 text-slate-400" aria-hidden="true" />
+              Protect with a password (optional)
+            </label>
+            {usePassword && (
+              <div className="mt-2">
+                <input
+                  type="password"
+                  required
+                  minLength={4}
+                  maxLength={72}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 4 characters"
+                  aria-label="Link password"
+                  autoComplete="new-password"
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Visitors must enter it before they see the file. Send it separately from the link
+                  (e.g. by phone). Stored only as a hash.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex justify-end">
           <Button
             type="submit"
@@ -259,12 +323,16 @@ export default function ShareDialog({ file, files, onClose }) {
             disabled={expiry === CUSTOM && Boolean(customProblem)}
           >
             {mode === 'link'
-              ? multi
-                ? `Create ${items.length} links`
-                : 'Create link'
-              : multi
-                ? `Share ${items.length} files`
-                : 'Share'}
+              ? folder
+                ? 'Create links'
+                : multi
+                  ? `Create ${items.length} links`
+                  : 'Create link'
+              : folder
+                ? 'Share folder'
+                : multi
+                  ? `Share ${items.length} files`
+                  : 'Share'}
           </Button>
         </div>
       </form>
@@ -295,6 +363,7 @@ export default function ShareDialog({ file, files, onClose }) {
             <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
             Copy {multi ? 'them' : 'it'} now: TrustShare keeps only a fingerprint (hash) of each
             link, so it can&apos;t be shown again. You can always create a new one.
+            {createdLinks[0]?.has_password && ' Visitors will need the password you set.'}
           </p>
         </div>
       )}
@@ -315,8 +384,14 @@ export default function ShareDialog({ file, files, onClose }) {
                   <UserRound className="size-4 shrink-0 text-slate-400" aria-hidden="true" />
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-slate-800">
+                  <p className="flex items-center gap-1.5 truncate font-medium text-slate-800">
                     {share.share_type === 'link' ? 'Share link' : share.recipient_email}
+                    {share.has_password && (
+                      <KeyRound
+                        className="size-3.5 text-amber-500"
+                        aria-label="Password protected"
+                      />
+                    )}
                   </p>
                   <p className="text-xs text-slate-500">
                     {permissionLabel(share.permission)} · {expiryLabel(share.expires_at)} ·

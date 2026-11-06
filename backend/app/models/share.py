@@ -48,6 +48,8 @@ class Share(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     token_hash: Mapped[str | None] = mapped_column(String(64), unique=True)
+    # Optional password for a link (bcrypt hash, like account passwords). None = no password.
+    password_hash: Mapped[str | None] = mapped_column(String(100))
     permission: Mapped[str] = mapped_column(String(10))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     max_downloads: Mapped[int | None] = mapped_column(Integer)

@@ -117,18 +117,21 @@ async def _files_shared(owner: User, details: dict[str, Any]) -> None:
         return
     names = details.get("file_names") or []
     count = details.get("count") or len(names)
+    folder = details.get("folder_name")
     can_download = details.get("permission") == "download"
     expires = details.get("expires_at")
     expires_text = (
         datetime.fromisoformat(expires).strftime("%d %b %Y, %H:%M UTC") if expires else None
     )
     listed = ", ".join(f"“{n}”" for n in names[:3]) + (" …" if count > 3 else "")
+    access = "view and download" if can_download else "view only"
     await _service().notify(
         recipient,
         "file_shared",
-        f"{count} files were shared with you",
-        f"{owner.full_name} shared {count} files with you: {listed} "
-        f"({'view and download' if can_download else 'view only'}).",
+        "A folder was shared with you" if folder else f"{count} files were shared with you",
+        f"{owner.full_name} shared the folder “{folder}” ({count} files) with you ({access})."
+        if folder
+        else f"{owner.full_name} shared {count} files with you: {listed} ({access}).",
         link="/shared-with-me",
         data={"count": count, "owner": owner.email},
         email=files_shared_email(
@@ -137,6 +140,7 @@ async def _files_shared(owner: User, details: dict[str, Any]) -> None:
             owner_name=owner.full_name,
             owner_email=owner.email,
             file_names=names,
+            folder_name=folder,
             can_download=can_download,
             expires=expires_text,
             link=_app_link("/shared-with-me"),

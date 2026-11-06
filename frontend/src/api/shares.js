@@ -24,6 +24,12 @@ export async function createSharesBulk(fileIds, body) {
   return data;
 }
 
+/** Every file in a folder (sub-folders included), same result shape as createSharesBulk. */
+export async function createFolderShares(folderId, body) {
+  const { data } = await api.post(`/folders/${folderId}/shares`, body);
+  return data;
+}
+
 export async function listFileShares(fileId) {
   const { data } = await api.get(`/files/${fileId}/shares`);
   return data.items;
@@ -66,18 +72,29 @@ export async function downloadReceived(share) {
 }
 
 // ---------- public link (no login needed) ----------
+// Links with a password: the typed password goes in a header (URL-encoded) with every request.
 
-export async function getPublicShare(token) {
-  const { data } = await api.get(`/s/${token}`);
+const passwordHeaders = (password) =>
+  password ? { 'X-Share-Password': encodeURIComponent(password) } : {};
+
+export async function getPublicShare(token, password) {
+  const { data } = await api.get(`/s/${token}`, { headers: passwordHeaders(password) });
   return data;
 }
 
-export async function previewPublic(token, signal) {
-  const response = await api.get(`/s/${token}/preview`, { responseType: 'blob', signal });
+export async function previewPublic(token, signal, password) {
+  const response = await api.get(`/s/${token}/preview`, {
+    responseType: 'blob',
+    signal,
+    headers: passwordHeaders(password),
+  });
   return response.data;
 }
 
-export async function downloadPublic(token, name) {
-  const response = await api.get(`/s/${token}/download`, { responseType: 'blob' });
+export async function downloadPublic(token, name, password) {
+  const response = await api.get(`/s/${token}/download`, {
+    responseType: 'blob',
+    headers: passwordHeaders(password),
+  });
   saveBlob(response.data, name);
 }

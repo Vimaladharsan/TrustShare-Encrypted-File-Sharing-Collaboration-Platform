@@ -1,4 +1,4 @@
-import { History, Link2, Share2, UserRound } from 'lucide-react';
+import { History, KeyRound, Link2, Share2, UserRound } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -124,6 +124,12 @@ export default function SharedByMePage() {
                         <>
                           <Link2 className="size-4 text-slate-400" aria-hidden="true" /> Anyone with
                           the link
+                          {share.has_password && (
+                            <KeyRound
+                              className="size-3.5 text-amber-500"
+                              aria-label="Password protected"
+                            />
+                          )}
                         </>
                       ) : (
                         <>

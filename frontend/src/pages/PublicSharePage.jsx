@@ -1,4 +1,4 @@
-import { Clock, Download, Eye, Link2Off, Lock, ShieldCheck } from 'lucide-react';
+import { Clock, Download, Eye, KeyRound, Link2Off, Lock, ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { toast } from 'sonner';
@@ -25,6 +25,7 @@ const ENDED = {
 /**
  * What someone sees when they open a share link (/s/<token>). No account needed. The token is in
  * the URL path only – it is never sent to other sites (no-referrer) and never logged in clear.
+ * Links with a password show a password box first; the typed password stays in memory only.
  */
 export default function PublicSharePage() {
   const { token } = useParams();
@@ -32,6 +33,9 @@ export default function PublicSharePage() {
   const [failure, setFailure] = useState(null); // { code, message }
   const [previewing, setPreviewing] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [password, setPassword] = useState(''); // accepted password (memory only)
+  const [askPassword, setAskPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
 
   useEffect(() => {
     // Don't leak the link to other sites through the Referer header.
@@ -53,24 +57,41 @@ export default function PublicSharePage() {
   }, []);
 
   const refresh = useCallback(
-    () =>
-      getPublicShare(token)
-        .then(setInfo)
+    (typed = password) =>
+      getPublicShare(token, typed)
+        .then((data) => {
+          setInfo(data);
+          setAskPassword(false);
+          setPasswordError('');
+          setPassword(typed);
+        })
         .catch((err) => {
-          if (!endIfGone(err)) {
+          const code = getErrorCode(err);
+          if (code === 'SHARE_PASSWORD_REQUIRED' || code === 'SHARE_PASSWORD_INVALID') {
+            setAskPassword(true);
+            setInfo(null);
+            setPasswordError(
+              code === 'SHARE_PASSWORD_INVALID' ? 'Wrong password – try again.' : '',
+            );
+          } else if (code === 'SHARE_PASSWORD_LOCKED') {
+            setAskPassword(true);
+            setPasswordError(getErrorMessage(err));
+          } else if (!endIfGone(err)) {
             setFailure((current) => current ?? { code: 'ERROR', message: getErrorMessage(err) });
           }
         }),
-    [token, endIfGone],
+    [token, endIfGone, password],
   );
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    refresh('');
+    // first load only – later checks reuse the accepted password
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   // Re-check while the page is open and when the visitor comes back to the tab.
   useEffect(() => {
-    if (failure) return undefined;
+    if (failure || askPassword) return undefined;
     const timer = setInterval(() => {
       if (document.visibilityState === 'visible') refresh();
     }, RECHECK_MS);
@@ -80,12 +101,12 @@ export default function PublicSharePage() {
       clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [failure, refresh]);
+  }, [failure, askPassword, refresh]);
 
   async function download() {
     setDownloading(true);
     try {
-      await downloadPublic(token, info.file_name);
+      await downloadPublic(token, info.file_name, password);
       await refresh(); // downloads left changed – or the limit is now reached
     } catch (err) {
       if (!endIfGone(err)) toast.error(getErrorMessage(err));
@@ -109,8 +130,11 @@ export default function PublicSharePage() {
 
       <main className="relative flex flex-1 items-center justify-center p-4">
         <div className="animate-pop-in shadow-pop w-full max-w-md rounded-3xl bg-white/90 p-8 ring-1 ring-slate-900/5 backdrop-blur">
-          {!info && !failure && <Loading />}
+          {!info && !failure && !askPassword && <Loading />}
           {failure && <Failure failure={failure} />}
+          {askPassword && !failure && (
+            <PasswordPrompt error={passwordError} onSubmit={(typed) => refresh(typed)} />
+          )}
           {info && (
             <SharedFile
               info={info}
@@ -136,7 +160,7 @@ export default function PublicSharePage() {
             size_bytes: info.size_bytes,
           }}
           load={(signal) =>
-            previewPublic(token, signal).catch((err) => {
+            previewPublic(token, signal, password).catch((err) => {
               endIfGone(err);
               throw err;
             })
@@ -199,6 +223,45 @@ function SharedFile({ info, downloading, onPreview, onDownload }) {
         <p className="mt-4 text-sm text-slate-500">This file can&apos;t be shown in the browser.</p>
       )}
     </div>
+  );
+}
+
+function PasswordPrompt({ error, onSubmit }) {
+  const [value, setValue] = useState('');
+  const [checking, setChecking] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setChecking(true);
+    await onSubmit(value);
+    setChecking(false);
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="py-2 text-center">
+      <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-blue-50 text-blue-600">
+        <KeyRound className="size-7" aria-hidden="true" />
+      </span>
+      <h1 className="mt-4 text-lg font-semibold text-slate-900">This link is password-protected</h1>
+      <p className="mt-1 text-sm text-slate-500">
+        Enter the password you got from the person who shared it.
+      </p>
+      <input
+        type="password"
+        required
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        aria-label="Link password"
+        aria-invalid={Boolean(error)}
+        placeholder="Password"
+        className="mt-5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-xs focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 focus:outline-none"
+      />
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      <Button type="submit" size="lg" loading={checking} className="mt-4 w-full">
+        Open
+      </Button>
+    </form>
   );
 }
 

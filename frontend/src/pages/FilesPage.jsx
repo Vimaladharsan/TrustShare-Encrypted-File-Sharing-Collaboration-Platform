@@ -217,6 +217,11 @@ export default function FilesPage({ mode = 'folder' }) {
   const folderActions = (folder) =>
     canManageFolders
       ? [
+          can('share:create') && {
+            label: 'Share',
+            icon: Share2,
+            onClick: () => setDialog({ type: 'shareFolder', item: folder }),
+          },
           {
             label: 'Rename',
             icon: Pencil,
@@ -431,6 +436,9 @@ export default function FilesPage({ mode = 'folder' }) {
       )}
       {dialog?.type === 'shareSelected' && (
         <ShareDialog files={dialog.items} onClose={() => setDialog(null)} />
+      )}
+      {dialog?.type === 'shareFolder' && (
+        <ShareDialog folder={dialog.item} onClose={() => setDialog(null)} />
       )}
       {dialog?.type === 'upload' && (
         <UploadModal
