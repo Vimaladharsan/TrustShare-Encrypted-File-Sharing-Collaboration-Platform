@@ -20,7 +20,14 @@ from app.schemas.mfa import (
     MfaSetupResponse,
     MfaStatusResponse,
 )
-from app.schemas.user import DeleteAccountRequest, DeviceSessionList, ProfileUpdate, UserResponse
+from app.schemas.user import (
+    AccountOverview,
+    DeleteAccountRequest,
+    DeviceSessionList,
+    ProfileUpdate,
+    UserResponse,
+)
+from app.services.account_overview import AccountOverviewService
 from app.services.account_service import AccountService
 from app.services.activity_service import ActivityService
 from app.services.email_service import EmailSender, account_deleted_email, get_email_sender
@@ -78,6 +85,21 @@ async def delete_me(
 
 
 # ---------- signed-in devices ----------
+
+
+@router.get(
+    "/me/overview",
+    response_model=AccountOverview,
+    summary="My security score (checklist with fixes) and account statistics",
+)
+async def my_overview(
+    request: Request,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+    db: AsyncDatabase = Depends(get_mongo),
+) -> AccountOverview:
+    return await AccountOverviewService(session, redis, db, request).overview(user)
 
 
 @router.get("/me/sessions", response_model=DeviceSessionList, summary="My signed-in devices")

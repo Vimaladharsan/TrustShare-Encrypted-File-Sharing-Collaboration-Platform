@@ -39,6 +39,12 @@ export async function updateProfile(fullName) {
   return data;
 }
 
+/** Security score (checklist with fixes) and account statistics for the profile page. */
+export async function getAccountOverview() {
+  const { data } = await api.get('/users/me/overview');
+  return data;
+}
+
 /** My signed-in devices: [{ id, browser, os, kind, ip_address, location, signed_in_at, last_active_at, current }] */
 export async function getDevices() {
   const { data } = await api.get('/users/me/sessions');

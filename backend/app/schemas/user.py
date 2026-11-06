@@ -102,3 +102,35 @@ class DeleteAccountRequest(BaseModel):
     password: str | None = Field(None, max_length=128)
     code: str | None = Field(None, max_length=20)
     confirm: str = Field(min_length=1, max_length=320)
+
+
+class SecurityCheck(BaseModel):
+    """One item of the account security checklist."""
+
+    key: str
+    label: str
+    points: int  # what this check adds to the score when it passes
+    ok: bool
+    detail: str
+    fix: str  # where the web app sends you: security | devices | verify_email | activity | vault
+
+
+class LastSignIn(BaseModel):
+    at: datetime
+    device: str  # e.g. "Chrome on Windows"
+
+
+class AccountStats(BaseModel):
+    member_since: datetime
+    files: int
+    storage_used_bytes: int
+    storage_quota_bytes: int
+    active_shares: int
+    previous_sign_in: LastSignIn | None  # the sign-in before the current one
+
+
+class AccountOverview(BaseModel):
+    score: int  # 0–100
+    grade: str  # strong | good | needs_attention
+    checks: list[SecurityCheck]
+    stats: AccountStats

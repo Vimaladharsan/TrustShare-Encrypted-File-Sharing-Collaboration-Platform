@@ -20,6 +20,7 @@ TrustShare is built milestone by milestone. **Milestone 1** (foundation: auth, R
 - **JWT access tokens** (15 min, kept in memory only) and **rotating refresh tokens** (7 days, HttpOnly cookie, stored hashed in Redis) with reuse detection (a 10-second grace window lets the same browser retry a just-rotated token – two tabs or fast reloads – without being logged out)
 - Logout, and **log out of all devices** from Settings
 - **Change password** in Settings (confirms the current one; other devices are logged out)
+- **Account security score** on My account: a 0–100 score from seven checks (two-step verification, verified email, no recent failed sign-ins, backup codes, password age, number of devices, secure vault), each with a *Fix now* button; plus an account strip with member since, files, storage, active shares and the previous sign-in
 - **My account** page with Profile · Security · Devices · Account tabs: edit your display name; see every signed-in **device** (browser, OS, IP, approximate location, last active) and **sign out one device** – its access token stops working at once, not after 15 minutes; generate **new backup codes** (needs a current code, old codes stop working)
 - **Delete my account**: confirmed with password (or typed email for Google-only accounts) plus a 2-step code if on; erases every file, object, wrapped key, share link, folder and session, keeps the audit trail, emails a confirmation; the last admin can't delete themselves
 - **Google login** (OAuth 2.0 Authorization Code flow with PKCE): ID token verified against Google's keys; links to an existing account with the same verified email, otherwise creates a User; MFA still required if enabled
@@ -330,7 +331,7 @@ Interactive documentation is available at `/docs` while the backend is running.
 |---|---|
 | Health | `GET /api/health` |
 | Auth | `POST /api/auth/register`, `/login`, `/mfa/verify`, `/refresh`, `/logout`, `/logout-all`, `/forgot-password`, `/reset-password`, `/verify-email`, `/verify-email/resend`; `GET /api/auth/providers`, `/google/login`, `/google/callback` |
-| Profile & MFA | `GET` · `PATCH` · `DELETE /api/users/me`, `POST /api/users/me/password`, `GET /api/users/me/sessions`, `DELETE /api/users/me/sessions/{id}`, `GET /api/users/me/mfa`, `POST /api/users/me/mfa/setup`, `/enable`, `/disable`, `/backup-codes` |
+| Profile & MFA | `GET` · `PATCH` · `DELETE /api/users/me`, `POST /api/users/me/password`, `GET /api/users/me/overview` (security score + stats), `GET /api/users/me/sessions`, `DELETE /api/users/me/sessions/{id}`, `GET /api/users/me/mfa`, `POST /api/users/me/mfa/setup`, `/enable`, `/disable`, `/backup-codes` |
 | Admin | `GET /api/admin/users` (requires `user:read`), `PATCH /api/admin/users/{id}` (role, enable/disable), `POST /api/admin/users/{id}/unlock` (require `user:manage`), `DELETE /api/admin/users/{id}` (inactive 30+ days, requires `user:delete_inactive`) |
 | Files | `POST /api/files` (upload), `GET /api/files`, `GET /api/files/usage`, `GET/PATCH/DELETE /api/files/{id}`, `GET /api/files/{id}/download`, `GET /api/files/{id}/preview`, `POST /api/files/{id}/trash`, `/restore`, `POST /api/files/bulk/move`, `/bulk/trash`, `/bulk/download` (ZIP) |
 | Folders | `GET/POST /api/folders`, `GET/PATCH/DELETE /api/folders/{id}`, `POST /api/folders/{id}/trash`, `/restore` |

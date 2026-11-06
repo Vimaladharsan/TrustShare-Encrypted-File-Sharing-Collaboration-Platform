@@ -3,20 +3,27 @@ import {
   Bell,
   CalendarDays,
   CheckCircle2,
+  Clock,
+  FileText,
+  HardDrive,
   MonitorSmartphone,
+  Share2,
   ShieldAlert,
   ShieldCheck,
   UserRound,
 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
+import { getAccountOverview } from '../api/account';
 import { useAuth } from '../auth/useAuth';
 import DeleteAccountCard from '../components/settings/DeleteAccountCard';
 import DevicesTab from '../components/settings/DevicesTab';
 import NotificationsTab from '../components/settings/NotificationsTab';
 import ProfileTab from '../components/settings/ProfileTab';
+import SecurityScoreCard from '../components/settings/SecurityScoreCard';
 import SecurityTab from '../components/settings/SecurityTab';
-import { formatDate } from '../utils/format';
+import { formatBytes, formatDate, timeAgo } from '../utils/format';
 
 const TABS = [
   { value: 'profile', label: 'Profile', icon: UserRound },
@@ -41,6 +48,16 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const [params, setParams] = useSearchParams();
   const tab = TABS.some((t) => t.value === params.get('tab')) ? params.get('tab') : 'profile';
+  const [overview, setOverview] = useState(null); // security score + stats (one request)
+
+  const loadOverview = useCallback(() => {
+    getAccountOverview()
+      .then(setOverview)
+      .catch(() => setOverview(null)); // the page works without it
+  }, []);
+
+  // Reload when the tab changes: turning on two-step or signing out a device changes the score.
+  useEffect(loadOverview, [loadOverview, tab, user.mfa_enabled]);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -57,7 +74,7 @@ export default function SettingsPage() {
           />
         </div>
         <div className="flex flex-col gap-4 px-6 pb-6 sm:flex-row sm:items-end">
-          <span className="-mt-10 grid size-20 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-2xl font-semibold text-white shadow-lg ring-4 ring-white">
+          <span className="relative z-10 -mt-10 grid size-20 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-2xl font-semibold text-white shadow-lg ring-4 ring-white">
             {initials(user.full_name)}
           </span>
           <div className="min-w-0 flex-1">
@@ -94,6 +111,7 @@ export default function SettingsPage() {
             </Badge>
           </div>
         </div>
+        {overview && <StatsStrip stats={overview.stats} />}
       </section>
 
       <nav
@@ -118,12 +136,58 @@ export default function SettingsPage() {
         ))}
       </nav>
 
+      {tab === 'profile' && overview && <SecurityScoreCard overview={overview} />}
       {tab === 'profile' && <ProfileTab />}
       {tab === 'security' && <SecurityTab />}
       {tab === 'devices' && <DevicesTab />}
       {tab === 'notifications' && <NotificationsTab />}
       {tab === 'account' && <DeleteAccountCard />}
     </div>
+  );
+}
+
+/** Member since · files · storage · active shares · previous sign-in. */
+function StatsStrip({ stats }) {
+  const used = stats.storage_quota_bytes
+    ? Math.min(100, Math.round((stats.storage_used_bytes / stats.storage_quota_bytes) * 100))
+    : 0;
+  const items = [
+    { icon: CalendarDays, label: 'Member since', value: formatDate(stats.member_since) },
+    { icon: FileText, label: 'Files', value: stats.files.toLocaleString('en-IN') },
+    {
+      icon: HardDrive,
+      label: 'Storage',
+      value: `${formatBytes(stats.storage_used_bytes)} of ${formatBytes(stats.storage_quota_bytes)}`,
+      bar: used,
+    },
+    { icon: Share2, label: 'Active shares', value: stats.active_shares },
+    {
+      icon: Clock,
+      label: 'Previous sign-in',
+      value: stats.previous_sign_in ? timeAgo(stats.previous_sign_in.at) : '—',
+      hint: stats.previous_sign_in?.device,
+    },
+  ];
+  return (
+    <dl className="grid grid-cols-2 gap-px border-t border-slate-100 bg-slate-100 sm:grid-cols-5">
+      {items.map(({ icon: Icon, label, value, bar, hint }) => (
+        <div key={label} className="bg-white px-5 py-3" title={hint}>
+          <dt className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+            <Icon className="size-3.5" aria-hidden="true" /> {label}
+          </dt>
+          <dd className="mt-0.5 truncate text-sm font-semibold text-slate-900">{value}</dd>
+          {bar !== undefined && (
+            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-blue-500"
+                style={{ width: `${Math.max(bar, 2)}%` }}
+              />
+            </div>
+          )}
+          {hint && <dd className="truncate text-[11px] text-slate-400">{hint}</dd>}
+        </div>
+      ))}
+    </dl>
   );
 }
 
