@@ -1,5 +1,6 @@
-import { Download, ShieldCheck, ShieldX } from 'lucide-react';
+import { Crosshair, Download, ShieldCheck, ShieldX, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 
 import { getErrorMessage } from '../../api/client';
@@ -11,10 +12,33 @@ import Button from '../../components/Button';
 import { ErrorState, Loading } from '../../components/StateMessage';
 
 const LIMIT = 25;
+const AROUND_MINUTES = 30;
+
+/**
+ * Opened from an alert ("Activity around this time"): ?around=<alert time>&user_id=… (or q=<IP>)
+ * → that user's entries from 30 minutes before to 30 minutes after the alert.
+ */
+function filtersFromAlert(params) {
+  const around = params.get('around');
+  const at = around ? new Date(around) : null;
+  if (!at || Number.isNaN(at.getTime())) return { filters: { offset: 0 }, context: null };
+  const minutes = AROUND_MINUTES * 60000;
+  const filters = {
+    offset: 0,
+    since: new Date(at.getTime() - minutes).toISOString(),
+    until: new Date(at.getTime() + minutes).toISOString(),
+  };
+  if (params.get('user_id')) filters.user_id = params.get('user_id');
+  if (params.get('q')) filters.q = params.get('q');
+  return { filters, context: { who: params.get('who') || 'this alert', at } };
+}
 
 /** Audit Logs: the permanent, hash-chained history – filters, integrity check and CSV export. */
 export default function AuditLogsPage() {
-  const [filters, setFilters] = useState({ offset: 0 });
+  const [params, setParams] = useSearchParams();
+  const [initial] = useState(() => filtersFromAlert(params));
+  const [filters, setFilters] = useState(initial.filters);
+  const [context, setContext] = useState(initial.context); // the alert being investigated
   const [page, setPage] = useState(null);
   const [integrity, setIntegrity] = useState(null);
   const [error, setError] = useState('');
@@ -59,7 +83,33 @@ export default function AuditLogsPage() {
 
       {integrity && <IntegrityBanner integrity={integrity} />}
 
+      {context && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          <Crosshair className="size-4 shrink-0" aria-hidden="true" />
+          <p className="min-w-0 flex-1">
+            Activity of <strong>{context.who}</strong> from {AROUND_MINUTES} minutes before to{' '}
+            {AROUND_MINUTES} minutes after the alert of{' '}
+            <strong>
+              {context.at.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}
+            </strong>
+            .
+          </p>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              setContext(null);
+              setFilters({ offset: 0 });
+              setParams({});
+            }}
+          >
+            <X className="size-3.5" aria-hidden="true" /> Clear
+          </Button>
+        </div>
+      )}
+
       <FilterBar
+        key={context ? 'alert' : 'all'} // remount so the search box reflects cleared filters
         value={filters}
         onChange={setFilters}
         show={['dates', 'user', 'activityType', 'status', 'fileId', 'q']}

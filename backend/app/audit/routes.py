@@ -86,6 +86,8 @@ async def filtered_logs(
     from_date: date | None = Query(None, alias="from"),
     to_date: date | None = Query(None, alias="to"),
     tz: str = Query("UTC", max_length=64),
+    since: datetime | None = Query(None, description="Exact start time (with time zone)"),
+    until: datetime | None = Query(None, description="Exact end time (with time zone)"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     service: AuditService = Depends(audit),
@@ -99,6 +101,8 @@ async def filtered_logs(
         from_date=from_date,
         to_date=to_date,
         tz=tz,
+        since=since,
+        until=until,
     )
     return await service.page(match, limit, offset)
 
@@ -124,6 +128,8 @@ async def export(
     from_date: date | None = Query(None, alias="from"),
     to_date: date | None = Query(None, alias="to"),
     tz: str = Query("UTC", max_length=64),
+    since: datetime | None = Query(None, description="Exact start time (with time zone)"),
+    until: datetime | None = Query(None, description="Exact end time (with time zone)"),
     admin: User = Depends(can_read_audit),
     service: AuditService = Depends(audit),
     db: AsyncDatabase = Depends(get_mongo),
@@ -137,6 +143,8 @@ async def export(
         from_date=from_date,
         to_date=to_date,
         tz=tz,
+        since=since,
+        until=until,
     )
     text, rows = await service.csv(match)
     filters = {"activity_type": activity_type, "status": status, "rows": rows}

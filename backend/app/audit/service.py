@@ -175,8 +175,11 @@ def build_filter(
     from_date: date | None = None,
     to_date: date | None = None,
     tz: str = "UTC",
+    since: datetime | None = None,
+    until: datetime | None = None,
 ) -> dict[str, Any]:
-    """MongoDB filter for the brief's audit filters: user, activity type, file ID, status, dates."""
+    """MongoDB filter for the brief's audit filters: user, activity type, file ID, status, dates –
+    plus an optional exact time window (since / until), e.g. 30 minutes around an alert."""
     match: dict[str, Any] = {}
     if user_id:
         match["user_id"] = user_id
@@ -208,6 +211,14 @@ def build_filter(
         if from_date and to_date and from_date > to_date:
             raise AppError("INVALID_RANGE", "The start date must be before the end date.", 400)
         match["created_at"] = when
+    if since or until:
+        if since and until and since > until:
+            raise AppError("INVALID_RANGE", "The start time must be before the end time.", 400)
+        window = match.setdefault("created_at", {})
+        if since:
+            window["$gte"] = max(since, window.get("$gte", since))
+        if until:
+            window["$lte"] = until
     return match
 
 

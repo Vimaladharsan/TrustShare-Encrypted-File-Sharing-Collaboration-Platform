@@ -1,5 +1,6 @@
-import { CheckCircle2, Eye, RotateCcw } from 'lucide-react';
+import { CheckCircle2, Eye, RotateCcw, ScrollText } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
 import { getErrorMessage } from '../../api/client';
@@ -176,6 +177,16 @@ export default function AlertsPage() {
 function AlertDialog({ alert, onClose, onChanged }) {
   const [note, setNote] = useState(alert.note || '');
   const [working, setWorking] = useState('');
+  const navigate = useNavigate();
+
+  /** Audit logs of this user (or, for anonymous visitors, this IP) 30 min before/after the alert. */
+  function investigate() {
+    const params = new URLSearchParams({ around: alert.created_at });
+    if (alert.user_id) params.set('user_id', alert.user_id);
+    else if (alert.ip_address) params.set('q', alert.ip_address);
+    params.set('who', alert.actor_email || alert.ip_address || 'this alert');
+    navigate(`/admin/audit?${params}`);
+  }
 
   async function act(action) {
     setWorking(action);
@@ -234,6 +245,11 @@ function AlertDialog({ alert, onClose, onChanged }) {
         />
       </label>
       <div className="mt-4 flex flex-wrap justify-end gap-2">
+        {(alert.user_id || alert.ip_address) && (
+          <Button variant="ghost" onClick={investigate} className="mr-auto">
+            <ScrollText className="size-4" aria-hidden="true" /> Activity around this time
+          </Button>
+        )}
         {alert.status !== 'open' && (
           <Button variant="secondary" onClick={() => act('reopen')} loading={working === 'reopen'}>
             <RotateCcw className="size-4" aria-hidden="true" /> Reopen
