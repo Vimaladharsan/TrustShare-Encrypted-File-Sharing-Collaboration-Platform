@@ -292,6 +292,8 @@ It creates two throwaway accounts (`@postman.example.com`); remove them afterwar
 docker run --rm --network trustshare_default -v "$PWD/postman:/etc/newman" postman/newman:6-alpine run TrustShare_M3.postman_collection.json -e TrustShare_local.postman_environment.json --env-var baseUrl=http://backend:8000/api --env-var adminEmail=… --env-var adminPassword=…
 ```
 
+Run one collection at a time, at least a minute apart: sign-ins are rate-limited to 10 per minute per IP address, and the M3 collection's brute-force test needs its six wrong passwords to reach the server (straight after another run, the limiter answers `429` first and no alert is raised – the protection working, not a failure). Remove the test accounts afterwards with `docker compose exec backend python -m app.scripts.remove_test_accounts postman.example.com`.
+
 ## Environment Variables
 
 See [.env.example](.env.example).

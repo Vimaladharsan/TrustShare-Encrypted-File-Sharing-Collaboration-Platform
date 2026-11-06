@@ -1,5 +1,4 @@
 import { Download } from 'lucide-react';
-import QRCode from 'qrcode';
 import { useEffect, useState } from 'react';
 
 import Button from '../Button';
@@ -7,13 +6,17 @@ import Button from '../Button';
 /**
  * QR code for a share link, drawn in the browser by the `qrcode` library. The link is a secret,
  * so it is never sent to an online QR service. Download saves it as a PNG (e.g. for a slide).
+ * The library is loaded only when a QR code is first shown, keeping it out of the main bundle.
  */
 export default function LinkQrCode({ url, fileName }) {
   const [image, setImage] = useState('');
 
   useEffect(() => {
     let alive = true;
-    QRCode.toDataURL(url, { width: 480, margin: 2, errorCorrectionLevel: 'M' })
+    import('qrcode')
+      .then(({ default: QRCode }) =>
+        QRCode.toDataURL(url, { width: 480, margin: 2, errorCorrectionLevel: 'M' }),
+      )
       .then((dataUrl) => alive && setImage(dataUrl))
       .catch(() => alive && setImage(''));
     return () => {
