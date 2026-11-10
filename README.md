@@ -11,7 +11,7 @@ A secure file-sharing and document management platform – a private alternative
 
 ## Status
 
-TrustShare is built milestone by milestone. **Milestone 1** (foundation: auth, RBAC, MFA, upload, dashboard) **Milestone 2** (encryption, cloud storage, secure sharing, key management, dashboards, HTTPS) and **Milestone 3** (activity monitoring, audit logs, notifications, reports, storage analytics, suspicious-activity detection) are complete.
+TrustShare is built milestone by milestone. **Milestone 1** (foundation: auth, RBAC, MFA, upload, dashboard) **Milestone 2** (encryption, cloud storage, secure sharing, key management, dashboards, HTTPS) and **Milestone 3** (activity monitoring, audit logs, notifications, reports, storage analytics, suspicious-activity detection) are complete. After Milestone 3 the existing features were polished: multi-select with ZIP download, sharing several files or a whole folder, optional link passwords, QR codes, editable shares with access history, desktop pop-ups, light/dark mode, a separate admin console look and an account security score. **Milestone 4** (security testing, cloud deployment, final documentation) is next.
 
 ## Features
 
@@ -89,7 +89,7 @@ New code lives in feature modules named like the brief: `activity_monitoring/`, 
 - **Suspicious activity detection:** rule engine with sliding windows in Redis and thresholds in `.env` – more than 5 failed sign-ins in 10 min, repeated unauthorized access, more than 20 downloads in 5 min, repeated attempts on expired or revoked links; one alert per rule and subject per window; alert workflow open → acknowledged → resolved (with notes, audited); from any alert, **Activity around this time** opens the audit log filtered to that user (or IP) from 30 minutes before to 30 minutes after the alert
 - **Reports:** uploads, downloads, sharing, one user's activity, security – summary, charts, tables and CSV export, with filters for date range, user, file type, activity type and file ID
 - **Storage analytics:** total and per-user storage (incl. vaults and trash), file, download and sharing statistics with the brief's charts (storage-by-user pie, uploads by date, downloads, sharing)
-- **Unified admin dashboard:** User activity · Audit logs · Security monitoring · Suspicious activity alerts · File activity reports · Storage analytics · Notification management · Users · System
+- **Unified admin dashboard:** User activity · Audit logs · Security monitoring · Suspicious activity alerts · File activity reports · Storage analytics · Notification management · Users · System – in a separate **dark operations console** with its own violet/amber look, so admin mode is never confused with the user workspace
 - **Privacy kept:** admins see file IDs, types and sizes in every report, log and alert – never file names (owners still see their own)
 - **Screenshots** of every module: [`docs/screenshots/m3/`](docs/screenshots/m3/) (demo data, personal addresses masked)
 
@@ -97,7 +97,7 @@ New code lives in feature modules named like the brief: `activity_monitoring/`, 
 - **HTTPS** through a Caddy reverse proxy (TLS 1.3) at https://localhost:8443; real client IPs via trusted proxy headers
 - **Activity log** in MongoDB for every important action (plus the hash-chained audit log since Milestone 3), including **login history** (successful logins with method, failed logins with reason, lockouts) and rejected uploads (who, what, IP, user agent, request ID)
 - Health endpoint that checks PostgreSQL, MongoDB, Redis and object storage
-- Standard JSON error format with request IDs, security headers, structured logging
+- Standard JSON error format with request IDs, security headers (`nosniff`, `X-Frame-Options: DENY`, referrer policy, `Cache-Control: no-store` so browsers never reuse a private or refused API answer – e.g. a revoked link's `410` – and every attempt reaches detection), structured logging
 - Everything runs with Docker Compose; database migrations run automatically on start
 
 ## Architecture
@@ -133,10 +133,10 @@ Full design with diagrams: [docs/architecture.md](docs/architecture.md) · data 
 | Layer | Technologies |
 |---|---|
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2 (async), Pydantic v2, Alembic, Uvicorn |
-| Frontend | React 19, Vite, React Router, Tailwind CSS, Axios, Recharts, lucide-react, sonner |
+| Frontend | React 19, Vite, React Router, Tailwind CSS, Axios, Recharts, qrcode (loaded on demand), lucide-react, sonner |
 | Data & storage | PostgreSQL 16, MongoDB 7, Redis 7, object storage: Azure Blob Storage (azure-storage-blob) or S3 API via boto3 (RustFS locally / AWS S3) |
 | Security | AES-256-GCM (`cryptography`), envelope encryption with versioned master keys, bcrypt, JWT, TOTP (pyotp), Fernet, permission-based RBAC, Caddy (TLS) |
-| Quality | pytest (204 tests), Postman/Newman collection, ruff, ESLint, Prettier, pre-commit, GitHub Actions |
+| Quality | pytest (315 tests), Postman/Newman collections (M2 + M3), ruff, ESLint, Prettier, pre-commit, GitHub Actions |
 | Deployment | Docker, Docker Compose (7 services incl. RustFS and Caddy) |
 
 ## Project Structure
@@ -346,7 +346,7 @@ Interactive documentation is available at `/docs` while the backend is running.
 | Security monitoring (M3) | `GET /api/security-monitoring/summary`, `/events`, `GET/PATCH /events/{id}` (acknowledge / resolve / reopen), `/rules` – `audit:read` |
 | Reports (M3) | `GET /api/reports/uploads`, `/downloads`, `/sharing`, `/users/{id}`, `/security` (`format=csv`) – `audit:read` |
 | Storage analytics (M3) | `GET /api/analytics/storage`, `/analytics/users/storage`, `/analytics/files`, `/analytics/downloads`, `/analytics/sharing` – `audit:read` |
-| Public links (M2) | `GET /api/s/{token}` · `/preview` · `/download` – no login, rate-limited per IP |
+| Public links (M2) | `GET /api/s/{token}` · `/preview` · `/download` – no login, rate-limited per IP; password-protected links need the `X-Share-Password` header (wrong or missing → `403`, 5 wrong → `429` for 15 min) |
 
 ## Roadmap
 
