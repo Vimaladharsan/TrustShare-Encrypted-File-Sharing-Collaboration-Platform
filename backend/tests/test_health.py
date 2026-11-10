@@ -16,6 +16,7 @@ def test_every_response_has_request_id_and_security_headers(client: TestClient) 
     assert response.headers["X-Request-ID"]
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["X-Frame-Options"] == "DENY"
+    assert response.headers["Cache-Control"] == "no-store"
 
 
 def test_unknown_route_uses_standard_error_format(client: TestClient) -> None:

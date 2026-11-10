@@ -19,6 +19,9 @@ SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",  # browser must not guess file types
     "X-Frame-Options": "DENY",  # page can't be embedded in an iframe (clickjacking)
     "Referrer-Policy": "strict-origin-when-cross-origin",
+    # API answers are private and change all the time. Browsers may otherwise reuse a cached
+    # "410 Gone" for a revoked link, so repeated attempts would never reach detection.
+    "Cache-Control": "no-store",
 }
 
 
