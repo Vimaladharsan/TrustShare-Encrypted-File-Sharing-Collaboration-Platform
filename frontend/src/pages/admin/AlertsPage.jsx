@@ -24,6 +24,7 @@ const TYPES = [
   'multiple_failed_logins',
   'account_locked',
   'suspicious_ip',
+  'new_device_login',
   'new_ip_login',
   'token_reuse',
   'unauthorized_access',

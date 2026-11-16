@@ -1,6 +1,6 @@
-import { LogOut, Monitor, Smartphone } from 'lucide-react';
+import { LogOut, Monitor, ShieldAlert, Smartphone, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 
 import { getDevices, signOutDevice } from '../../api/account';
@@ -12,10 +12,15 @@ import ConfirmDialog from '../ConfirmDialog';
 import { ErrorState, Loading } from '../StateMessage';
 import SettingsCard from './SettingsCard';
 
-/** Devices tab: every signed-in device, each can be signed out on its own. */
+const NEW_FOR_MS = 24 * 60 * 60 * 1000; // a device signed in within a day is marked "New"
+
+/** Devices tab: every signed-in device, each can be signed out on its own.
+ *  Opened from a new-sign-in alert (?check=new-sign-in) it first asks "Was this you?". */
 export default function DevicesTab() {
   const { logoutAll } = useAuth();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const checking = params.get('check') === 'new-sign-in';
   const [devices, setDevices] = useState(null);
   const [error, setError] = useState('');
   const [confirm, setConfirm] = useState(null); // null | { device } | 'all'
@@ -46,8 +51,45 @@ export default function DevicesTab() {
     navigate('/login');
   }
 
+  function isNew(device) {
+    return !device.current && Date.now() - new Date(device.signed_in_at).getTime() < NEW_FOR_MS;
+  }
+
   return (
     <div className="space-y-6">
+      {checking && (
+        <div
+          role="status"
+          className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800"
+        >
+          <ShieldAlert className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+          <div className="min-w-0 flex-1 text-sm">
+            <p className="font-semibold">Was this sign-in you?</p>
+            <p className="mt-1">
+              Devices that signed in during the last day are marked <strong>New</strong>. If you
+              don&apos;t recognise one, sign it out – it loses access immediately – and then change
+              your password.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => setParams({ tab: 'security' })}>
+                Change password
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setParams({ tab: 'devices' })}>
+                Yes, it was me
+              </Button>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setParams({ tab: 'devices' })}
+            className="h-fit rounded-lg p-1 hover:bg-amber-100"
+            aria-label="Dismiss"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+      )}
+
       <SettingsCard
         title="Signed-in devices"
         description="Don't recognise a device? Sign it out – it loses access immediately – and change your password."
@@ -72,6 +114,11 @@ export default function DevicesTab() {
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-2 font-medium text-slate-900">
                       {device.browser} on {device.os}
+                      {isNew(device) && (
+                        <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-600/20 ring-inset">
+                          New
+                        </span>
+                      )}
                       {device.current && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-600/15 ring-inset">
                           <span className="size-1.5 rounded-full bg-emerald-500" /> This device

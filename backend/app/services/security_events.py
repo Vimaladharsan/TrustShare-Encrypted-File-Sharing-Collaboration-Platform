@@ -6,6 +6,8 @@ should look at – each with a type and a severity (high / medium / low / info):
   multiple_failed_logins   3+ wrong passwords or codes in a row for one account     medium
   account_locked           the account was locked after too many failures           high
   suspicious_ip            many failed sign-ins from one IP (often across accounts) high
+  new_device_login         successful sign-in from a device (browser + system) never
+                           seen for the account                                     medium
   new_ip_login             successful sign-in from an IP never seen for the account medium
   token_reuse              an old refresh token came back – possible token theft     high
   unauthorized_access      403 (missing permission), forged token, invalid link     medium/low
@@ -48,6 +50,7 @@ EVENT_TYPES: dict[str, tuple[str, str]] = {
     "multiple_failed_logins": ("medium", "Multiple failed sign-in attempts"),
     "account_locked": ("high", "Account locked after repeated failures"),
     "suspicious_ip": ("high", "Many failed sign-ins from one IP address"),
+    "new_device_login": ("medium", "Sign-in from a new device"),
     "new_ip_login": ("medium", "Sign-in from a new IP address"),
     "token_reuse": ("high", "Refresh token reused – all sessions ended"),
     "unauthorized_access": ("medium", "Unauthorized access attempt"),

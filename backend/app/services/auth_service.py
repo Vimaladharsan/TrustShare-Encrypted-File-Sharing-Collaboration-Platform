@@ -20,6 +20,7 @@ from app.core.security import (
     spend_password_check_time,
     verify_password,
 )
+from app.core.user_agent import describe_device
 from app.models import User
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
@@ -123,17 +124,26 @@ class AuthService:
                 "suspicious_ip", request=self.request, details={"failed_logins_15min": recent}
             )
 
-    async def _watch_new_ip(self, user: User) -> None:
-        """A successful sign-in from an IP this account never signed in from before."""
+    async def _watch_new_sign_in(self, user: User, user_agent: str, device: str) -> None:
+        """A successful sign-in from a device (browser + system) or an IP address this account
+        never signed in from before. The very first sign-in of an account is never "new"."""
         if self.activity is None or self.request is None:
             return
-        ip = client_ip(self.request)
         logs = self.activity.logs
         previous = {"user_id": str(user.id), "action": "auth.login.success"}
-        if await logs.find_one(previous) and not await logs.find_one(
-            {**previous, "ip_address": ip}
-        ):
-            await record_security_event("new_ip_login", request=self.request, user=user)
+        if not await logs.find_one(previous):
+            return
+        ip = client_ip(self.request)
+        # Older sign-ins have no details.device yet – fall back to the exact user agent.
+        same_device = {"$or": [{"details.device": device}, {"user_agent": user_agent[:200]}]}
+        if not await logs.find_one({**previous, **same_device}):
+            await record_security_event(
+                "new_device_login", request=self.request, user=user, details={"device": device}
+            )
+        elif not await logs.find_one({**previous, "ip_address": ip}):
+            await record_security_event(
+                "new_ip_login", request=self.request, user=user, details={"device": device}
+            )
 
     async def register(self, data: RegisterRequest) -> tuple[User, bool]:
         """Returns (user, created). For an email that's already registered nothing is created
@@ -241,8 +251,10 @@ class AuthService:
         await self.session.commit()  # also saves a used backup code, if one was used
         session_id = uuid.uuid4().hex  # one id per device, kept across token rotation
         refresh_token = await self.sessions.create(user.id, ip, user_agent, family=session_id)
-        await self._watch_new_ip(user)  # before logging this sign-in
-        await self._log(user, "auth.login.success", details={"method": method})
+        found = describe_device(user_agent)
+        device = f"{found['browser']} on {found['os']}"
+        await self._watch_new_sign_in(user, user_agent, device)  # before logging this sign-in
+        await self._log(user, "auth.login.success", details={"method": method, "device": device})
         return self._token_response(user, session_id), refresh_token
 
     async def refresh(

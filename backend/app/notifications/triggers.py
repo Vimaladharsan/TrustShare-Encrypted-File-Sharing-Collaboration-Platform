@@ -37,15 +37,20 @@ RULE_ALERTS = {
     "revoked_link_abuse",
 }
 ACCOUNT_EVENTS = {
+    "new_device_login": ("New device signed in to your account", "warning"),
     "new_ip_login": ("New sign-in to your account", "warning"),
     "account_locked": ("Your account was locked", "critical"),
     "repeated_failed_logins": ("Many failed sign-ins on your account", "critical"),
     "token_reuse": ("Your sessions were ended for safety", "critical"),
     "vault_locked": ("Your vault was locked", "critical"),
 }
+NEW_SIGN_IN_EVENTS = {"new_device_login", "new_ip_login"}
 ACCOUNT_MESSAGES = {
-    "new_ip_login": "Someone signed in to your account from a new IP address ({ip}). "
-    "If this wasn't you, change your password and sign out other devices.",
+    "new_device_login": "{device} signed in to your account for the first time (IP address "
+    "{ip}). If this was you, there is nothing to do. If it wasn't, sign that device out and "
+    "change your password.",
+    "new_ip_login": "Someone signed in to your account from a new IP address ({ip}, {device}). "
+    "If this wasn't you, sign that device out and change your password.",
     "account_locked": "Too many wrong passwords – your account is locked for a few minutes. "
     "If this wasn't you, change your password.",
     "repeated_failed_logins": "There were {count} failed sign-in attempts on your account. "
@@ -268,22 +273,25 @@ async def _alert_account_owner(event: dict[str, Any]) -> None:
     message = ACCOUNT_MESSAGES[event["type"]].format(
         ip=event.get("ip_address") or "unknown",
         count=(event.get("rule") or {}).get("count", "several"),
+        device=(event.get("details") or {}).get("device", "an unknown device"),
     )
+    new_sign_in = event["type"] in NEW_SIGN_IN_EVENTS
+    link = "/settings?tab=devices&check=new-sign-in" if new_sign_in else "/settings?tab=devices"
     await _service().notify(
         user,
         "account_security",
         title,
         message,
         severity=severity,
-        link="/settings?tab=devices",
+        link=link,
         data={"alert_id": event.get("alert_id"), "event_type": event["type"]},
         email=notification_email(
             user.email,
             user.full_name,
             title,
             message,
-            "Review your devices",
-            _app_link("/settings?tab=devices"),
+            "Wasn't you? Review your devices" if new_sign_in else "Review your devices",
+            _app_link(link),
             "Security emails can be turned off in Settings → Notifications (not recommended).",
         ),
     )
