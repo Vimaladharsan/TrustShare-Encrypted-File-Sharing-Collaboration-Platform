@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, ArrowUpDown, Star } from 'lucide-react';
 
+import { startMoveDrag } from '../../utils/dragMove';
 import { formatBytes, formatDate } from '../../utils/format';
 import ActionMenu from '../ActionMenu';
 import FileIcon from './FileIcon';
@@ -16,8 +17,18 @@ const COLUMNS = [
  * actionsFor(file) returns the ⋮ menu items for that file.
  * Optional selection: pass `selected` (a Set of ids) and `onToggle(id)` to show checkboxes.
  * Optional `onOpen(file)`: the file name becomes clickable (opens the preview).
+ * Optional `dragFor(file)` → { payload, label }: rows can be dragged onto a folder to move them.
  */
-export default function FileTable({ files, sort, onSort, actionsFor, selected, onToggle, onOpen }) {
+export default function FileTable({
+  files,
+  sort,
+  onSort,
+  actionsFor,
+  selected,
+  onToggle,
+  onOpen,
+  dragFor,
+}) {
   const selectable = Boolean(selected && onToggle);
   const allSelected = selectable && files.length > 0 && files.every((f) => selected.has(f.id));
   return (
@@ -77,6 +88,16 @@ export default function FileTable({ files, sort, onSort, actionsFor, selected, o
           {files.map((file) => (
             <tr
               key={file.id}
+              draggable={Boolean(dragFor)}
+              onDragStart={
+                dragFor
+                  ? (e) => {
+                      const { payload, label } = dragFor(file);
+                      startMoveDrag(e, payload, label);
+                    }
+                  : undefined
+              }
+              title={dragFor ? 'Drag onto a folder to move' : undefined}
               className={`group transition-colors ${
                 selectable && selected.has(file.id) ? 'bg-blue-50/60' : 'hover:bg-slate-50/80'
               }`}

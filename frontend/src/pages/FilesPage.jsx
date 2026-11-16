@@ -159,6 +159,30 @@ export default function FilesPage({ mode = 'folder' }) {
     }
   }
 
+  /** Something was dragged onto a folder card or a breadcrumb: move it there. */
+  function moveByDrop(payload, target) {
+    if (payload.files?.length) {
+      runBulk(
+        () => moveSelectedFiles(payload.files, target.id),
+        (n) => `${plural(n, 'file')} moved to ${target.name}`,
+      );
+    } else if (payload.folder) {
+      run(
+        () => updateFolder(payload.folder.id, { parent_id: target.id }),
+        `“${payload.folder.name}” moved to ${target.name}`,
+      );
+    }
+  }
+
+  // Dragging a ticked file takes all ticked files along; an unticked one goes alone.
+  function dragFor(file) {
+    const ids = selected.has(file.id) ? [...selected] : [file.id];
+    return {
+      payload: { files: ids },
+      label: ids.length > 1 ? plural(ids.length, 'file') : file.name,
+    };
+  }
+
   function toggleSort(by) {
     setSort((current) =>
       current.by === by
@@ -256,7 +280,7 @@ export default function FilesPage({ mode = 'folder' }) {
             </h1>
           </div>
         ) : (
-          <Breadcrumbs crumbs={crumbs} />
+          <Breadcrumbs crumbs={crumbs} onMoveInto={canEditFiles ? moveByDrop : undefined} />
         )}
         {mode === 'folder' && (
           <div className="flex gap-2">
@@ -334,6 +358,8 @@ export default function FilesPage({ mode = 'folder' }) {
                   folders={folders}
                   onOpen={(folder) => navigate(`/folders/${folder.id}`)}
                   actionsFor={canManageFolders ? folderActions : null}
+                  onMoveInto={canEditFiles || canManageFolders ? moveByDrop : undefined}
+                  draggable={canManageFolders}
                 />
               </section>
             )}
@@ -416,6 +442,7 @@ export default function FilesPage({ mode = 'folder' }) {
                   selected={selected}
                   onToggle={toggleSelected}
                   onOpen={(file) => setDialog({ type: 'preview', item: file })}
+                  dragFor={canEditFiles ? dragFor : undefined}
                 />
               </section>
             )}

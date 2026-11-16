@@ -20,6 +20,7 @@ TrustShare is built milestone by milestone. **Milestone 1** (foundation: auth, R
 - **JWT access tokens** (15 min, kept in memory only) and **rotating refresh tokens** (7 days, HttpOnly cookie, stored hashed in Redis) with reuse detection (a 10-second grace window lets the same browser retry a just-rotated token – two tabs or fast reloads – without being logged out)
 - Logout, and **log out of all devices** from Settings
 - **Change password** in Settings (confirms the current one; other devices are logged out)
+- **New-device sign-in alert:** a sign-in from a browser + system the account has never used (e.g. "Chrome on Windows"), or from a new IP address, notifies the owner in the app and by email with the device and IP; the alert opens the Devices tab with a *Was this sign-in you?* check (recent devices marked **New**, sign them out, change password). A browser update is not a new device; the first sign-in of an account never alerts
 - **Account security score** on My account: a 0–100 score from seven checks (two-step verification, verified email, no recent failed sign-ins, backup codes, password age, number of devices, secure vault), each with a *Fix now* button; plus an account strip with member since, files, storage, active shares and the previous sign-in
 - **My account** page with Profile · Security · Devices · Account tabs: edit your display name; see every signed-in **device** (browser, OS, IP, approximate location, last active) and **sign out one device** – its access token stops working at once, not after 15 minutes; generate **new backup codes** (needs a current code, old codes stop working)
 - **Delete my account**: confirmed with password (or typed email for Google-only accounts) plus a 2-step code if on; erases every file, object, wrapped key, share link, folder and session, keeps the audit trail, emails a confirmation; the last admin can't delete themselves
@@ -45,6 +46,7 @@ TrustShare is built milestone by milestone. **Milestone 1** (foundation: auth, R
 - Drive-like layout: sidebar, search across all folders, storage meter, account menu
 - Nested folders with breadcrumbs; create, rename and move files and folders
 - Category filters, sortable file table, download, and **in-app preview** of PDFs, images and text files (served in a sandbox)
+- **Drag and drop to move:** drag a file row onto a folder card or onto a breadcrumb (e.g. *My Files*) to move it; dragging a ticked file takes all ticked files along; folders can be dragged into other folders too (a folder can't go into itself – checked by the server). Desktop browsers; on phones the ⋮ *Move to…* menu does the same
 - **Multi-select** in My Files and search: tick files, then move them, trash them or **download them as one ZIP** (decrypted on the fly into the archive – never written to disk; a ZIP counts once for the excessive-downloads rule)
 - Trash with restore, bulk restore/delete, empty trash and permanent delete
 - Loading, empty and error states; responsive layout
@@ -136,7 +138,7 @@ Full design with diagrams: [docs/architecture.md](docs/architecture.md) · data 
 | Frontend | React 19, Vite, React Router, Tailwind CSS, Axios, Recharts, qrcode (loaded on demand), lucide-react, sonner |
 | Data & storage | PostgreSQL 16, MongoDB 7, Redis 7, object storage: Azure Blob Storage (azure-storage-blob) or S3 API via boto3 (RustFS locally / AWS S3) |
 | Security | AES-256-GCM (`cryptography`), envelope encryption with versioned master keys, bcrypt, JWT, TOTP (pyotp), Fernet, permission-based RBAC, Caddy (TLS) |
-| Quality | pytest (315 tests), Postman/Newman collections (M2 + M3), ruff, ESLint, Prettier, pre-commit, GitHub Actions |
+| Quality | pytest (318 tests), Postman/Newman collections (M2 + M3), ruff, ESLint, Prettier, pre-commit, GitHub Actions |
 | Deployment | Docker, Docker Compose (7 services incl. RustFS and Caddy) |
 
 ## Project Structure
