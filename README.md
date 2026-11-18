@@ -1,366 +1,144 @@
-# TrustShare: Secure File-Sharing System
+# TrustShare – Secure File-Sharing System
 
-A secure file-sharing and document management platform – a private alternative to Google Drive. Every file is validated, **encrypted server-side with its own AES-256-GCM key** (envelope encryption with rotatable master keys) and stored in private cloud object storage (S3 API or Azure Blob Storage). Users organise files in folders and share them through **permission-controlled, expiring, revocable links** or directly with other users – with analytics for users and a security dashboard for admins. Every action is recorded in a **tamper-evident audit log**, suspicious behaviour raises **alerts**, and users and admins get **real-time notifications**.
+**A private, encrypted alternative to Google Drive.** Upload files, organise them in folders and
+share them through expiring, permission-controlled links – every file is encrypted on the server
+with its own AES-256 key, every action is recorded in a tamper-evident audit log, and suspicious
+behaviour raises alerts in real time.
 
 ![CI](https://github.com/Vimaladharsan/TrustShare-Encrypted-File-Sharing-Collaboration-Platform/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Python](https://img.shields.io/badge/python-3.12+-blue)
+![Python](https://img.shields.io/badge/python-3.12-blue)
 ![FastAPI](https://img.shields.io/badge/backend-FastAPI-009688)
 ![React](https://img.shields.io/badge/frontend-React_%2B_Vite-61DAFB)
-![Status](https://img.shields.io/badge/milestone_3-complete-2ea44f)
+![Tests](https://img.shields.io/badge/tests-318-2ea44f)
+![Status](https://img.shields.io/badge/milestones_1--3-complete-2ea44f)
 
-## Status
+---
 
-TrustShare is built milestone by milestone. **Milestone 1** (foundation: auth, RBAC, MFA, upload, dashboard) **Milestone 2** (encryption, cloud storage, secure sharing, key management, dashboards, HTTPS) and **Milestone 3** (activity monitoring, audit logs, notifications, reports, storage analytics, suspicious-activity detection) are complete. After Milestone 3 the existing features were polished: multi-select with ZIP download, sharing several files or a whole folder, optional link passwords, QR codes, editable shares with access history, desktop pop-ups, light/dark mode, a separate admin console look and an account security score. **Milestone 4** (security testing, cloud deployment, final documentation) is next.
+## Highlights
 
-## Features
+| | |
+|---|---|
+| 🔐 **Encryption at rest** | AES-256-GCM with a fresh key per file, envelope encryption with rotatable master keys; files live encrypted in Azure Blob Storage (or any S3-compatible store) |
+| 🔗 **Secure sharing** | Links with view / download permission, expiry, download limits, optional password, instant revoke and QR code; direct sharing with registered users; access history per share |
+| 👤 **Strong authentication** | JWT with rotating refresh tokens, two-step verification (TOTP + backup codes), Google sign-in, email verification, lockout and rate limiting, new-device alerts |
+| 🛡️ **Role-based access** | Admin, User and Guest built from permissions; admins manage accounts but **can never see users' file names or contents** |
+| 📜 **Tamper-evident audit log** | Every action recorded; each entry is SHA-256 hash-chained to the previous one, so any change or deletion is detected |
+| 🚨 **Threat detection** | Rules for brute-force sign-ins, unauthorized access, mass downloads and abuse of expired or revoked links; alerts with an open → acknowledged → resolved workflow |
+| 🔔 **Real-time notifications** | In-app (Server-Sent Events), email and desktop pop-ups: shares, downloads, expiring links, security warnings |
+| 📊 **Analytics** | Storage, upload, download and sharing analytics for users; reports, storage analytics and a security dashboard for admins |
+| 🗄️ **Secure vault** | A second, password-protected area with an extra layer of encryption for the most sensitive files |
 
-### Authentication and sessions
-- Registration with password-strength rules (checked live in the UI and enforced on the server); passwords hashed with **bcrypt**; the same answer for new and already-registered emails (the owner gets a notice email), so sign-up can't reveal who has an account
-- **JWT access tokens** (15 min, kept in memory only) and **rotating refresh tokens** (7 days, HttpOnly cookie, stored hashed in Redis) with reuse detection (a 10-second grace window lets the same browser retry a just-rotated token – two tabs or fast reloads – without being logged out)
-- Logout, and **log out of all devices** from Settings
-- **Change password** in Settings (confirms the current one; other devices are logged out)
-- **New-device sign-in alert:** a sign-in from a browser + system the account has never used (e.g. "Chrome on Windows"), or from a new IP address, notifies the owner in the app and by email with the device and IP; the alert opens the Devices tab with a *Was this sign-in you?* check (recent devices marked **New**, sign them out, change password). A browser update is not a new device; the first sign-in of an account never alerts
-- **Account security score** on My account: a 0–100 score from seven checks (two-step verification, verified email, no recent failed sign-ins, backup codes, password age, number of devices, secure vault), each with a *Fix now* button; plus an account strip with member since, files, storage, active shares and the previous sign-in
-- **My account** page with Profile · Security · Devices · Account tabs: edit your display name; see every signed-in **device** (browser, OS, IP, approximate location, last active) and **sign out one device** – its access token stops working at once, not after 15 minutes; generate **new backup codes** (needs a current code, old codes stop working)
-- **Delete my account**: confirmed with password (or typed email for Google-only accounts) plus a 2-step code if on; erases every file, object, wrapped key, share link, folder and session, keeps the audit trail, emails a confirmation; the last admin can't delete themselves
-- **Google login** (OAuth 2.0 Authorization Code flow with PKCE): ID token verified against Google's keys; links to an existing account with the same verified email, otherwise creates a User; MFA still required if enabled
-- **Email verification**: a single-use link (24 h) is emailed on sign-up; unverified users see a reminder with a Resend button (or are blocked from logging in with `REQUIRE_EMAIL_VERIFICATION=true`)
-- **Forgot password**: emailed single-use reset link (15 min, stored only as a hash); resetting logs out every device
-- **Two-step verification (TOTP)** with QR-code setup for Google Authenticator and one-time backup codes
-- Account lockout after 5 failed logins (15 min) and per-IP rate limiting on login and registration
-
-### Roles and permissions
-- **Admin**, **User** and **Guest** roles built from permissions such as `file:upload` or `user:read` – routes check permissions, not role names, so new roles need no code changes
-- Guests are read-only; Admins create the first Admin from the command line, then manage users in the **Users** page: change roles, disable/enable accounts (disabled users are logged out everywhere), unlock lockouts – but never their own account or the last admin. Admins **can't open other users' files**; they can delete accounts that haven't logged in for 30+ days, with all their files
-- Ownership checks on every file and folder (other users' items return 404)
-
-### Secure upload
-- Allow-list of types: PDF, DOCX, XLSX, PPTX, TXT, CSV, PNG, JPG
-- **Content check** – magic bytes, plus the internal structure of Office files – so a renamed `.exe` is rejected
-- 25 MB limit enforced while streaming, per-user storage quota, **SHA-256** fingerprint with duplicate detection
-- Files stored under random names (the user's filename never becomes a path); metadata in MongoDB
-- Upload dialog with drag and drop, several files at once, per-file progress, cancel/retry and clear error messages
-
-### File dashboard
-- Drive-like layout: sidebar, search across all folders, storage meter, account menu
-- Nested folders with breadcrumbs; create, rename and move files and folders
-- Category filters, sortable file table, download, and **in-app preview** of PDFs, images and text files (served in a sandbox)
-- **Drag and drop to move:** drag a file row onto a folder card or onto a breadcrumb (e.g. *My Files*) to move it; dragging a ticked file takes all ticked files along; folders can be dragged into other folders too (a folder can't go into itself – checked by the server). Desktop browsers; on phones the ⋮ *Move to…* menu does the same
-- **Multi-select** in My Files and search: tick files, then move them, trash them or **download them as one ZIP** (decrypted on the fly into the archive – never written to disk; a ZIP counts once for the excessive-downloads rule)
-- Trash with restore, bulk restore/delete, empty trash and permanent delete
-- Loading, empty and error states; responsive layout
-- **Light and dark mode** for the workspace (sun/moon button in the top bar, or Light / Dark / System in the account menu; remembered per browser, applied before the page paints, "System" follows the operating system live). Sign-in and share-link pages stay light; the admin console is always its own dark theme
-- Buttons adapt to the user's permissions (enforced by the backend regardless)
-
-### Encryption and storage (Milestone 2)
-- **AES-256-GCM** with a fresh random 256-bit key per file, in 1 MiB authenticated chunks (format "TSE1"): any changed, missing, reordered or swapped chunk is detected and the download is refused
-- **Envelope encryption:** each file key is stored only wrapped by a versioned **master key** (`MASTER_KEYS`); keys never appear in responses, logs or the browser (tests check this)
-- Encrypted bytes in private **object storage** – RustFS locally, **Azure Blob Storage** or **AWS S3** by configuration (`STORAGE_PROVIDER`) – metadata in MongoDB, wrapped keys in PostgreSQL – no single store reveals a file
-- **Key rotation** without re-encrypting files (`python -m app.scripts.rotate_keys`), crypto-shredding on permanent delete, migration of Milestone 1 plaintext files
-- Decryption only in memory, after authorization; integrity failures return a safe error – details: [docs/key-management.md](docs/key-management.md)
-
-### Secure sharing (Milestone 2)
-- **Share links** for anyone (no account): view-only or view & download, expiry as a preset (1 hour … 30 days) or an exact date and time (max 30 days), optional download limit, instant revoke; 256-bit tokens stored only as SHA-256 hashes and hidden in logs
-- **Direct sharing** with registered users ("Shared with me" / "Shared by me"); the recipient gets an email notice
-- **Share several files at once** from the My Files selection: one link per file (Copy all), or one person gets all of them with a single notification and email; each file is checked on its own
-- **Optional password on links:** visitors must enter it before they see anything about the file; stored only as a bcrypt hash, sent in an `X-Share-Password` header, 5 wrong tries lock that visitor out of the link for 15 minutes (shown in the access history); can be added, changed or removed later
-- **Share a whole folder:** every file in the folder (sub-folders included) with the same settings – one link per file, or one person gets all of them with a single notification and email (the files in the folder now; files added later are not included)
-- **QR code** for every new link, generated in the browser (the link is never sent to an online QR service), downloadable as PNG
-- **Access history per share:** who opened the link, viewed or downloaded the file, when and from which device, plus refused attempts with the reason (expired, revoked, limit reached, view only); registered visitors by name, link visitors as "Anonymous visitor", IP addresses shown with the last part hidden
-- **Edit a share without revoking it:** change view/download, extend or shorten the expiry (people's shares can also be set to never expire) or change the download limit – the link stays the same, an expired or used-up share becomes active again, the edit is audited and the recipient of a direct share is notified
-- Every access re-checks revocation, expiry, limit, file status and the owner's account and permissions – trashing a file or disabling its owner stops all links at once
-
-### Secure vault
-- A private, password-protected place per user for the most sensitive files, with a **separate vault password** (must differ from the login password)
-- **Extra encryption:** each vault file's key is sealed with a key derived from the vault password (scrypt) *inside* the normal master-key envelope, and file names are encrypted too – without the vault password nobody can open them, not even someone with the database and master keys
-- The password is asked for **every** action (list, open, add, rename, delete, move) and never kept; 5 wrong passwords lock the vault for 15 minutes and raise a high-severity security event
-- Private only: no sharing, not in search, Recent or the normal file list; "Move to vault" / "Move to My Files" only re-lock the key (the encrypted file isn't touched)
-- Change the vault password (every key re-locked) or, if it's forgotten, reset the vault (deletes its files – they can't be recovered by design); vault files count toward the storage quota and are erased with the account
-
-### Dashboards (Milestone 2)
-- **User:** Dashboard, Recent, Favorites, Storage breakdown, **File Analytics** (storage by type, uploads, downloads incl. unique users and shared downloads, sharing trends, date range, change vs previous period), own Activity Logs, and a Security page
-- **Admin panel:** **Security Dashboard** (logins, failed logins, unauthorized and blocked attempts, security events by severity, recent logins with IP and location), audit log viewer with **CSV export** (formula-injection safe, the export itself is audited), storage per account (sizes only – admins can't open users' files), sharing reports, system monitoring
-- **Security events** recorded automatically: repeated failed logins, lockouts, suspicious IPs, new-IP sign-ins, token reuse, 403s and forged tokens, rate-limit blocks, disguised or tampered files, download anomalies, admin actions
-
-### Monitoring, notifications & analytics (Milestone 3)
-New code lives in feature modules named like the brief: `activity_monitoring/`, `audit/`, `notifications/`, `reports/`, `analytics/`, `security_monitoring/`.
-- **Activity monitoring:** one reusable `record_activity()` records every important action automatically (login/logout, failed logins, uploads, downloads, file access, sharing, link creation/expiry/revocation, unauthorized attempts) with user, activity type, file ID, status, IP and time; admins watch a **live feed** (Server-Sent Events)
-- **Audit logs:** a separate, append-only `audit_logs` collection with the brief's fields; every entry is **hash-chained** to the one before (SHA-256), so any change or deletion is detected by `/api/audit-logs/verify`; filters by user, activity type, file ID, status and dates; CSV export; admins only
-- **Notifications & alerts:** in-app notifications delivered **in real time** (SSE over Redis pub/sub, authenticated with the normal Authorization header) and by **email** per the user's preferences – file shared with you, your shared file was downloaded, link about to expire / expired (background job), account security events; **security alerts to every admin** for rule-based and high-severity events; optional **desktop pop-ups** (browser Notification API, switched on per device in Settings → Notifications) while TrustShare is in a background tab – clicking one opens the related page
-- **Suspicious activity detection:** rule engine with sliding windows in Redis and thresholds in `.env` – more than 5 failed sign-ins in 10 min, repeated unauthorized access, more than 20 downloads in 5 min, repeated attempts on expired or revoked links; one alert per rule and subject per window; alert workflow open → acknowledged → resolved (with notes, audited); from any alert, **Activity around this time** opens the audit log filtered to that user (or IP) from 30 minutes before to 30 minutes after the alert
-- **Reports:** uploads, downloads, sharing, one user's activity, security – summary, charts, tables and CSV export, with filters for date range, user, file type, activity type and file ID
-- **Storage analytics:** total and per-user storage (incl. vaults and trash), file, download and sharing statistics with the brief's charts (storage-by-user pie, uploads by date, downloads, sharing)
-- **Unified admin dashboard:** User activity · Audit logs · Security monitoring · Suspicious activity alerts · File activity reports · Storage analytics · Notification management · Users · System – in a separate **dark operations console** with its own violet/amber look, so admin mode is never confused with the user workspace
-- **Privacy kept:** admins see file IDs, types and sizes in every report, log and alert – never file names (owners still see their own)
-- **Screenshots** of every module: [`docs/screenshots/m3/`](docs/screenshots/m3/) (demo data, personal addresses masked)
-
-### Platform
-- **HTTPS** through a Caddy reverse proxy (TLS 1.3) at https://localhost:8443; real client IPs via trusted proxy headers
-- **Activity log** in MongoDB for every important action (plus the hash-chained audit log since Milestone 3), including **login history** (successful logins with method, failed logins with reason, lockouts) and rejected uploads (who, what, IP, user agent, request ID)
-- Health endpoint that checks PostgreSQL, MongoDB, Redis and object storage
-- Standard JSON error format with request IDs, security headers (`nosniff`, `X-Frame-Options: DENY`, referrer policy, `Cache-Control: no-store` so browsers never reuse a private or refused API answer – e.g. a revoked link's `410` – and every attempt reaches detection), structured logging
-- Everything runs with Docker Compose; database migrations run automatically on start
+The full list is in **[docs/features.md](docs/features.md)**.
 
 ## Architecture
 
+```mermaid
+flowchart LR
+    U["Browser<br/>React + Vite"] -- "HTTPS (TLS 1.3)" --> C["Caddy<br/>reverse proxy"]
+    C -- "pages" --> F["React app"]
+    C -- "/api" --> B["FastAPI backend<br/>routes → services → repositories"]
+    B -- "encrypt / decrypt<br/>AES-256-GCM" --> S[("Azure Blob Storage<br/>or S3<br/>ciphertext only")]
+    B --> P[("PostgreSQL<br/>users, roles, shares,<br/>wrapped file keys")]
+    B --> M[("MongoDB<br/>file metadata,<br/>activity + audit logs")]
+    B --> R[("Redis<br/>sessions, rate limits,<br/>detection, pub/sub")]
+    B -. "email" .-> E["SMTP"]
 ```
-Browser ──HTTPS──> Caddy ──> React + Vite (UI)
-                     └─/api─> FastAPI backend ──encrypt / decrypt (AES-256-GCM)──> Object storage
-                                    │                                           (RustFS / AWS S3,
-              ┌─────────────────────┼─────────────────────┐                     ciphertext only)
-              ▼                     ▼                     ▼
-         PostgreSQL              MongoDB                Redis
-   (users, roles, wrapped     (file metadata,      (sessions, refresh
-    file keys, shares)       activity logs,         tokens, rate limits)
-                             security events)
-```
 
-Each database is used for what it is good at: PostgreSQL for consistent relational data, MongoDB for flexible, high-volume documents, Redis for fast data that expires on its own. The backend is layered – **routes → services → repositories** – so HTTP handling, business rules and data access stay separate.
+Each store holds one kind of data – encrypted bytes, metadata and keys are kept apart, so no
+single store reveals a file. More: [architecture](docs/architecture.md) ·
+[database design](docs/database.md) · [encryption & key management](docs/key-management.md).
 
-Full design with diagrams: [docs/architecture.md](docs/architecture.md) · data model: [docs/database.md](docs/database.md) · requirements and permission matrix: [docs/requirements.md](docs/requirements.md) · wireframes: [docs/wireframes.html](docs/wireframes.html).
+### How a file is protected
 
-**Encryption workflow (implemented in Milestone 2)**
+1. The file is uploaded over HTTPS and checked – type allow-list, real content (magic bytes), size and quota.
+2. A new random 256-bit key is created for this file only.
+3. The file is encrypted with AES-256-GCM in authenticated chunks and stored under a random name.
+4. The file key is wrapped by the master key and stored in PostgreSQL; metadata goes to MongoDB.
+5. On every download, permissions, link expiry, revocation and limits are checked again.
+6. The file is decrypted in memory only, its integrity verified, and streamed to the user.
 
-1. The user uploads a file over HTTPS.
-2. The backend validates type, size, content and permissions.
-3. A unique AES-256 key is generated for the file and wrapped by the active master key (envelope encryption).
-4. The file is encrypted in authenticated chunks and stored in object storage under a random name.
-5. Metadata (MongoDB), the wrapped key (PostgreSQL) and an activity log entry are recorded.
-6. The owner, a direct-share recipient or a valid share link may access the file – checked on every request.
-7. The backend unwraps the key, verifies and decrypts the file in memory only, and streams it.
-
-## Tech Stack
+## Tech stack
 
 | Layer | Technologies |
 |---|---|
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2 (async), Pydantic v2, Alembic, Uvicorn |
-| Frontend | React 19, Vite, React Router, Tailwind CSS, Axios, Recharts, qrcode (loaded on demand), lucide-react, sonner |
-| Data & storage | PostgreSQL 16, MongoDB 7, Redis 7, object storage: Azure Blob Storage (azure-storage-blob) or S3 API via boto3 (RustFS locally / AWS S3) |
-| Security | AES-256-GCM (`cryptography`), envelope encryption with versioned master keys, bcrypt, JWT, TOTP (pyotp), Fernet, permission-based RBAC, Caddy (TLS) |
-| Quality | pytest (318 tests), Postman/Newman collections (M2 + M3), ruff, ESLint, Prettier, pre-commit, GitHub Actions |
-| Deployment | Docker, Docker Compose (7 services incl. RustFS and Caddy) |
+| Frontend | React 19, Vite, Tailwind CSS, React Router, Axios, Recharts |
+| Data | PostgreSQL 16, MongoDB 7, Redis 7 |
+| Storage | Azure Blob Storage, S3 API (RustFS locally, AWS S3) |
+| Security | AES-256-GCM (`cryptography`), bcrypt, JWT, TOTP, OAuth 2.0 + PKCE, TLS (Caddy) |
+| Quality | pytest, Postman / Newman, ruff, ESLint, Prettier, pre-commit, GitHub Actions |
+| Run | Docker and Docker Compose (7 services) |
 
-## Project Structure
+## Quick start
 
-```
-TrustShare/
-├── backend/
-│   ├── app/
-│   │   ├── activity_monitoring/  # M3: record_activity(), admin feed, live stream
-│   │   ├── audit/                # M3: hash-chained audit_logs, filters, verify, CSV
-│   │   ├── notifications/        # M3: notifications, triggers, SSE stream, expiry scheduler
-│   │   ├── security_monitoring/  # M3: detection rules, alert workflow
-│   │   ├── reports/              # M3: upload/download/sharing/user/security reports
-│   │   ├── analytics/            # M3: admin storage analytics
-│   │   ├── api/            # Routes (auth, users, admin, files, folders, trash, shares, analytics, health)
-│   │   ├── core/           # Config, security, permissions, errors, logging, middleware
-│   │   ├── crypto/         # Master-key keyring (wraps and unwraps file keys)
-│   │   ├── db/             # PostgreSQL, MongoDB and Redis connections
-│   │   ├── models/         # SQLAlchemy models
-│   │   ├── repositories/   # Data access
-│   │   ├── schemas/        # Pydantic request/response models
-│   │   ├── scripts/        # create_admin, seed_demo, encrypt_existing_files, rotate_keys, copy_objects, remove_test_accounts
-│   │   ├── services/       # Business logic (auth, MFA, upload, encryption, sharing, analytics, security events)
-│   │   └── storage/        # S3 + Azure Blob adapters, SecureFileStore (encrypt on write, verify + decrypt on read)
-│   ├── alembic/            # Database migrations
-│   └── tests/
-├── frontend/
-│   └── src/
-│       ├── api/            # Axios client with automatic token refresh
-│       ├── auth/           # Auth context and hooks
-│       ├── components/     # Layouts, file table, dialogs, upload, share dialog, charts
-│       ├── pages/          # Auth, files, sharing, analytics, security, admin panel
-│       └── utils/
-├── caddy/                  # Caddyfile for local HTTPS
-├── docs/                   # Architecture, database design, key management, requirements, wireframes
-├── postman/                # Postman collections (Milestone 2 + 3) + environment
-├── .github/workflows/      # CI pipeline
-├── docker-compose.yml
-└── .env.example
-```
-
-## Getting Started
-
-### Prerequisites
-
-- Docker and Docker Compose
-- For running outside Docker: Python 3.12+ and Node.js 20+
-
-### Run with Docker
+Requires Docker Desktop.
 
 ```bash
 git clone https://github.com/Vimaladharsan/TrustShare-Encrypted-File-Sharing-Collaboration-Platform.git
 cd TrustShare-Encrypted-File-Sharing-Collaboration-Platform
-cp .env.example .env    # then replace every "change-me" value
+cp .env.example .env            # then replace every "change-me" value
 docker compose up -d --build
-```
-
-- **App over HTTPS: https://localhost:8443** (Caddy reverse proxy, TLS 1.3)
-- Frontend (plain HTTP, development): http://localhost:5173
-- API docs (Swagger): http://localhost:8000/docs
-- Health check: http://localhost:8000/api/health
-- Object storage console (RustFS): http://localhost:9001/rustfs/console/
-
-Migrations run automatically when the backend container starts.
-
-### HTTPS (local)
-
-The `caddy` service terminates TLS with certificates from its own local certificate authority and
-forwards `/api/*` to FastAPI and everything else to the React app. The backend reads the visitor's
-real IP from `X-Forwarded-For`, but only from proxies inside the Docker network.
-
-Browsers warn until they trust Caddy's root certificate. To trust it for your Windows user only:
-
-```powershell
-docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt ..\caddy-root.crt
-Import-Certificate -FilePath ..\caddy-root.crt -CertStoreLocation Cert:\CurrentUser\Root
-```
-
-(Or double-click the file → Install Certificate → Current User → "Trusted Root Certification
-Authorities".) The certificate stays valid across restarts because Caddy keeps it in the
-`caddydata` volume. To make emailed links and share links use HTTPS too, set
-`FRONTEND_URL=https://localhost:8443` in `.env`.
-
-### Using real AWS S3 instead of RustFS
-
-The code speaks the plain S3 API, so switching is configuration only:
-
-1. AWS console → **S3** → create a bucket (e.g. in `ap-south-1`), keep **Block all public access**
-   on, default encryption SSE-S3 on (an extra layer – the objects are already AES-256-GCM encrypted).
-2. **IAM** → create a user for the app (no console access) with the least-privilege policy in
-   [docs/aws-iam-policy.json](docs/aws-iam-policy.json) (replace `YOUR-BUCKET-NAME`), then create an
-   access key for it.
-3. In `.env`: `S3_ENDPOINT_URL=` (empty), `S3_REGION=ap-south-1`, `S3_BUCKET=<bucket>`,
-   `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` = the new key → `docker compose up -d --force-recreate backend`.
-4. Copy the existing encrypted objects across (no decryption needed – file keys stay valid):
-   `docker compose exec backend python -m app.scripts.copy_objects --from-endpoint http://rustfs:9000`
-
-Switching back = restore the RustFS values in `.env` and recreate the backend.
-
-### Using Azure Blob Storage
-
-The brief allows AWS S3 **or** Azure Blob Storage; TrustShare supports both (`STORAGE_PROVIDER`).
-Azure for Students gives free credit without a credit card.
-
-1. Azure portal → **Storage accounts → Create**: Standard performance, **LRS** redundancy (cheapest),
-   region e.g. *Central India*. Under Advanced keep **Require secure transfer** on and
-   **Allow enabling anonymous access on containers** off.
-2. In the account → **Data storage → Containers → + Container** → name `trustshare-files`,
-   access level **Private**.
-3. **Security + networking → Access keys** → copy the **Connection string** (into `secrets.txt`).
-4. In `.env`: `STORAGE_PROVIDER=azure`, `AZURE_STORAGE_CONNECTION_STRING=<connection string>`,
-   `AZURE_CONTAINER=trustshare-files` → `docker compose up -d --force-recreate backend`.
-5. Copy the existing encrypted objects from RustFS (no decryption – file keys stay valid):
-   `docker compose exec backend python -m app.scripts.copy_objects --from-endpoint http://rustfs:9000`
-
-The Azure code is tested against Azurite, Microsoft's Azure Storage emulator, on every CI run.
-Switching back = `STORAGE_PROVIDER=s3` and recreate the backend.
-
-### Create an admin and demo data
-
-```bash
-# First Admin (the password is asked for interactively)
 docker compose exec backend python -m app.scripts.create_admin --email you@example.com --name "Admin"
-
-# Optional demo data: a User and a Guest account, sample folders and files
-docker compose exec backend python -m app.scripts.seed_demo
 ```
 
-The seed script asks for one password used by both demo accounts (`user@example.com`, `guest@example.com`) and is safe to run more than once.
+Open **https://localhost:8443**. API documentation: http://localhost:8000/docs.
 
-### Run tests and linters
+Storage providers, HTTPS certificates, email, Google sign-in, demo data and all settings:
+**[docs/setup.md](docs/setup.md)**.
+
+## Documentation
+
+| Document | What it covers |
+|---|---|
+| [Documentation index](docs/README.md) | Every document with a short description |
+| [Features](docs/features.md) | The complete feature list |
+| [Project brief coverage](docs/brief-coverage.md) | Each item of the brief → where it is implemented and tested |
+| [Setup and configuration](docs/setup.md) | Installation, storage, HTTPS, environment variables, tests, troubleshooting |
+| [API reference](docs/api.md) | Endpoints by module, with required permissions |
+| [Architecture](docs/architecture.md) · [Database](docs/database.md) · [Key management](docs/key-management.md) | System design |
+| [Requirements](docs/requirements.md) · [Wireframes](docs/wireframes.html) | Roles, permission matrix, user stories, UI plan |
+
+## Testing
+
+- **318 automated backend tests** (pytest) – authentication, encryption, sharing, access control,
+  monitoring, notifications, analytics and an end-to-end scenario. 315 run anywhere; 3 Azure Blob
+  tests run in CI against Microsoft's Azurite emulator.
+- **Postman collections** for Milestones 2 and 3 – 77 requests, 126 checks.
+- **GitHub Actions** runs linting, migrations, all tests and the production frontend build on every push.
 
 ```bash
 docker compose exec backend pytest
-docker compose exec backend ruff check .
-docker compose exec frontend npm run lint
 ```
 
-### Postman collection
+## Project structure
 
-`postman/TrustShare_M2.postman_collection.json` checks encrypted upload and download, access control,
-share links (view vs download, limit, revoke, expiry), direct sharing, admin RBAC and analytics – 30
-requests, run in order. Import it with `postman/TrustShare_local.postman_environment.json` into
-Postman (Collection Runner), or run it with Newman in Docker:
-
-```bash
-docker run --rm --network trustshare_default -v "$PWD/postman:/etc/newman" postman/newman:6-alpine run TrustShare_M2.postman_collection.json -e TrustShare_local.postman_environment.json --env-var baseUrl=http://backend:8000/api
+```
+backend/     FastAPI app – api/ (routes), services/, repositories/, models/, schemas/,
+             storage/ (Azure / S3 + encryption), audit/, notifications/,
+             security_monitoring/, reports/, analytics/ – plus alembic/ and tests/
+frontend/    React app – pages/, components/, api/ (Axios client), auth/, theme/
+caddy/       HTTPS reverse proxy configuration
+docs/        Project documentation
+postman/     API test collections
 ```
 
-It creates two throwaway accounts (`@postman.example.com`); remove them afterwards with
-`docker compose exec backend python -m app.scripts.remove_test_accounts postman.example.com`.
+## Project status
 
-`postman/TrustShare_M3.postman_collection.json` checks Milestone 3 – activity monitoring, audit logs (incl. the hash-chain verification), notifications, the brute-force alert and its workflow, reports and storage analytics – 47 requests, 77 checks. Admin endpoints need an admin, which can't be created through the API: fill `adminEmail` / `adminPassword` in the environment, or pass them to Newman with `--env-var adminEmail=… --env-var adminPassword=…`. Run it from the repository root (the upload step reads `postman/sample-report.pdf`):
+| Milestone | Scope | Status |
+|---|---|---|
+| 1 | Design, setup, authentication, RBAC, MFA, secure upload, file dashboard | ✅ Complete |
+| 2 | AES-256 encryption, cloud storage, secure sharing, key management, dashboards, HTTPS | ✅ Complete |
+| 3 | Activity monitoring, audit logs, notifications, alerts, reports, analytics, threat detection | ✅ Complete |
+| 4 | Security testing, cloud deployment, final documentation, demo | 🔄 In progress |
 
-```bash
-docker run --rm --network trustshare_default -v "$PWD/postman:/etc/newman" postman/newman:6-alpine run TrustShare_M3.postman_collection.json -e TrustShare_local.postman_environment.json --env-var baseUrl=http://backend:8000/api --env-var adminEmail=… --env-var adminPassword=…
-```
-
-Run one collection at a time, at least a minute apart: sign-ins are rate-limited to 10 per minute per IP address, and the M3 collection's brute-force test needs its six wrong passwords to reach the server (straight after another run, the limiter answers `429` first and no alert is raised – the protection working, not a failure). Remove the test accounts afterwards with `docker compose exec backend python -m app.scripts.remove_test_accounts postman.example.com`.
-
-## Environment Variables
-
-See [.env.example](.env.example).
-
-| Variable | Purpose |
-|---|---|
-| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | PostgreSQL credentials |
-| `MONGO_USER` / `MONGO_PASSWORD` | MongoDB credentials |
-| `REDIS_PASSWORD` | Redis password |
-| `JWT_SECRET` | Signs access tokens (at least 32 characters) |
-| `MFA_ENCRYPTION_KEY` | Encrypts two-step verification secrets at rest |
-| `SMTP_USER` / `SMTP_PASSWORD` | Optional Gmail account + app password for sending emails (otherwise emails go to the backend log) |
-| `FRONTEND_URL` | Base URL used in email links (default `http://localhost:5173`) |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` | Optional Google login (button hidden when not set) |
-| `REQUIRE_EMAIL_VERIFICATION` | `true` blocks login until the email is verified (default `false`: reminder only) |
-| `MASTER_KEYS` / `ACTIVE_MASTER_KEY_VERSION` | Versioned 256-bit master keys (`1:<base64>,2:<base64>`) that wrap every file key, and the one used for new files – back them up separately; see [docs/key-management.md](docs/key-management.md) |
-| `S3_ENDPOINT_URL` / `S3_BUCKET` / `S3_REGION` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Object storage for the encrypted files (empty endpoint = real AWS S3) |
-| `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY` | Credentials of the local RustFS container |
-| `STORAGE_PROVIDER` / `AZURE_STORAGE_CONNECTION_STRING` / `AZURE_CONTAINER` | `s3` (default) or `azure`; the Azure storage account's connection string and private container |
-
-Milestone 3 settings (optional): detection thresholds `DETECT_FAILED_LOGINS_LIMIT`/`_MINUTES` (5 / 10), `DETECT_UNAUTHORIZED_*` (4 / 10), `DETECT_DOWNLOADS_*` (20 / 5), `DETECT_EXPIRED_LINK_*` and `DETECT_REVOKED_LINK_*` (2 / 10) – an alert fires when the count goes above the limit; `SCHEDULER_ENABLED` (true), `SCHEDULER_INTERVAL_SECONDS` (300), `LINK_REMINDER_HOURS` (24), `DOWNLOAD_NOTICE_COOLDOWN_MINUTES` (10), `ADMIN_ALERT_EMAIL_COOLDOWN_MINUTES` (15), `SSE_HEARTBEAT_SECONDS` (25), `SSE_MAX_SECONDS` (3600).
-
-Optional settings with defaults include `MAX_UPLOAD_MB` (25), `DEFAULT_QUOTA_MB` (1024), `ZIP_MAX_FILES` (100), `ZIP_MAX_MB` (250), `ACCESS_TOKEN_TTL_MINUTES` (15), `REFRESH_TOKEN_TTL_DAYS` (7), `MAX_FAILED_LOGINS` (5), `LOCKOUT_MINUTES` (15), `SHARE_LINK_MAX_DAYS` (30), `SHARE_LINK_RATE_LIMIT_PER_MINUTE` (60) and `INACTIVE_ACCOUNT_DAYS` (30).
-
-> **Never commit `.env` files or secrets.**
-
-## API
-
-Interactive documentation is available at `/docs` while the backend is running.
-
-| Area | Endpoints |
-|---|---|
-| Health | `GET /api/health` |
-| Auth | `POST /api/auth/register`, `/login`, `/mfa/verify`, `/refresh`, `/logout`, `/logout-all`, `/forgot-password`, `/reset-password`, `/verify-email`, `/verify-email/resend`; `GET /api/auth/providers`, `/google/login`, `/google/callback` |
-| Profile & MFA | `GET` · `PATCH` · `DELETE /api/users/me`, `POST /api/users/me/password`, `GET /api/users/me/overview` (security score + stats), `GET /api/users/me/sessions`, `DELETE /api/users/me/sessions/{id}`, `GET /api/users/me/mfa`, `POST /api/users/me/mfa/setup`, `/enable`, `/disable`, `/backup-codes` |
-| Admin | `GET /api/admin/users` (requires `user:read`), `PATCH /api/admin/users/{id}` (role, enable/disable), `POST /api/admin/users/{id}/unlock` (require `user:manage`), `DELETE /api/admin/users/{id}` (inactive 30+ days, requires `user:delete_inactive`) |
-| Files | `POST /api/files` (upload), `GET /api/files`, `GET /api/files/usage`, `GET/PATCH/DELETE /api/files/{id}`, `GET /api/files/{id}/download`, `GET /api/files/{id}/preview`, `POST /api/files/{id}/trash`, `/restore`, `POST /api/files/bulk/move`, `/bulk/trash`, `/bulk/download` (ZIP) |
-| Folders | `GET/POST /api/folders`, `GET/PATCH/DELETE /api/folders/{id}`, `POST /api/folders/{id}/trash`, `/restore` |
-| Trash | `POST /api/trash/restore`, `/delete`, `/restore-all`, `/empty` |
-| Secure vault | `GET/POST /api/vault` (status / create), `POST /api/vault/password`, `POST /api/vault/reset`, `GET/POST /api/vault/files`, `GET /api/vault/files/{id}/preview` · `/download`, `PATCH/DELETE /api/vault/files/{id}`, `POST /api/vault/files/{id}/move-out`, `POST /api/vault/import/{file_id}` – file routes need the `X-Vault-Password` header |
-| Sharing (M2) | `POST/GET /api/files/{id}/shares` (create link or direct share / list), `GET /api/shares/sent`, `GET /api/shares/received`, `POST /api/shares/bulk` (several files at once), `POST /api/folders/{id}/shares` (a whole folder), `GET /api/shares/{id}/access` (access history), `PATCH /api/shares/{id}` (edit permission / expiry / limit), `DELETE /api/shares/{id}` (revoke), `GET /api/shares/{id}/preview` · `/download` (recipient) |
-| Analytics (M2) | `GET /api/analytics/me?from&to&tz`, `GET /api/files/storage`, `GET /api/files/recent`, `GET /api/files/favorites`, `PUT/DELETE /api/files/{id}/favorite`, `GET /api/activity/me` |
-| Admin reports (M2) | `GET /api/admin/overview` (`user:read`), `GET /api/admin/security/overview`, `/security/logins`, `/security/events`, `GET /api/admin/audit`, `GET /api/admin/audit/export` (CSV) (`audit:read`) |
-| Activity monitoring (M3) | `GET /api/activity-monitoring/activities`, `/summary`, `/types`, `/stream` (SSE) – `audit:read` |
-| Audit logs (M3) | `GET /api/audit-logs`, `/audit-logs/user/{user_id}`, `/audit-logs/file/{file_id}`, `/audit-logs/filter` (incl. an exact `since` / `until` window), `/audit-logs/verify`, `/audit-logs/export` (CSV) – `audit:read` |
-| Notifications (M3) | `GET /api/notifications`, `/unread-count`, `POST /{id}/read`, `/read-all`, `GET/PUT /preferences`, `GET /stream` (SSE); `GET /api/notifications/admin/stats` (`audit:read`) |
-| Security monitoring (M3) | `GET /api/security-monitoring/summary`, `/events`, `GET/PATCH /events/{id}` (acknowledge / resolve / reopen), `/rules` – `audit:read` |
-| Reports (M3) | `GET /api/reports/uploads`, `/downloads`, `/sharing`, `/users/{id}`, `/security` (`format=csv`) – `audit:read` |
-| Storage analytics (M3) | `GET /api/analytics/storage`, `/analytics/users/storage`, `/analytics/files`, `/analytics/downloads`, `/analytics/sharing` – `audit:read` |
-| Public links (M2) | `GET /api/s/{token}` · `/preview` · `/download` – no login, rate-limited per IP; password-protected links need the `X-Share-Password` header (wrong or missing → `403`, 5 wrong → `429` for 15 min) |
-
-## Roadmap
-
-- [x] **Milestone 1:** design, Docker setup, authentication, RBAC, MFA, secure upload, file dashboard, CI
-- [x] **Milestone 2:** AES-256-GCM envelope encryption, S3-compatible storage, secure links and direct sharing, key rotation, user analytics, admin security dashboard, HTTPS
-- [x] **Milestone 3:** activity monitoring, tamper-evident audit logs, real-time + email notifications, security alerts, reports, storage analytics, rule-based suspicious-activity detection, unified admin dashboard
-- [ ] **Milestone 4:** security testing, cloud deployment, documentation, demo
+> **Security note:** never commit `.env` files or secrets – `.env.example` lists every setting
+> with placeholder values.
 
 ## License
 
-Distributed under the MIT License. See [LICENSE](LICENSE) for details.
+MIT – see [LICENSE](LICENSE).
 
 ## Author
 
-**S Vimaladharsan**: [GitHub](https://github.com/Vimaladharsan)
+**S Vimaladharsan** – [GitHub](https://github.com/Vimaladharsan)
