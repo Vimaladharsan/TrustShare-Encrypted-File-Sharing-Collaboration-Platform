@@ -1,0 +1,16 @@
+# Production web server: builds the React app and serves it with Caddy, which also terminates
+# HTTPS and forwards /api to the backend (configuration: caddy/Caddyfile.prod).
+
+# 1) Build the static files.
+FROM node:20-alpine AS build
+WORKDIR /app
+# Keep the build within a small VM's memory (with swap).
+ENV NODE_OPTIONS=--max-old-space-size=1024
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# 2) Serve them – no Node.js in the final image.
+FROM caddy:2.10.2-alpine
+COPY --from=build /app/dist /srv

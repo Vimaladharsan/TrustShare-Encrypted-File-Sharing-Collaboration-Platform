@@ -110,3 +110,20 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm run build
+
+  production-images:
+    name: Production images – build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the production backend image
+        run: docker build -f backend/Dockerfile.prod -t trustshare-backend:ci backend
+      - name: Build the production web image (React build + Caddy)
+        run: docker build -f frontend/Dockerfile.prod -t trustshare-web:ci frontend
+      - name: Validate the production compose file and Caddyfile
+        run: |
+          cp .env.production.example .env
+          docker compose -f docker-compose.prod.yml config --quiet
+          docker run --rm -e DOMAIN=example.com -e ACME_EMAIL=ci@example.com \
+            -v "$PWD/caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro" caddy:2.10.2-alpine \
+            caddy validate --config /etc/caddy/Caddyfile
