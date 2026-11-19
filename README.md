@@ -111,6 +111,7 @@ Storage providers, HTTPS certificates, email, Google sign-in, demo data and all 
 | [Setup and configuration](docs/setup.md) | Installation, storage, HTTPS, environment variables, tests, troubleshooting |
 | [Deployment guide](docs/deployment.md) | Production setup and deployment to Azure with HTTPS |
 | [Security testing](docs/security-testing.md) | 104 attacks against the live site (OWASP Top 10), findings, dependency scan |
+| [Performance](docs/performance.md) | Encryption speed, API times, uploads, concurrent users, detection accuracy, page load |
 | [API reference](docs/api.md) | Endpoints by module, with required permissions |
 | [Architecture](docs/architecture.md) · [Database](docs/database.md) · [Key management](docs/key-management.md) | System design |
 | [Requirements](docs/requirements.md) · [Wireframes](docs/wireframes.html) | Roles, permission matrix, user stories, UI plan |
@@ -123,6 +124,8 @@ Storage providers, HTTPS certificates, email, Google sign-in, demo data and all 
 - **Security testing of the live site** – 104 tests based on the OWASP Top 10 (tokens, brute force,
   access control, share links, uploads, injection, headers, TLS); one low-severity issue found and fixed.
   Dependency scans: 0 known vulnerabilities. [Report](docs/security-testing.md).
+- **Performance on the live site** – AES-256 at ≈ 1 GB/s, ≈ 5 ms server time per request, 50 concurrent
+  users with 0 errors, 7 / 7 attacks detected with no false alarms. [Report](docs/performance.md).
 - **Postman collections** for Milestones 2 and 3 – 77 requests, 126 checks.
 - **GitHub Actions** runs linting, migrations, all tests and the production frontend build on every push.
 
@@ -149,7 +152,7 @@ postman/     API test collections
 | 1 | Design, setup, authentication, RBAC, MFA, secure upload, file dashboard | ✅ Complete |
 | 2 | AES-256 encryption, cloud storage, secure sharing, key management, dashboards, HTTPS | ✅ Complete |
 | 3 | Activity monitoring, audit logs, notifications, alerts, reports, analytics, threat detection | ✅ Complete |
-| 4 | Security testing, cloud deployment, final documentation, demo | 🔄 Deployed, documented and security-tested; final demo next |
+| 4 | Security testing, cloud deployment, final documentation, demo | 🔄 Deployed, documented, security-tested and measured; final demo next |
 
 > **Security note:** never commit `.env` files or secrets – `.env.example` lists every setting
 > with placeholder values.

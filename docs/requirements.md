@@ -1,8 +1,10 @@
 # TrustShare – Requirements
 
 > Final requirements for Milestones 1–3, with the status of each item. The **Built in** column shows
-> the milestone that delivered it. Milestone 4 (testing, deployment, documentation) is tracked in the
-> [brief coverage](brief-coverage.md).
+> the milestone that delivered it. Milestone 4 (security testing, deployment, performance,
+> documentation) is covered in the [brief coverage](brief-coverage.md), the
+> [security test report](security-testing.md), the [performance report](performance.md) and the
+> [deployment guide](deployment.md).
 
 ## 1. Problem and objective
 
@@ -196,7 +198,7 @@ error states, works at phone width, and supports light and dark mode.
 | Security | Encryption at rest (AES-256-GCM) and in transit (TLS 1.3); hashed passwords; short-lived signed tokens; HttpOnly SameSite refresh cookie; CORS limited to the frontend; input validation (Pydantic); security headers and `Cache-Control: no-store`; no secrets in git; generic sign-in errors (no account enumeration) |
 | Privacy | Admins never see file names or contents; link tokens and IP addresses masked where shown |
 | Integrity | Authenticated encryption detects tampered files; hash-chained audit log detects edited or deleted entries |
-| Performance | Uploads and downloads streamed in chunks (memory does not grow with file size); typical API response well under 200 ms locally. Measured in Milestone 4 |
+| Performance | Uploads and downloads streamed in chunks (memory does not grow with file size); measured on the live site: ≈ 5 ms server processing, ≈ 70–85 ms for users in India, 50 concurrent active users with 0 errors – [performance](performance.md) |
 | Reliability | Health check for PostgreSQL, MongoDB, Redis and storage; containers restart automatically; recording a log or notification never breaks the user's request |
 | Maintainability | Layered backend (routes → services → repositories), typed Python, ruff, ESLint, Prettier, pre-commit, Alembic migrations, CI on every push |
 | Testability | 318 automated backend tests, Postman collections, demo-data script |

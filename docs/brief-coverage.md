@@ -171,7 +171,7 @@ Admins see file IDs, types and sizes only – never file names or contents.
 | **1** – Initialization, design, core setup | Objectives, architecture, database schema, wireframes, frontend + backend setup, PostgreSQL / MongoDB / Redis, authentication + RBAC, secure upload, file dashboard | ✅ (tag `v0.1-milestone1`) |
 | **2** – Encryption & secure sharing | AES-256 encryption, cloud storage, encrypted retrieval, sharing, access control, link expiration, key management, secure decryption | ✅ (tag `v0.2-milestone2`) |
 | **3** – Monitoring, notifications & analytics | Activity monitoring, audit logging, notifications and alerts, reports, storage analytics, suspicious-activity detection | ✅ |
-| **4** – Testing, deployment & documentation | Security testing, UI responsiveness, Docker + cloud deployment, production infrastructure, final documentation, final demo | 🔄 documentation ✅ · deployment ✅ · [security testing](security-testing.md) ✅ · final demo next |
+| **4** – Testing, deployment & documentation | Security testing, UI responsiveness, Docker + cloud deployment, production infrastructure, final documentation, final demo | 🔄 documentation ✅ · deployment ✅ · [security testing](security-testing.md) ✅ · [performance & responsiveness](performance.md) ✅ · final demo next |
 
 ## 5. Tools & tech stack
 
@@ -186,8 +186,16 @@ Admins see file IDs, types and sizes only – never file names or contents.
 
 ## 6. Performance metrics
 
-The brief's performance metrics (encryption speed, upload / download time, API response time,
-concurrent users, detection accuracy) will be measured and reported in Milestone 4.
+Measured on the live deployment – full results in **[performance.md](performance.md)**.
+
+| Brief metric | Result |
+|---|---|
+| Encryption speed | AES-256-GCM ≈ 860–1,150 MB/s encrypt, ≈ 385–580 MB/s decrypt; a 25 MB file encrypts in 25 ms |
+| Upload / download time | 10 MB: 0.6 s up / 0.3 s down inside Azure; from home it follows the user's connection speed |
+| API response time | ≈ 5 ms server processing (median); ≈ 70–85 ms for a user in India, mostly network |
+| Concurrent users | 50 active users at 52 requests/s with 0 errors on the free 1 GB VM; 100 users slower but still 0 errors |
+| Detection accuracy | 7 / 7 attacks detected, 0 / 8 false alarms at the rule limits |
+| UI responsiveness | ≈ 250 KB first visit (compressed), pages in ≈ 0.5 s, no sideways scrolling at phone / tablet / desktop width |
 
 ## 7. Testing summary
 
@@ -195,4 +203,8 @@ concurrent users, detection accuracy) will be measured and reported in Milestone
   Microsoft's Azurite emulator and are skipped on machines without it.
 - **Postman collections:** Milestone 2 (30 requests, 49 checks) and Milestone 3 (47 requests,
   77 checks).
-- **GitHub Actions CI** on every push: ruff, migrations, tests, ESLint, Prettier, production build.
+- **GitHub Actions CI** on every push: ruff, migrations, tests, ESLint, Prettier, production build,
+  production Docker images.
+- **Security testing of the live site:** 104 tests mapped to the OWASP Top 10, one low-severity
+  issue found and fixed, dependency scans clean – [security-testing.md](security-testing.md).
+- **Performance measurements** on the live site – [performance.md](performance.md).

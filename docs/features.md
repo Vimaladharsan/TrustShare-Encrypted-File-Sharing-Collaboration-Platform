@@ -92,8 +92,10 @@ New code lives in feature modules named like the brief: `activity_monitoring/`, 
 - **Screenshots** of every screen: [user guide](user-guide.md) and [`screenshots/`](screenshots/) (demo data, personal details masked)
 
 ## 10. Platform
-- **HTTPS** through a Caddy reverse proxy (TLS 1.3) at https://localhost:8443; real client IPs via trusted proxy headers
+- **Live deployment** on an Azure VM: https://trustshare-vimal.centralindia.cloudapp.azure.com – production Docker images (non-root backend, built React app served by Caddy), automatic Let's Encrypt certificate, HSTS and a strict Content-Security-Policy; databases never exposed to the internet ([deployment guide](deployment.md))
+- **HTTPS** through a Caddy reverse proxy (TLS 1.3) – in development at https://localhost:8443; real client IPs via trusted proxy headers
 - **Activity log** in MongoDB for every important action (plus the hash-chained audit log since Milestone 3), including **login history** (successful logins with method, failed logins with reason, lockouts) and rejected uploads (who, what, IP, user agent, request ID)
 - Health endpoint that checks PostgreSQL, MongoDB, Redis and object storage
 - Standard JSON error format with request IDs, security headers (`nosniff`, `X-Frame-Options: DENY`, referrer policy, `Cache-Control: no-store` so browsers never reuse a private or refused API answer – e.g. a revoked link's `410` – and every attempt reaches detection), structured logging
 - Everything runs with Docker Compose; database migrations run automatically on start
+- **Verified:** security-tested on the live site ([104 tests](security-testing.md)) and measured ([performance](performance.md))

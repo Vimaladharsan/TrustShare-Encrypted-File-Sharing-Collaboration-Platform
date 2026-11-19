@@ -3,6 +3,9 @@
 How to use TrustShare, for **users** (part 1) and **administrators** (part 2). The screenshots use
 demo data.
 
+**Open TrustShare:** https://trustshare-vimal.centralindia.cloudapp.azure.com (or your own
+installation – see [setup](setup.md) and the [deployment guide](deployment.md)).
+
 **Contents**
 
 - Part 1 – Users: [Getting started](#1-getting-started) · [Files and folders](#2-files-and-folders) ·

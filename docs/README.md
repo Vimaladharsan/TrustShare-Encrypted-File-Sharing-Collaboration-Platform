@@ -1,6 +1,7 @@
 # TrustShare – Documentation
 
 Start with the [project README](../README.md) for an overview, then use this index.
+The live system: https://trustshare-vimal.centralindia.cloudapp.azure.com
 
 ## Using and running TrustShare
 
@@ -10,6 +11,7 @@ Start with the [project README](../README.md) for an overview, then use this ind
 | [Setup and configuration](setup.md) | Running with Docker, local HTTPS, Azure Blob Storage or AWS S3, creating the first admin and demo data, environment variables, tests, Postman, troubleshooting |
 | [Features](features.md) | The complete feature list, grouped by area |
 | [Security testing](security-testing.md) | Security test of the live site: 104 tests mapped to the OWASP Top 10, findings and fixes, threat-detection evidence, dependency scan |
+| [Performance](performance.md) | Measured on the live site: encryption speed, API response times, uploads / downloads, concurrent users, detection accuracy, page load and responsiveness |
 | [Deployment guide](deployment.md) | Production setup and step-by-step deployment to a free Azure VM with HTTPS, operations, backups, troubleshooting |
 | [API reference](api.md) | Every endpoint by module, with the permission it needs |
 

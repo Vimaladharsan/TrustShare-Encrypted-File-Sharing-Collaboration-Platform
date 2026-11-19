@@ -487,7 +487,7 @@ see the [deployment guide](deployment.md).
 | Message queue / event bus | Redis pub/sub and an in-process scheduler |
 | PostgreSQL, MongoDB, Redis, encrypted storage, audit logs | As in section 1 |
 | Docker, CI/CD | Docker Compose, GitHub Actions |
-| AWS / Azure | Azure Blob Storage for files; cloud hosting in Milestone 4 |
+| AWS / Azure | Azure VM running the Docker Compose stack behind Caddy (HTTPS); Azure Blob Storage for files |
 | Kubernetes, SIEM / IDS, ML anomaly detection, mobile / desktop apps, FCM, captcha | Future work |
 
 Item-by-item coverage: [brief-coverage.md](brief-coverage.md).
