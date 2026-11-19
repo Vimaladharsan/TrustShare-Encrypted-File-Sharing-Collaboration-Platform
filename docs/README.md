@@ -9,6 +9,7 @@ Start with the [project README](../README.md) for an overview, then use this ind
 | [User guide](user-guide.md) | Step-by-step guide for users and administrators, with screenshots of every screen |
 | [Setup and configuration](setup.md) | Running with Docker, local HTTPS, Azure Blob Storage or AWS S3, creating the first admin and demo data, environment variables, tests, Postman, troubleshooting |
 | [Features](features.md) | The complete feature list, grouped by area |
+| [Security testing](security-testing.md) | Security test of the live site: 104 tests mapped to the OWASP Top 10, findings and fixes, threat-detection evidence, dependency scan |
 | [Deployment guide](deployment.md) | Production setup and step-by-step deployment to a free Azure VM with HTTPS, operations, backups, troubleshooting |
 | [API reference](api.md) | Every endpoint by module, with the permission it needs |
 

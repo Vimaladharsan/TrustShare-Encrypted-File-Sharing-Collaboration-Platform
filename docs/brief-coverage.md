@@ -171,7 +171,7 @@ Admins see file IDs, types and sizes only – never file names or contents.
 | **1** – Initialization, design, core setup | Objectives, architecture, database schema, wireframes, frontend + backend setup, PostgreSQL / MongoDB / Redis, authentication + RBAC, secure upload, file dashboard | ✅ (tag `v0.1-milestone1`) |
 | **2** – Encryption & secure sharing | AES-256 encryption, cloud storage, encrypted retrieval, sharing, access control, link expiration, key management, secure decryption | ✅ (tag `v0.2-milestone2`) |
 | **3** – Monitoring, notifications & analytics | Activity monitoring, audit logging, notifications and alerts, reports, storage analytics, suspicious-activity detection | ✅ |
-| **4** – Testing, deployment & documentation | Security testing, UI responsiveness, Docker + cloud deployment, production infrastructure, final documentation, final demo | 🔄 documentation ✅ · deployment ✅ · security testing next |
+| **4** – Testing, deployment & documentation | Security testing, UI responsiveness, Docker + cloud deployment, production infrastructure, final documentation, final demo | 🔄 documentation ✅ · deployment ✅ · [security testing](security-testing.md) ✅ · final demo next |
 
 ## 5. Tools & tech stack
 

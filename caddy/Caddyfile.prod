@@ -23,7 +23,9 @@
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
 		# Only our own scripts may run. blob: is used for file previews and downloads, data: for
 		# QR codes; inline styles come from the chart library.
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; frame-src 'self' blob:; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		# "?" = only when the backend has not set its own: file previews keep their stricter
+		# sandbox policy (security test, 19 Nov 2026).
+		?Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; frame-src 'self' blob:; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 	}
 
 	handle /api/* {
