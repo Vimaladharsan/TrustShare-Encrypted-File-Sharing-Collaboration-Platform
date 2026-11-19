@@ -1,7 +1,7 @@
-# TrustShare – Encryption & Key Management (Milestone 2)
+# TrustShare – Encryption & Key Management
 
 How TrustShare protects stored files: which keys exist, where they live, who can use them, and how they
-are rotated and recovered. Companion to [architecture.md §8](architecture.md#8-milestone-2--encryption-storage-and-sharing)
+are rotated and recovered. Companion to [architecture.md §4.5–4.8](architecture.md#45-encrypted-upload)
 and [database.md](database.md).
 
 ---

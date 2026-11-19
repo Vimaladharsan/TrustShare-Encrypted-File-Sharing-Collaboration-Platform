@@ -4,11 +4,12 @@ Three stores, each used for what it does best (see [architecture.md](architectur
 
 | Store | Data |
 |---|---|
-| PostgreSQL | Identity & authorisation: users, roles, permissions, OAuth links, MFA backup codes. **(M2)** shares. |
-| MongoDB | File metadata, folders, activity / audit logs. |
-| Redis | Short-lived security state: refresh sessions, one-time tokens, rate limits, lockouts. |
+| PostgreSQL | Identity and authorisation: users, roles, permissions, OAuth links, MFA backup codes; shares; wrapped file keys; vaults. |
+| MongoDB | File and folder metadata, vault file metadata, favorites, activity logs, hash-chained audit logs, security events and alerts, notifications. |
+| Redis | Short-lived state: refresh sessions, one-time tokens, rate limits, lockouts, detection windows, notification pub/sub. |
+| Object storage | Encrypted file contents only (Azure Blob Storage or S3). |
 
-### Data placement rationale (read this before the viva)
+### Data placement rationale
 
 The M1 brief is slightly inconsistent: its intro says file details go in PostgreSQL, while Step 4, the expected outcomes and the **graded checklist** say file metadata goes in **MongoDB**. The full brief's M2 workflow says "metadata **and permissions** in PostgreSQL".
 
@@ -78,6 +79,40 @@ erDiagram
         varchar code_hash "bcrypt of one-time code"
         timestamptz used_at "null = unused"
         timestamptz created_at
+    }
+    USERS ||--o{ SHARES : "owns"
+    USERS ||--o{ SHARES : "receives (direct share)"
+    USERS ||--o{ FILE_KEYS : "owns"
+    USERS ||--o| VAULTS : "has"
+
+    SHARES {
+        uuid id PK
+        varchar file_id "MongoDB file id"
+        uuid owner_id FK
+        varchar share_type "link | user"
+        uuid recipient_id FK "direct shares"
+        char token_hash UK "SHA-256 of link token"
+        varchar password_hash "optional, bcrypt"
+        varchar permission "view | download"
+        timestamptz expires_at
+        int max_downloads
+        int download_count
+        timestamptz revoked_at
+    }
+    FILE_KEYS {
+        varchar file_id PK "MongoDB file id"
+        uuid owner_id FK
+        bytea wrapped_key "file key wrapped by a master key"
+        smallint key_version
+        varchar algorithm "AES-256-GCM"
+        timestamptz rotated_at
+    }
+    VAULTS {
+        uuid user_id PK
+        bytea salt "for scrypt"
+        int kdf_n
+        bytea verifier
+        timestamptz password_changed_at
     }
 ```
 
@@ -161,7 +196,7 @@ Migrations are managed with **Alembic** (`backend/alembic/versions`).
 
 ## 2. MongoDB (documents)
 
-Database: `trustshare`. Collections: `files`, `folders`, `activity_logs`, and in Milestone 2 `security_events` and `favorites`.
+Database: `trustshare`. Collections: `files`, `folders`, `vault_files`, `favorites`, `activity_logs`, `audit_logs`, `security_events`, `notifications`, `notification_preferences`.
 
 ### 2.1 `files`
 
@@ -203,7 +238,7 @@ Database: `trustshare`. Collections: `files`, `folders`, `activity_logs`, and in
 | sha256 | Integrity + duplicate detection. In M2 also proves the decrypted file matches the original. |
 | storage_key | Random server-generated path inside the storage backend. |
 | status | `active` or `trashed`. Permanent delete removes the document and the stored file. |
-| encryption | `null` in M1 (plaintext on local disk). **(M2)** describes how the object is encrypted: algorithm, object format, chunk size, ciphertext size (the master-key version lives with the wrapped key in PostgreSQL, so rotation never has to touch MongoDB). **No key material** – the wrapped key is in PostgreSQL `file_keys`. Added without any migration (schema-flexible). |
+| encryption | Describes how the object is encrypted: algorithm, object format, chunk size, ciphertext size (the master-key version lives with the wrapped key in PostgreSQL, so rotation never has to touch MongoDB). **No key material** – the wrapped key is in PostgreSQL `file_keys`. Added without any migration (schema-flexible). |
 
 Indexes:
 
@@ -381,14 +416,26 @@ Why Redis and not PostgreSQL for these: they are read on almost every request, t
 
 ---
 
-## 4. File store (`StorageBackend`)
+## 4. Object storage
+
+Encrypted file contents live in **private object storage** behind one small interface, so the
+provider is a configuration choice (`STORAGE_PROVIDER`):
 
 ```python
-class StorageBackend(Protocol):
-    async def save(self, key: str, chunks: AsyncIterator[bytes]) -> int: ...
-    async def open(self, key: str) -> AsyncIterator[bytes]: ...
+class ObjectStorage(Protocol):
+    async def save(self, key: str, source: Path) -> None: ...
+    def open(self, key: str) -> AsyncIterator[bytes]: ...
     async def delete(self, key: str) -> None: ...
+    async def exists(self, key: str) -> bool: ...
 ```
 
-- **M1 – `LocalStorage`:** `storage/{user_id}/{uuid}` inside a Docker volume, not inside the web root.
-- **M2 – `S3Storage`:** private bucket on RustFS (local) or AWS S3 via boto3. `FileService` encrypts each file with its own AES-256-GCM key (`EncryptionService`) before calling `save`, and decrypts while streaming from `open`; the wrapped key goes to PostgreSQL `file_keys`. The object store only ever holds ciphertext. Details: [key-management.md](key-management.md).
+| Adapter | Used for |
+|---|---|
+| `AzureBlobStorage` (`storage/azure_blob.py`) | Azure Blob Storage – in use; tested against Microsoft's Azurite emulator in CI |
+| `S3Storage` (`storage/s3.py`) | Any S3 API: RustFS locally, or AWS S3 |
+
+`SecureFileStore` (`storage/secure_store.py`) sits in front of the adapter: it encrypts each file with
+its own AES-256-GCM key before `save`, stores the wrapped key in PostgreSQL `file_keys`, and verifies
+and decrypts while streaming from `open`. Objects are stored under random keys, so file names never
+reach the storage provider. The object store only ever holds ciphertext. Details:
+[key-management.md](key-management.md).

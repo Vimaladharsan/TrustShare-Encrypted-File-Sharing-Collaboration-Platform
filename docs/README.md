@@ -6,8 +6,10 @@ Start with the [project README](../README.md) for an overview, then use this ind
 
 | Document | What it covers |
 |---|---|
+| [User guide](user-guide.md) | Step-by-step guide for users and administrators, with screenshots of every screen |
 | [Setup and configuration](setup.md) | Running with Docker, local HTTPS, Azure Blob Storage or AWS S3, creating the first admin and demo data, environment variables, tests, Postman, troubleshooting |
 | [Features](features.md) | The complete feature list, grouped by area |
+| [Deployment guide](deployment.md) | Production setup and step-by-step deployment to a free Azure VM with HTTPS, operations, backups, troubleshooting |
 | [API reference](api.md) | Every endpoint by module, with the permission it needs |
 
 ## Design
@@ -26,5 +28,5 @@ Start with the [project README](../README.md) for an overview, then use this ind
 | Document | What it covers |
 |---|---|
 | [Project brief coverage](brief-coverage.md) | Every item of the project brief → where it is implemented and how it is tested, plus what was done differently and what is out of scope |
-| [Screenshots](screenshots/) | Screens of the running application |
+| [Screenshots](screenshots/) | 37 screens of the running application (demo data, personal details masked) |
 | [Postman collections](../postman/) | API checks for Milestones 2 and 3 |

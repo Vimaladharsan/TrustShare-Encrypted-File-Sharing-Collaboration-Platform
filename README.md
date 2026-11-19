@@ -31,6 +31,17 @@ behaviour raises alerts in real time.
 
 The full list is in **[docs/features.md](docs/features.md)**.
 
+## Screenshots
+
+| | |
+|---|---|
+| ![My Files](docs/screenshots/04-my-files.png) **My Files** – folders, sortable files, category filters | ![Share dialog](docs/screenshots/09-share-link-with-qr-code.png) **Secure sharing** – permission, expiry, limit, password, QR code |
+| ![Access history](docs/screenshots/12-access-history.png) **Access history** – who opened or downloaded a shared file | ![Secure vault](docs/screenshots/15-secure-vault.png) **Secure vault** – a second password and extra encryption |
+| ![Admin dashboard](docs/screenshots/30-admin-dashboard.png) **Admin console** – never shows users' file names | ![Audit logs](docs/screenshots/32-admin-audit-logs.png) **Audit log** – hash-chained, integrity verified |
+| ![Suspicious activity](docs/screenshots/34-admin-suspicious-activity.png) **Threat detection** – alerts with a review workflow | ![Storage analytics](docs/screenshots/37-admin-storage-analytics.png) **Storage analytics** |
+
+Every screen, explained step by step: **[user guide](docs/user-guide.md)**.
+
 ## Architecture
 
 ```mermaid
@@ -92,9 +103,11 @@ Storage providers, HTTPS certificates, email, Google sign-in, demo data and all 
 | Document | What it covers |
 |---|---|
 | [Documentation index](docs/README.md) | Every document with a short description |
+| [User guide](docs/user-guide.md) | How to use TrustShare – users and administrators, with screenshots |
 | [Features](docs/features.md) | The complete feature list |
 | [Project brief coverage](docs/brief-coverage.md) | Each item of the brief → where it is implemented and tested |
 | [Setup and configuration](docs/setup.md) | Installation, storage, HTTPS, environment variables, tests, troubleshooting |
+| [Deployment guide](docs/deployment.md) | Production setup and deployment to Azure with HTTPS |
 | [API reference](docs/api.md) | Endpoints by module, with required permissions |
 | [Architecture](docs/architecture.md) · [Database](docs/database.md) · [Key management](docs/key-management.md) | System design |
 | [Requirements](docs/requirements.md) · [Wireframes](docs/wireframes.html) | Roles, permission matrix, user stories, UI plan |

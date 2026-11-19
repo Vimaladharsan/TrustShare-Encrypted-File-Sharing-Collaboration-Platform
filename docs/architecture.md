@@ -1,81 +1,132 @@
 # TrustShare – System Architecture
 
-> Diagrams use Mermaid and render directly on GitHub and in VS Code (Markdown Preview Mermaid Support extension).
+> Final architecture after Milestones 1–3. Diagrams use Mermaid and render directly on GitHub.
+> Related: [database design](database.md) · [encryption and key management](key-management.md) ·
+> [API reference](api.md) · [brief coverage](brief-coverage.md).
+
+## Contents
+
+1. [Overview](#1-overview)
+2. [Backend structure](#2-backend-structure)
+3. [Frontend structure](#3-frontend-structure)
+4. [Request flows](#4-request-flows) – registration, sign-in, token refresh, Google sign-in, encrypted
+   upload, encrypted download, sharing, key rotation
+5. [Monitoring, notifications and detection](#5-monitoring-notifications-and-detection)
+6. [Security design](#6-security-design)
+7. [Deployment view](#7-deployment-view)
+8. [Mapping to the brief's reference architecture](#8-mapping-to-the-briefs-reference-architecture)
 
 ## 1. Overview
 
-TrustShare is a three-tier web application:
+TrustShare is a three-tier web application behind an HTTPS reverse proxy:
 
-1. **Client** – a React single-page app (Vite + Tailwind). It only talks to the backend over HTTPS; it never touches a database or the file store.
-2. **API** – a FastAPI backend. Every request is authenticated (JWT), authorised (permission check) and validated (Pydantic) before any data is touched.
-3. **Data** – three databases, each chosen for what it is good at, plus a file store behind an interface.
+1. **Client** – a React single-page app (Vite, Tailwind CSS). It talks only to the API; it never
+   touches a database or the file store.
+2. **API** – a FastAPI backend. Every request is authenticated (JWT), authorised (permission check)
+   and validated (Pydantic) before any data is touched. Files are encrypted and decrypted here.
+3. **Data** – three databases, each used for what it does best, plus private object storage that
+   only ever holds ciphertext.
 
 ```mermaid
 flowchart LR
-    U["👤 Browser<br/>React + Vite + Tailwind"]
-    G["Google OAuth 2.0<br/>(OpenID Connect)"]
-    M["Gmail SMTP<br/>(verification / reset emails)"]
+    U["Browser<br/>React SPA"]
+    C["Caddy<br/>TLS 1.3 reverse proxy"]
+    G["Google<br/>OAuth 2.0 / OIDC"]
+    M["Gmail SMTP"]
 
     subgraph API["FastAPI backend (Uvicorn)"]
         direction TB
-        MW["Middleware<br/>CORS · request ID · rate limit · error handler"]
-        R["Routers<br/>/auth /users /admin /files /folders /activity /health"]
-        D["Dependencies<br/>get_current_user · require_permission()"]
-        S["Services<br/>AuthService · MfaService · FileService · FolderService · ActivityService"]
-        RP["Repositories<br/>UserRepo (SQL) · FileRepo / FolderRepo / ActivityRepo (Mongo)"]
-        ST["StorageBackend<br/>LocalStorage (M1) → EncryptedS3Storage (M2)"]
+        MW["Middleware<br/>request ID · security headers · CORS · errors"]
+        R["Routes<br/>auth · users · files · folders · trash · vault · shares · admin ·<br/>activity monitoring · audit · notifications · reports · analytics"]
+        D["Dependencies<br/>get_current_user · require_permission() · rate limits"]
+        S["Services<br/>auth · MFA · files · sharing · vault · encryption · notifications · detection"]
+        RP["Repositories"]
+        ST["SecureFileStore<br/>encrypt on write · verify + decrypt on read"]
         MW --> R --> D --> S --> RP
         S --> ST
     end
 
-    PG[("PostgreSQL 16<br/>users · roles · permissions<br/>oauth accounts · MFA backup codes")]
-    MO[("MongoDB 7<br/>files · folders · activity_logs")]
-    RE[("Redis 7<br/>refresh sessions · one-time tokens<br/>rate limits · lockouts")]
-    FS[["File store<br/>./storage (M1)<br/>AWS S3, AES-256-GCM (M2)"]]
+    PG[("PostgreSQL<br/>users · roles · permissions · shares ·<br/>wrapped file keys · vaults")]
+    MO[("MongoDB<br/>file metadata · folders · activity + audit logs ·<br/>security events · notifications")]
+    RE[("Redis<br/>sessions · one-time tokens · rate limits ·<br/>detection windows · pub/sub")]
+    OS[["Object storage<br/>Azure Blob or S3 (RustFS locally)<br/>ciphertext only"]]
 
-    U -- "HTTPS · JSON · Bearer JWT" --> MW
+    U -- "HTTPS" --> C
+    C -- "/api" --> MW
+    C -- "pages" --> FE["React app"]
     U -. "redirect" .-> G
-    G -. "callback with code" .-> R
+    G -. "callback" .-> R
     S -. "SMTP/TLS" .-> M
     RP --> PG
     RP --> MO
     S --> RE
-    ST --> FS
+    ST --> OS
 ```
 
 ### Why three databases?
 
 | Store | Holds | Why this store |
 |---|---|---|
-| **PostgreSQL** | Users, roles, permissions, OAuth links, MFA backup codes. **(M2)** share links and permission grants. | Data that must be **consistent and relational**: unique emails, foreign keys (user → role), transactions. A wrong row here is a security bug, so we want strict schema and constraints. |
-| **MongoDB** | File metadata, folders, activity/audit logs. | **High-volume, flexible documents**. File metadata varies by type (an image has dimensions, a PDF has page count, M2 adds encryption fields) – no migrations needed. Activity logs are append-only and grow fast. The M1 brief requires file metadata in MongoDB. |
-| **Redis** | Refresh-token sessions, email-verify / reset / MFA-challenge tokens, rate-limit counters, lockouts. | Data that is **temporary and read on every request**. Redis keeps it in memory (sub-millisecond) and deletes it automatically with a **TTL**, so expired tokens clean themselves up. |
+| **PostgreSQL** | Users, roles, permissions, OAuth links, MFA backup codes, shares, wrapped file keys, vaults | Data that must be **consistent and relational**: unique emails, foreign keys, transactions, constraints (e.g. a download limit counted atomically). A wrong row here is a security bug. |
+| **MongoDB** | File and folder metadata, activity logs, hash-chained audit logs, security events, notifications, vault file metadata | **High-volume, flexible documents.** Logs are append-only and grow fast; metadata varies by file type. The Milestone 1 brief requires file metadata in MongoDB. |
+| **Redis** | Refresh-token sessions, verification / reset / MFA / OAuth-state tokens (hashed), rate limits, lockouts, detection windows, pub/sub for real-time events | Data that is **temporary and read on every request** – kept in memory and deleted automatically with a TTL. |
 
-The detailed schema is in [database.md](database.md).
+**Separation of secrets:** encrypted bytes (object storage), metadata (MongoDB) and keys
+(PostgreSQL, wrapped by master keys held only in the backend's environment) live in different
+places, so no single store reveals a file. Schema details: [database.md](database.md).
 
-## 2. Backend layering
+## 2. Backend structure
 
 ```
 backend/app/
-├── main.py            # create app, middleware, routers, lifespan (connect / disconnect DBs)
-├── core/              # config (pydantic-settings), security (bcrypt, JWT), logging, errors
-├── db/                # postgres.py (SQLAlchemy async engine), mongo.py (Motor), redis.py
-├── models/            # SQLAlchemy ORM models (PostgreSQL tables)
-├── schemas/           # Pydantic request / response models
-├── repositories/      # data access only – no business rules
-├── services/          # business rules – auth, MFA, OAuth, files, folders, activity, email
-├── storage/           # StorageBackend interface + LocalStorage
-├── api/
-│   ├── deps.py        # get_current_user, require_permission("file:upload")
-│   └── routes/        # auth.py, users.py, admin.py, files.py, folders.py, activity.py, health.py
-└── tests/
+├── main.py                # app, middleware, routers, lifespan (connect databases, start scheduler)
+├── core/                  # settings, security (bcrypt, JWT), permissions, errors, logging, middleware, rate limits
+├── db/                    # PostgreSQL (SQLAlchemy async), MongoDB, Redis connections
+├── models/                # SQLAlchemy models (PostgreSQL tables)
+├── schemas/               # Pydantic request / response models
+├── repositories/          # data access only – no business rules
+├── services/              # business rules: auth, MFA, OAuth, files, folders, trash, sharing, vault,
+│                          #   encryption, analytics, security events, email, account deletion
+├── crypto/                # master-key keyring (wraps / unwraps file keys), vault key derivation
+├── storage/               # object storage adapters (S3, Azure Blob) + SecureFileStore
+├── activity_monitoring/   # record_activity() – one recording function for every action; live feed
+├── audit/                 # hash-chained audit_logs: filters, verify, CSV
+├── security_monitoring/   # detection rules, alert workflow
+├── notifications/         # notifications, triggers, SSE stream, background scheduler
+├── reports/               # upload / download / sharing / user / security reports
+├── analytics/             # admin storage analytics
+├── api/                   # deps.py (get_current_user, require_permission) and routes/
+└── scripts/               # create_admin, seed_demo, rotate_keys, copy_objects, remove_test_accounts …
 ```
 
-**Rule:** routers handle HTTP only (parse, call a service, return a schema); services contain all decisions; repositories only read and write. This keeps every security decision in one testable place.
+**Rule:** routes handle HTTP only (parse, call a service, return a schema); services make every
+decision; repositories only read and write. Every security decision therefore lives in one
+testable place. Milestone 3 modules are named like the brief.
 
-## 3. Request flows
+## 3. Frontend structure
 
-### 3.1 Registration and email verification
+```
+frontend/src/
+├── api/             # Axios client + one module per backend area
+├── auth/            # AuthProvider: session resume, sign-in, MFA step, sign-out
+├── notifications/   # NotificationsProvider: SSE stream, unread count, desktop pop-ups
+├── theme/           # light / dark / system theme
+├── components/      # layouts (workspace, admin console), file table, dialogs, charts …
+└── pages/           # workspace pages, admin pages, public share page, auth pages
+```
+
+- **Access token in memory only** (never localStorage). The Axios client refreshes it once on a
+  `401` and retries; concurrent requests share one refresh (a reused refresh token would end every
+  session).
+- **Permission-aware UI:** buttons and menus follow the user's permissions from `/api/users/me` –
+  a convenience only; the backend enforces everything.
+- **Two layouts:** the light/dark user workspace and a separate dark admin console, so admin mode is
+  never mistaken for the workspace.
+- Every page has loading, empty and error states and works at phone width.
+
+## 4. Request flows
+
+### 4.1 Registration and email verification
 
 ```mermaid
 sequenceDiagram
@@ -110,7 +161,7 @@ sequenceDiagram
     API-->>FE: 200
 ```
 
-### 3.2 Login with MFA, JWT issue and role check
+### 4.2 Sign-in with two-step verification, JWT and permission check
 
 ```mermaid
 sequenceDiagram
@@ -137,8 +188,8 @@ sequenceDiagram
         API->>API: pyotp verify (±30 s window, no code reuse)
     end
     API->>API: create access JWT (sub, role, perms, exp 15 min)
-    API->>R: SET refresh:{jti} (user, family, ip, ua), TTL 7 days
-    API->>R: SADD user_sessions:{user_id} jti
+    API->>R: SET refresh:{sha256(token)} (user, family, ip, ua), TTL 7 days
+    API->>R: SADD user_sessions:{user_id} token hash
     API->>MO: activity_logs ← auth.login.success
     API-->>FE: 200 {access_token} + Set-Cookie refresh_token (HttpOnly, SameSite=Strict)
 
@@ -152,7 +203,7 @@ sequenceDiagram
     end
 ```
 
-### 3.3 Token refresh (rotation + reuse detection)
+### 4.3 Token refresh, devices and sign-out
 
 ```mermaid
 sequenceDiagram
@@ -163,10 +214,10 @@ sequenceDiagram
 
     FE->>API: any request → 401 (access token expired)
     FE->>API: POST /api/auth/refresh (cookie: refresh_token)
-    API->>API: verify refresh JWT signature → jti
-    API->>R: GETDEL refresh:{jti}
+    API->>API: hash the refresh token
+    API->>R: GETDEL refresh:{sha256(token)}
     alt key found (normal case)
-        API->>R: SET refresh:{new_jti}, TTL 7 days (same family)
+        API->>R: SET refresh:{sha256(new token)}, TTL 7 days (same family)
         API-->>FE: new access token + new refresh cookie
         FE->>API: retry original request
     else key missing (token already used → likely stolen)
@@ -177,38 +228,7 @@ sequenceDiagram
 
 **Devices and per-device sign-out.** Every login starts a *session* (the refresh-token family, a random id). The id goes into each access token as the `sid` claim, and each refresh record keeps the browser, IP and `signed_in_at`. `GET /users/me/sessions` groups the refresh records by family (newest one wins) and marks the one matching the caller's `sid` as *This device*. `DELETE /users/me/sessions/{id}` deletes that family's refresh records and sets `revoked_sid:{id}` in Redis for 15 minutes (the access-token lifetime), so the signed-out device's access token is rejected on its very next request instead of working until it expires.
 
-### 3.4 File upload
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor U as User
-    participant FE as React
-    participant API as FastAPI
-    participant ST as StorageBackend (LocalStorage)
-    participant MO as MongoDB
-
-    U->>FE: Drop file in upload modal
-    FE->>API: POST /api/files (multipart, folder_id) – progress via Axios onUploadProgress
-    API->>API: require_permission("file:upload")  (Guest → 403)
-    API->>MO: folder exists & belongs to user?
-    API->>MO: current usage (sum of size_bytes) vs quota
-    API->>API: read first 2 KB → magic-byte type detection + extension must match allow-list
-    loop stream in 1 MB chunks
-        API->>API: running size > 25 MB? → abort 413
-        API->>API: update SHA-256
-        API->>ST: write chunk to temp file
-    end
-    API->>ST: move temp file → storage/{user_id}/{uuid} (random name)
-    API->>MO: INSERT files {original_name, size, mime, sha256, owner_id, folder_id, storage_key, ...}
-    API->>MO: activity_logs ← file.upload
-    API-->>FE: 201 {file metadata}
-    FE->>FE: refresh list + toast "Uploaded"
-```
-
-Rejected cases return clear errors with a machine-readable code: **415** `UNSUPPORTED_FILE_TYPE`, **413** `FILE_TOO_LARGE`, **413** `QUOTA_EXCEEDED`, **409** `DUPLICATE_FILE` (the UI offers "keep both"). A rejected upload's temp file is deleted immediately.
-
-### 3.5 Google login (OAuth 2.0 Authorization Code flow)
+### 4.4 Google sign-in (OAuth 2.0 Authorization Code flow)
 
 ```mermaid
 sequenceDiagram
@@ -227,7 +247,7 @@ sequenceDiagram
     U->>GG: Sign in & consent
     GG-->>API: 302 /api/auth/google/callback?code&state
     API->>R: GETDEL oauth_state:{state} (must exist)
-    API->>GG: exchange code → ID token; verify signature, audience, email_verified
+    API->>GG: exchange code → ID token, verify signature, audience and email_verified
     API->>PG: find oauth_account(google, sub) → else user by email → else create user
     API->>R: create refresh session (same as normal login)
     API-->>U: 302 → frontend /auth/callback (refresh cookie set) → frontend calls /auth/refresh
@@ -237,125 +257,10 @@ If the linked account has MFA enabled, the callback redirects to the MFA step in
 
 Implementation notes: the authorization request also uses **PKCE** (S256; the code verifier is stored with the state in Redis), the ID token signature is checked against Google's published keys (`aud` = our client id, `iss` = Google), and errors (cancelled, expired state, unverified Google email, disabled account) redirect to `/login?oauth_error=…`.
 
-## 4. API surface (Milestone 1)
+### 4.5 Encrypted upload
 
-All routes are under `/api`. Interactive docs: `http://localhost:8000/docs`.
-
-| Method | Path | Permission | Purpose |
-|---|---|---|---|
-| GET | `/health` | public | Status of PostgreSQL, MongoDB, Redis |
-| POST | `/auth/register` | public | Create account, send verification email |
-| POST | `/auth/verify-email` | public | Confirm email with token |
-| POST | `/auth/verify-email/resend` | logged in | Send a new verification link (soft mode by default: unverified users can log in; `REQUIRE_EMAIL_VERIFICATION=true` blocks them) |
-| POST | `/auth/resend-verification` | public | Resend link (rate-limited) |
-| POST | `/auth/login` | public | Password login → tokens or MFA challenge |
-| POST | `/auth/mfa/verify` | public (challenge) | Second step with TOTP or backup code |
-| POST | `/auth/refresh` | refresh cookie | Rotate refresh token, new access token |
-| POST | `/auth/logout` | logged in | Revoke current session |
-| POST | `/auth/logout-all` | logged in | Revoke all sessions |
-| POST | `/auth/forgot-password` | public | Email reset link (always 202, same answer for unknown emails) |
-| POST | `/auth/reset-password` | public (token) | Set new password, revoke sessions |
-| GET | `/auth/google/login` · `/auth/google/callback` | public | Google OAuth |
-| GET | `/users/me` | logged in | Profile, role, permissions, storage usage |
-| PATCH | `/users/me` | logged in | Update name |
-| DELETE | `/users/me` | logged in (password / typed email + 2-step code) | Delete own account and all its files; 409 for the last admin |
-| GET | `/users/me/sessions` | logged in | Signed-in devices (browser, OS, IP, location, last active, current) |
-| DELETE | `/users/me/sessions/{id}` | logged in (own sessions) | Sign out one device |
-| POST | `/users/me/password` | logged in | Change password |
-| POST | `/users/me/mfa/setup` · `/mfa/enable` · `/mfa/disable` · `/mfa/backup-codes` | logged in | Manage TOTP |
-| GET | `/admin/users` | `user:read` | List/search users |
-| PATCH | `/admin/users/{id}` | `user:manage` | Change role, activate/deactivate (not yourself; never the last admin) |
-| POST | `/admin/users/{id}/unlock` | `user:manage` | Clear a login lockout early |
-| GET | `/folders` · POST `/folders` | `file:read` · `folder:manage` | List children / create |
-| PATCH · DELETE | `/folders/{id}` | `folder:manage` | Rename, move, trash |
-| GET | `/folders/{id}/breadcrumbs` | `file:read` | Path to root |
-| GET | `/files` | `file:read` | List with `folder_id, q, category, sort, order, page, trashed` |
-| POST | `/files` | `file:upload` | Upload (multipart) |
-| GET | `/files/{id}` · `/files/{id}/download` · `/files/{id}/preview` | `file:read` | Metadata / download / inline preview |
-| PATCH | `/files/{id}` | `file:update` | Rename, move |
-| POST | `/files/{id}/trash` · `/files/{id}/restore` | `file:update` | Soft delete / restore |
-| DELETE | `/files/{id}` | `file:delete` | Permanent delete |
-| GET | `/activity` | logged in (own) / `audit:read` (all) | Activity log |
-
-**Error format** (every error):
-```json
-{ "error": { "code": "FILE_TOO_LARGE", "message": "File exceeds the 25 MB limit.", "request_id": "b1f2…" } }
-```
-
-## 5. Security design (M1)
-
-| Threat | Control |
-|---|---|
-| Password database leak | bcrypt (cost 12, salted); passwords never logged. |
-| Token theft | Access token lives 15 min in memory only (not localStorage); refresh token in **HttpOnly, SameSite=Strict** cookie, rotated on each use, reuse → revoke all. |
-| Brute force / credential stuffing | Redis rate limit (e.g. 5 login attempts/min/IP), lockout after 5 failures, optional MFA. |
-| User enumeration | Same response for "email exists"/"doesn't exist" on register, login, forgot-password. |
-| Privilege escalation | Permission checked on **every** route via dependency; ownership checked in services; role cannot be set at registration. |
-| Malicious upload | Allow-list + magic-byte check, 25 MB limit enforced while streaming, random stored names, files never executed or served with their original Content-Type unless safe; `Content-Disposition: attachment` for downloads; previews only for PDF/images/TXT/CSV, text always sent as `text/plain`, with `Content-Security-Policy: sandbox`; `X-Content-Type-Options: nosniff`. |
-| Path traversal | Storage keys are server-generated UUIDs; user input never becomes a path. |
-| CSRF (OAuth) | Random `state` stored in Redis, single use. |
-| Secrets in code | `.env` (gitignored) loaded by pydantic-settings; `.env.example` documents keys. |
-| Tampering / snooping on disk **(M2)** | Chunked AES-256-GCM with a per-file key; keys wrapped by versioned master keys (envelope encryption); the private bucket holds only ciphertext – see [§8](#8-milestone-2--encryption-storage-and-sharing) and [key-management.md](key-management.md). |
-
-## 6. Deployment view (M1 – local)
-
-```mermaid
-flowchart TB
-    subgraph host["Developer laptop – docker compose"]
-        FE["frontend<br/>node:20 · Vite dev server :5173"]
-        BE["backend<br/>python:3.12-slim · Uvicorn :8000"]
-        PG[("postgres:16<br/>:5432 · volume pgdata")]
-        MO[("mongo:7<br/>:27017 · volume mongodata")]
-        RE[("redis:7<br/>:6379")]
-        VOL[["./storage volume"]]
-    end
-    FE --> BE
-    BE --> PG
-    BE --> MO
-    BE --> RE
-    BE --> VOL
-```
-
-All services have health checks; the backend waits for the databases to be healthy before starting. **(M4)** moves this to a cloud VM / AWS with NGINX + HTTPS.
-
-## 7. Mapping to the brief's reference architecture
-
-| Brief component | TrustShare implementation |
-|---|---|
-| Web App (React/Next.js) | React + Vite SPA |
-| Admin Dashboard | Admin pages in the same SPA, gated by permissions |
-| API Gateway: SSL, Auth, Validation, Rate limiting, Audit logging, Routing | FastAPI middleware + dependencies (NGINX/TLS added in M4) |
-| Auth Service | `AuthService`, `MfaService`, `OAuthService` |
-| File Service | `FileService`, `FolderService`, `StorageBackend` |
-| Encryption Service | **M2** – `EncryptionService` + `Keyring` (chunked AES-256-GCM, envelope keys, rotation), `S3Storage` |
-| Sharing Service | **M2** – `ShareService`: link + direct shares in PostgreSQL (hashed tokens, permission, expiry, revocation, limits) |
-| Notification Service | Email (M1: verification/reset) → **M3** `notifications` module: in-app (live via SSE) + email alerts, expiry reminders (§9) |
-| Analytics Service | **M3** – `reports` + `analytics` modules: aggregations over MongoDB files/activity logs and PostgreSQL users/shares (§9) |
-| Data layer: PostgreSQL, MongoDB, Redis, encrypted storage, audit logs | As in §1 (activity feed = MongoDB `activity_logs`; since M3 the tamper-evident audit trail = MongoDB `audit_logs`) |
-| Infrastructure: Docker, CI/CD (GitHub Actions), AWS | Docker Compose + GitHub Actions now; cloud in M4 |
-| Message queue, Kubernetes, SIEM/IDS, ML anomaly detection, mobile/desktop clients, FCM, Captcha | **Future scope** (see requirements §8) |
-
----
-
-## 8. Milestone 2 – Encryption, storage and sharing
-
-Requirements: Milestone 2 brief (AES-256 encryption, cloud storage, encrypted retrieval, secure sharing,
-access permissions, link expiry, key management, secure decryption) plus the mentor's dashboards
-(user File Analytics, admin Security Dashboard, user Security page). Key details:
-[key-management.md](key-management.md).
-
-### 8.1 Components added
-
-| Component | Responsibility |
-|---|---|
-| `EncryptionService` | Chunked AES-256-GCM encrypt/decrypt of file streams; generates one DEK per file. |
-| `Keyring` | Versioned master keys (KEKs) from the environment; wraps/unwraps DEKs. The only code that sees KEKs. |
-| `S3Storage` (`StorageBackend`) | Upload/download/delete objects in a **private** bucket via the S3 API (boto3). RustFS locally, AWS S3 in the cloud. |
-| `ShareService` | Link shares (hashed token) and direct shares (registered recipient); permission, expiry, revocation, download limit. |
-| `AnalyticsService` | Date-range aggregations over activity logs and file metadata (user File Analytics, admin dashboards). |
-| `SecurityEventService` | Records security events with severity (failed/locked logins, unauthorized and blocked requests, tampering, suspicious downloads). |
-
-### 8.2 Encrypted upload
+Validation (permission `file:upload`, type allow-list, magic bytes and Office structure, 25 MB
+streamed limit, quota, SHA-256) happens before encryption.
 
 ```mermaid
 sequenceDiagram
@@ -368,7 +273,7 @@ sequenceDiagram
     participant MO as MongoDB
 
     U->>API: POST /api/files (multipart, JWT)
-    API->>API: Permission file:upload, type allow-list, size, quota, magic bytes, SHA-256 (as in M1)
+    API->>API: Permission file:upload, type allow-list, size, quota, magic bytes, SHA-256
     API->>ENC: new random DEK (256-bit)
     ENC->>ENC: encrypt 1 MiB chunks with AES-256-GCM (nonce = prefix + counter + last flag, AAD = file id + index)
     API->>S3: PUT encrypted object (private bucket, random key)
@@ -381,7 +286,9 @@ sequenceDiagram
 
 The plaintext never reaches object storage; the raw DEK never leaves backend memory.
 
-### 8.3 Encrypted download / preview
+Rejected cases return clear errors with a machine-readable code: **415** `UNSUPPORTED_FILE_TYPE`, **413** `FILE_TOO_LARGE`, **413** `QUOTA_EXCEEDED`, **409** `DUPLICATE_FILE` (the UI offers "keep both"). A rejected upload's temp file is deleted immediately.
+
+### 4.6 Encrypted download and preview
 
 ```mermaid
 sequenceDiagram
@@ -405,7 +312,7 @@ sequenceDiagram
     API->>MO: activity_logs: file.download {via: owner | direct_share | link}
 ```
 
-### 8.4 Share links and direct sharing
+### 4.7 Sharing
 
 ```mermaid
 sequenceDiagram
@@ -444,58 +351,21 @@ sequenceDiagram
 
 Link tokens: 256-bit random (`secrets.token_urlsafe(32)`), only the SHA-256 is stored, the full link is shown once; request logs print `/api/s/***`; the share page sets `Referrer-Policy: no-referrer`; public endpoints are rate-limited per IP (`SHARE_LINK_RATE_LIMIT_PER_MINUTE`). Download limits are counted with one atomic `UPDATE … WHERE download_count < max_downloads`, so two visitors can't both take the last download. Links must expire within `SHARE_LINK_MAX_DAYS` (30); direct shares may have no expiry.
 
-### 8.5 Key rotation
+Edits (`PATCH /api/shares/{id}`) keep the same link; optional link passwords are bcrypt-hashed and
+sent in the `X-Share-Password` header; every open, view, download and refused attempt is recorded
+for the share's access history.
+
+### 4.8 Key rotation
 
 Admin adds master key `v(n+1)` → sets it active → runs `rotate_keys` → every `file_keys` row on an older
 version is unwrapped and re-wrapped with the new key (batches, idempotent) → old KEK removed when unused.
 Files are never re-encrypted; downloads keep working during rotation.
 
-### 8.6 Dashboards (mentor's additions)
+Details: [key-management.md](key-management.md).
 
-- **User:** new sidebar (Dashboard, My Files, Shared with Me, Shared by Me, Recent, Favorites, Trash,
-  Storage, File Analytics, Activity Logs, Security, Settings); File Analytics with summary cards, storage by
-  type, uploads/downloads/sharing over time, recent uploads/downloads and a date range; a Security page
-  describing the active protections.
-- **Admin:** separate admin panel with a **Security Dashboard** – login metrics and charts, unauthorized
-  and blocked attempts, security events by severity and type, recent logins with IP and location, audit
-  log. Every admin endpoint requires the `audit:read` / `user:read` permissions on the **backend**; the
-  hidden menu is only a convenience.
+## 5. Monitoring, notifications and detection
 
-### 8.7 API surface added in Milestone 2
-
-| Method | Endpoint | Permission | Purpose |
-|---|---|---|---|
-| POST | `/files/{id}/shares` | `share:create` + owner | Create a link or direct share |
-| GET | `/files/{id}/shares` | owner | List a file's shares with status |
-| GET | `/shares/sent` · `/shares/received` | logged in | "Shared by Me" / "Shared with Me" |
-| DELETE | `/shares/{share_id}` | owner | Revoke |
-| GET | `/shares/{share_id}/preview` · `/shares/{share_id}/download` | recipient | Open a file shared with me |
-| GET | `/s/{token}` · `/s/{token}/preview` · `/s/{token}/download` | public (token) | Link visitor access |
-| PUT/DELETE | `/files/{id}/favorite` · GET `/files/favorites` | owner | Favorites (star own files) |
-| GET | `/files/recent` · `/files/storage` | logged in | Recent (from my activity) · Storage breakdown |
-| GET | `/activity/me?group=auth\|files\|sharing` | logged in | My own activity log |
-| GET | `/analytics/me?from&to&tz` | logged in | User File Analytics (days in the user's time zone; each metric vs the previous period of equal length) |
-| GET | `/admin/security/overview?from&to&tz` | `audit:read` | Security Dashboard: metrics vs previous period, logins/day, unauthorized & blocked/day, events by type, recent logins (IP + location), recent events |
-| GET | `/admin/security/logins?status` · `/admin/security/events?severity&type` | `audit:read` | Full login history · security events |
-| GET | `/admin/audit?q&group&status` | `audit:read` | Audit log of every user (search by email, action or IP) |
-| GET | `/admin/audit/export?q&group&status` | `audit:read` | Same as CSV (max 10,000 rows; cells starting with = + - @ are neutralised; the export is logged and raises an `admin_action` event) |
-| GET | `/admin/overview` | `user:read` | Admin Dashboard: users, storage per account (sizes only), sharing, activity/day, key versions, events (7 days) |
-
-### 8.8 Deployment view (Milestone 2 – local)
-
-`docker compose` gains a **`rustfs`** service (RustFS – open-source S3-compatible object storage, private bucket
-created on start, console on :9001/rustfs/console/). Leaving `S3_ENDPOINT_URL` empty and putting real AWS credentials in `.env`
-switches the same code to **AWS S3**; `STORAGE_PROVIDER=azure` plus a connection string uses **Azure Blob Storage**
-instead (`app/storage/azure_blob.py`, same five operations behind the `ObjectStorage` interface, tested against Azurite in CI). HTTPS locally is provided by a **Caddy** reverse proxy at `https://localhost:8443`
-(`caddy/Caddyfile`: TLS 1.3 with Caddy's local CA, HTTP/2 + HTTP/3, `/api/*` → backend, rest → frontend).
-Uvicorn runs with `--proxy-headers --forwarded-allow-ips 172.16.0.0/12`, so the client IP used by logs and
-rate limits comes from `X-Forwarded-For` – trusted only from proxies inside the Docker network.
-
----
-
-## 9. Milestone 3 – Monitoring, notifications & analytics
-
-### 9.1 Modules (named like the brief)
+### 5.1 Modules
 
 | Module | Responsibility |
 |---|---|
@@ -509,7 +379,7 @@ rate limits comes from `X-Forwarded-For` – trusted only from proxies inside th
 M1/M2 code stays layered (routes → services → repositories); `ActivityService.log` now simply delegates to
 `record_activity`, so every existing call site feeds monitoring, audit, detection and notifications.
 
-### 9.2 Event flow
+### 5.2 Event flow
 
 ```mermaid
 flowchart LR
@@ -528,7 +398,7 @@ flowchart LR
     S --> R
 ```
 
-### 9.3 Design decisions
+### 5.3 Design decisions
 
 - **Tamper-evident audit log.** `hash = SHA-256(prev_hash + canonical entry)`; a unique index on `seq` makes
   concurrent writers retry instead of forking the chain. `GET /api/audit-logs/verify` re-computes every hash and
@@ -549,9 +419,74 @@ flowchart LR
 - **Storage of file metadata.** The brief assumes file metadata in PostgreSQL; TrustShare keeps it in MongoDB
   (Milestone 1 requirement), so analytics read MongoDB `files`/`vault_files` and PostgreSQL `users`/`shares`.
 
-### 9.4 Unified admin dashboard
+### 5.4 Admin console
 
-Overview · **Monitoring** (User activity with live feed, Audit logs with integrity banner, Security monitoring,
-Suspicious activity alerts) · **Reports & analytics** (File activity reports, Storage analytics) ·
-**Management** (Users, Notifications, System). Users get a notification bell (live), a notifications page and
-Settings → Notifications (email per type).
+Overview · **Monitoring** (user activity with live feed, audit logs with integrity banner, security
+monitoring, suspicious-activity alerts) · **Reports & analytics** (file activity reports, storage
+analytics) · **Management** (users, notifications, system). Every admin endpoint requires
+`audit:read` or `user:read` / `user:manage` on the backend; the hidden menu is only a convenience.
+
+## 6. Security design
+
+| Threat | Control |
+|---|---|
+| Storage or database leak | Files encrypted with AES-256-GCM, one key per file; keys stored only wrapped by master keys kept outside the databases; vault files sealed again with a key from the vault password |
+| Tampered files | Authenticated encryption per chunk; any changed, missing or reordered chunk stops the download and raises a security event |
+| Tampered logs | Audit entries hash-chained (SHA-256); verification names the first broken entry |
+| Password database leak | bcrypt (cost 12, salted); passwords never logged |
+| Token theft | Access token 15 min, in memory only; refresh token HttpOnly + SameSite cookie, rotated on every use, reuse ends every session; per-device sign-out takes effect immediately |
+| Brute force / credential stuffing | Per-IP rate limits, lockout after 5 failures, two-step verification, brute-force detection alerting admins |
+| Account enumeration | Same answer for existing and unknown emails on registration, sign-in and password reset |
+| Privilege escalation | Permission checked on every route; ownership checked in services; other users' files answer `404`; role can't be chosen at registration; admins have no file permission over other users |
+| Link guessing or leaks | 256-bit random tokens stored only as hashes and masked in logs; expiry, download limits, optional password, instant revoke; every access re-checked |
+| Malicious uploads | Allow-list + magic-byte and Office-structure check, streamed size limit, random stored names; downloads as attachments; previews only for safe types, sandboxed |
+| Interception | TLS 1.3 through Caddy |
+| Cached sensitive responses | `Cache-Control: no-store` on every API response |
+| Clickjacking / MIME sniffing | `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` |
+| CSRF on OAuth | Random `state` (single use) + PKCE |
+| Secrets in code | `.env` (gitignored), `.env.example` documents every key |
+
+## 7. Deployment view
+
+Local development and the current setup: one `docker compose` project with **7 services**.
+
+```mermaid
+flowchart TB
+    subgraph host["docker compose"]
+        CA["caddy<br/>:8443 HTTPS"]
+        FE["frontend<br/>Vite :5173"]
+        BE["backend<br/>python:3.12-slim · Uvicorn :8000"]
+        PG[("postgres:16")]
+        MO[("mongo:7")]
+        RE[("redis:7")]
+        RF[["rustfs<br/>S3-compatible, local"]]
+    end
+    AZ[["Azure Blob Storage<br/>(STORAGE_PROVIDER=azure)"]]
+    CA --> FE
+    CA --> BE
+    BE --> PG
+    BE --> MO
+    BE --> RE
+    BE --> RF
+    BE -.-> AZ
+```
+
+All services have health checks; the backend waits for the databases and runs migrations on start.
+Uvicorn trusts `X-Forwarded-For` only from proxies inside the Docker network, so logs and rate
+limits see the visitor's real IP. Cloud deployment is part of Milestone 4.
+
+## 8. Mapping to the brief's reference architecture
+
+| Brief component | TrustShare |
+|---|---|
+| Web app (React / Next.js), admin dashboard | React + Vite SPA with a separate admin console |
+| API gateway: SSL termination, routing | Caddy |
+| Gateway: authentication, validation, rate limiting, audit logging | FastAPI dependencies and middleware |
+| Auth, file, encryption, sharing, notification, analytics services | Backend modules (sections 2 and 5) |
+| Message queue / event bus | Redis pub/sub and an in-process scheduler |
+| PostgreSQL, MongoDB, Redis, encrypted storage, audit logs | As in section 1 |
+| Docker, CI/CD | Docker Compose, GitHub Actions |
+| AWS / Azure | Azure Blob Storage for files; cloud hosting in Milestone 4 |
+| Kubernetes, SIEM / IDS, ML anomaly detection, mobile / desktop apps, FCM, captcha | Future work |
+
+Item-by-item coverage: [brief-coverage.md](brief-coverage.md).

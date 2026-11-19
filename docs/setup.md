@@ -1,6 +1,7 @@
 # TrustShare – Setup and Configuration
 
 How to run TrustShare locally, configure storage and email, create accounts, and run the tests.
+For the production server see the [deployment guide](deployment.md).
 
 ## Prerequisites
 

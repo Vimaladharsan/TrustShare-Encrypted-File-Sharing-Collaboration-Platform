@@ -89,7 +89,7 @@ New code lives in feature modules named like the brief: `activity_monitoring/`, 
 - **Storage analytics:** total and per-user storage (incl. vaults and trash), file, download and sharing statistics with the brief's charts (storage-by-user pie, uploads by date, downloads, sharing)
 - **Unified admin dashboard:** User activity · Audit logs · Security monitoring · Suspicious activity alerts · File activity reports · Storage analytics · Notification management · Users · System – in a separate **dark operations console** with its own violet/amber look, so admin mode is never confused with the user workspace
 - **Privacy kept:** admins see file IDs, types and sizes in every report, log and alert – never file names (owners still see their own)
-- **Screenshots** of every module: [`screenshots/m3/`](screenshots/m3/) (demo data, personal addresses masked)
+- **Screenshots** of every screen: [user guide](user-guide.md) and [`screenshots/`](screenshots/) (demo data, personal details masked)
 
 ## 10. Platform
 - **HTTPS** through a Caddy reverse proxy (TLS 1.3) at https://localhost:8443; real client IPs via trusted proxy headers
