@@ -16,7 +16,7 @@ in `postman/`.
 
 | # | Brief outcome | Status | Where / evidence |
 |---|---|---|---|
-| i | Developed and deployed a secure file-sharing and document management platform | ✅ developed · 🔄 deployed | Runs with Docker Compose; cloud deployment is Milestone 4 |
+| i | Developed and deployed a secure file-sharing and document management platform | ✅ | Live at https://trustshare-vimal.centralindia.cloudapp.azure.com – [deployment guide](deployment.md) |
 | ii | Authentication and role-based access control | ✅ | [Module 1](#module-1--user-authentication), [permission matrix](requirements.md) |
 | iii | Secure file upload and encrypted storage workflows | ✅ | [Module 2](#module-2--file-management), [Module 4](#module-4--encryption--security) |
 | iv | Secure sharing and temporary access management | ✅ | [Module 3](#module-3--secure-sharing) |
@@ -24,7 +24,7 @@ in `postman/`.
 | vi | Notification and security alert systems | ✅ | [Module 6](#module-6--notifications) |
 | vii | Analytics dashboards for storage usage and activity monitoring | ✅ | [Module 7](#module-7--analytics-dashboards) |
 | viii | Server-side AES-256 encryption and secure key management | ✅ | [key-management.md](key-management.md) |
-| ix | Deployed using Docker and AWS or Azure | ✅ Docker · ✅ Azure Blob Storage for files · 🔄 cloud hosting of the app | Milestone 4 |
+| ix | Deployed using Docker and AWS or Azure | ✅ | Docker Compose on an Azure VM, HTTPS by Caddy + Let's Encrypt, files in Azure Blob Storage – [deployment guide](deployment.md) |
 
 ---
 
@@ -158,7 +158,7 @@ Admins see file IDs, types and sizes only – never file names or contents.
 | Docker | ✅ | Docker Compose, 7 services |
 | CI/CD pipeline (GitHub Actions) | ✅ | Lint, migrations, tests, frontend build on every push |
 | NGINX web server | ➖ | Caddy (automatic TLS) |
-| AWS / Azure cloud | ✅ storage · 🔄 hosting | Milestone 4 |
+| AWS / Azure cloud | ✅ | Azure VM (app) + Azure Blob Storage (files) |
 | Kubernetes, Prometheus + Grafana | ⛔ | Future work |
 | SIEM, IDS/IPS, ML anomaly detection | ⛔ | Future work; rule-based detection is used |
 
@@ -171,7 +171,7 @@ Admins see file IDs, types and sizes only – never file names or contents.
 | **1** – Initialization, design, core setup | Objectives, architecture, database schema, wireframes, frontend + backend setup, PostgreSQL / MongoDB / Redis, authentication + RBAC, secure upload, file dashboard | ✅ (tag `v0.1-milestone1`) |
 | **2** – Encryption & secure sharing | AES-256 encryption, cloud storage, encrypted retrieval, sharing, access control, link expiration, key management, secure decryption | ✅ (tag `v0.2-milestone2`) |
 | **3** – Monitoring, notifications & analytics | Activity monitoring, audit logging, notifications and alerts, reports, storage analytics, suspicious-activity detection | ✅ |
-| **4** – Testing, deployment & documentation | Security testing, UI responsiveness, Docker + cloud deployment, production infrastructure, final documentation, final demo | 🔄 documentation in progress |
+| **4** – Testing, deployment & documentation | Security testing, UI responsiveness, Docker + cloud deployment, production infrastructure, final documentation, final demo | 🔄 documentation ✅ · deployment ✅ · security testing next |
 
 ## 5. Tools & tech stack
 
@@ -181,7 +181,7 @@ Admins see file IDs, types and sizes only – never file names or contents.
 | React.js / Next.js, Tailwind CSS, Axios, JWT | ✅ React (Vite), Tailwind CSS, Axios, JWT |
 | PostgreSQL, MongoDB, Redis | ✅ |
 | JWT, OAuth2, AES-256, bcrypt, HTTPS/TLS, secure token generation | ✅ |
-| AWS S3 / Azure Blob Storage, Docker, AWS / Azure | ✅ Azure Blob + S3 API, Docker · 🔄 cloud hosting |
+| AWS S3 / Azure Blob Storage, Docker, AWS / Azure | ✅ Azure Blob + S3 API, Docker, Azure VM |
 | VS Code, Git + GitHub, Docker Compose, Postman, monitoring & logging | ✅ (structured request logs, health checks, admin system page) |
 
 ## 6. Performance metrics

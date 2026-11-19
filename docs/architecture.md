@@ -473,7 +473,8 @@ flowchart TB
 
 All services have health checks; the backend waits for the databases and runs migrations on start.
 Uvicorn trusts `X-Forwarded-For` only from proxies inside the Docker network, so logs and rate
-limits see the visitor's real IP. Cloud deployment is part of Milestone 4.
+limits see the visitor's real IP. Production runs the same stack with `docker-compose.prod.yml` on an Azure VM –
+see the [deployment guide](deployment.md).
 
 ## 8. Mapping to the brief's reference architecture
 

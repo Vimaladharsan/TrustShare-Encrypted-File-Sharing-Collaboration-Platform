@@ -5,6 +5,8 @@ share them through expiring, permission-controlled links – every file is encry
 with its own AES-256 key, every action is recorded in a tamper-evident audit log, and suspicious
 behaviour raises alerts in real time.
 
+**Live:** [trustshare-vimal.centralindia.cloudapp.azure.com](https://trustshare-vimal.centralindia.cloudapp.azure.com) – running on Azure with Docker and HTTPS.
+
 ![CI](https://github.com/Vimaladharsan/TrustShare-Encrypted-File-Sharing-Collaboration-Platform/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.12-blue)
@@ -143,7 +145,7 @@ postman/     API test collections
 | 1 | Design, setup, authentication, RBAC, MFA, secure upload, file dashboard | ✅ Complete |
 | 2 | AES-256 encryption, cloud storage, secure sharing, key management, dashboards, HTTPS | ✅ Complete |
 | 3 | Activity monitoring, audit logs, notifications, alerts, reports, analytics, threat detection | ✅ Complete |
-| 4 | Security testing, cloud deployment, final documentation, demo | 🔄 In progress |
+| 4 | Security testing, cloud deployment, final documentation, demo | 🔄 Deployed and documented; security testing next |
 
 > **Security note:** never commit `.env` files or secrets – `.env.example` lists every setting
 > with placeholder values.

@@ -8,6 +8,7 @@ stored in Azure Blob Storage.
   and the account has no credit card, so nothing can be charged; the small remaining costs (public
   IP, blob storage) come out of the free credit.
 - **Time:** about 45 minutes the first time.
+- **Live instance:** https://trustshare-vimal.centralindia.cloudapp.azure.com (Azure, Central India, B2ats v2 – deployed 19 Nov 2026).
 
 ## Contents
 
@@ -228,7 +229,7 @@ All commands run in `~/trustshare` on the VM.
 | Status | `docker compose -f docker-compose.prod.yml ps` |
 | Logs | `docker compose -f docker-compose.prod.yml logs -f backend` (or `web`, `mongo` …) |
 | Memory | `free -h` and `docker stats --no-stream` |
-| Update to the latest code | `git pull && docker compose -f docker-compose.prod.yml up -d --build` |
+| Update to the latest code | `git pull && docker compose -f docker-compose.prod.yml up -d --build` (if git reports local changes, run `git checkout -- .` first – `.env` is not affected) |
 | Restart | `docker compose -f docker-compose.prod.yml restart` |
 | Stop (data kept) | `docker compose -f docker-compose.prod.yml down` |
 
@@ -259,6 +260,7 @@ the Azure container **and** the `.env` with the master keys.
 |---|---|
 | No certificate / browser warning on the real domain | `docker compose -f docker-compose.prod.yml logs web`. Ports 80 and 443 must be open in the VM's networking rules, and `DOMAIN` must match the DNS name exactly |
 | `502 Bad Gateway` right after starting | The backend is still applying migrations – wait a minute; then check `logs backend` |
+| Build fails with `Read timed out` from pypi.org | A temporary network hiccup; the image already waits 120 s and retries 10 times – run the same `up -d --build` again |
 | Build stops with "killed" / out of memory | Check swap is on (`free -h`); build again |
 | Site slow, containers restarting | `docker stats --no-stream`; set `WEB_WORKERS=1` (default) or resize the VM to **B1ms** (2 GB – uses more credit) |
 | Google sign-in error `redirect_uri_mismatch` | The URI in Google Cloud Console must equal `GOOGLE_REDIRECT_URI` exactly, with `https://` |
@@ -284,3 +286,9 @@ compose file and Caddyfile on every push.
 redirect, security headers present, only ports 80/443 published, browser sweep of every page with no
 Content-Security-Policy violations, PDF preview, live notification stream, idle memory of the whole
 stack ≈ 580 MB with two backend workers (production uses one on a 1 GB VM).
+
+**Verified live after deployment (19 Nov 2026):** health `ok` for every service, a trusted Let's Encrypt
+certificate (auto-renewing), HTTP → HTTPS redirect, security headers present, ports 5432 / 27017 / 6379 /
+8000 closed from the internet, Google sign-in redirecting to the production callback, and the browser
+sweep of every user page (upload, preview, download, rename, favorites, share link, drag and drop,
+folders, trash and restore, dark mode, notifications, phone width) passing on the live site.
